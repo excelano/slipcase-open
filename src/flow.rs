@@ -132,8 +132,22 @@ pub fn open(
     let mark = match extract::extract(&mut container, &session) {
         Ok(m) => m,
         Err(e) => {
+            let payload = session.payload_path();
             let _ = session.clone().remove();
-            return Err(Error::Extract(e));
+            // `extract` reports whether *it* managed to take the ungated
+            // payload back off disk, and then this removes the whole session
+            // directory, which usually succeeds where the single unlink did
+            // not. Left alone, the message tells somebody there is an ungated
+            // executable on disk after the file has gone. Re-asked of the
+            // filesystem, after the cleanup, so the sentence is true when it is
+            // printed.
+            return Err(Error::Extract(match e {
+                extract::Error::Unmarked { cause, .. } => extract::Error::Unmarked {
+                    cause,
+                    payload_removed: !payload.exists(),
+                },
+                other => other,
+            }));
         }
     };
 
@@ -249,26 +263,43 @@ impl Opened {
             return Ok(false);
         }
         self.saw_payload_change = true;
+        self.save_if_changed()
+    }
 
-        // **Asked of the bytes rather than of the events.** One save arrives as
-        // several events — a temporary sibling, a rename, a metadata touch —
-        // and they do not reliably land in one drain, so counting events makes
-        // the number of repacks a function of how busy the machine is. A quiet
-        // period before repacking would trade that for latency on every save
-        // and still only make the guess better.
-        //
-        // The question is whether the payload differs from what the container
-        // holds, and `recover` answers exactly that by comparing against the
-        // CRC-32 the container already records (concept 6.3). So a redundant
-        // event costs one comparison instead of one rebuild, and the
-        // write-backs a session performs become a property of the edits rather
-        // than of the event storm.
-        if !matches!(recover::state(&self.session), recover::State::Edited) {
-            return Ok(false);
+    /// Write the payload back, unless it already matches what the container
+    /// holds.
+    ///
+    /// **Asked of the bytes rather than of the events.** One save arrives as
+    /// several events — a temporary sibling, a rename, a metadata touch — and
+    /// they do not reliably land in one drain, so counting events makes the
+    /// number of repacks a function of how busy the machine is. A quiet period
+    /// before repacking would trade that for latency on every save and still
+    /// only make the guess better. `recover` answers the real question by
+    /// comparing against the CRC-32 the container already records (concept
+    /// 6.3), so a redundant event costs one comparison instead of one rebuild.
+    ///
+    /// **Only the two quiet states are silent.** An earlier version returned
+    /// *nothing to do* for every state that was not `Edited`, which meant a
+    /// container deleted or replaced underneath a live session stopped it
+    /// saving without saying anything — the user edits, nothing is written, and
+    /// no error appears. Those states go to the write-back to be refused and
+    /// reported, which is where the refusal belongs anyway.
+    ///
+    /// # Errors
+    ///
+    /// Where the write-back failed, or cannot be attempted at all.
+    pub fn save_if_changed(&mut self) -> Result<bool, writeback::Error> {
+        match recover::state(&self.session) {
+            // Nothing to write, and nothing wrong.
+            recover::State::Unchanged | recover::State::NothingExtracted => Ok(false),
+            // `Edited`, and every state that means this session can no longer
+            // reach its container. `write_back` refuses the ones it must and
+            // names the reason.
+            _ => {
+                writeback::write_back(&mut self.session)?;
+                Ok(true)
+            }
         }
-
-        writeback::write_back(&mut self.session)?;
-        Ok(true)
     }
 
     /// Wait up to `within` for something to happen, then [`pump`](Self::pump).
@@ -281,26 +312,23 @@ impl Opened {
         self.pump_including(first)
     }
 
-    /// Close the session: a final write-back where asked, then clean up.
+    /// Close the session: catch up on the watch, then clean up.
     ///
-    /// `write_back` is the caller's answer to concept 6.2's question. Where the
-    /// session saw no change, asking is the only available answer to Save As —
-    /// no event fires when somebody saves to a different location, so a session
-    /// that saw nothing may still have an edit that belongs in the container.
-    /// Asking is not detection and must not be reported as though it were.
+    /// Concept 6.2's question — *write it back anyway?* — is the caller's, and
+    /// so is the answer: it asks, and calls
+    /// [`save_if_changed`](Self::save_if_changed) if the answer is yes. This
+    /// used to take a `bool` and repack unconditionally on it, which rebuilt
+    /// the container even when the payload matched it byte for byte, and
+    /// rebuilt it twice when the final pump had just done so.
     ///
     /// # Errors
     ///
-    /// Where the final write-back failed, in which case nothing is removed and
-    /// the session stays recoverable.
-    pub fn close(mut self, write_back: bool) -> Result<Closed, writeback::Error> {
-        // Anything the watch has not been asked about yet, first. A save
-        // arriving between the last pump and the close is a save.
+    /// Where the final catch-up write-back failed, in which case nothing is
+    /// removed and the session stays recoverable.
+    pub fn close(mut self) -> Result<Closed, writeback::Error> {
+        // Anything the watch has not been asked about yet. A save arriving
+        // between the last pump and the close is a save.
         self.pump()?;
-
-        if write_back {
-            writeback::write_back(&mut self.session)?;
-        }
 
         // Concept 6.2. The close is honoured either way; what changes is
         // whether the directory goes now or is handed to recovery, so that an
@@ -321,6 +349,7 @@ mod tests {
     use super::{open, Closed, Error};
     use crate::platform::testing::Recording;
     use crate::policy::{Layer, Origin, Source};
+    use crate::writeback;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::time::Duration;
@@ -527,10 +556,11 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
         let launcher = Recording::default();
 
-        let o = open(&root, &c, &Default_, &launcher).unwrap();
+        let mut o = open(&root, &c, &Default_, &launcher).unwrap();
         fs::write(o.payload_path(), b"edited quietly").unwrap();
         // Deliberately not pumped: this is the path where nothing was seen.
-        assert_eq!(o.close(true).unwrap(), Closed::Cleared);
+        assert!(o.save_if_changed().unwrap());
+        assert_eq!(o.close().unwrap(), Closed::Cleared);
 
         let mut back = slpc::Container::open(&c).unwrap();
         let mut got = Vec::new();
@@ -557,13 +587,93 @@ mod tests {
         let payload = o.payload_path();
         fs::write(payload.with_file_name("~$report.pdf"), b"").unwrap();
 
-        assert_eq!(o.close(false).unwrap(), Closed::LeftForRecovery);
+        assert_eq!(o.close().unwrap(), Closed::LeftForRecovery);
 
         let left = crate::session::scan(&root).unwrap();
         assert_eq!(left.len(), 1);
         // Still there for the editor's next save to land in, which is the whole
         // point of not deleting it.
         assert!(payload.is_file());
+    }
+
+    #[test]
+    fn a_container_deleted_under_a_live_session_is_reported_rather_than_ignored() {
+        // Found in review, and it was a regression: once `pump` compared bytes,
+        // every state that was not `Edited` returned *nothing to do*, so a
+        // container removed underneath a session stopped it saving and said
+        // nothing at all. The person keeps editing and no error ever appears.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let mut o = open(&root, &c, &Default_, &Recording::default()).unwrap();
+
+        fs::write(o.payload_path(), b"edited").unwrap();
+        fs::remove_file(&c).unwrap();
+
+        assert!(matches!(
+            o.save_if_changed(),
+            Err(writeback::Error::Container(_))
+        ));
+    }
+
+    #[test]
+    fn a_different_container_at_the_recorded_path_refuses_the_write_back() {
+        // The guard belongs on the acting side and not only in `recover`:
+        // repacking here would rename the payload of a container this session
+        // was never opened against.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let mut o = open(&root, &c, &Default_, &Recording::default()).unwrap();
+
+        fs::write(o.payload_path(), b"edited").unwrap();
+        let other = container(tmp.path(), "plan.dwg", b"unrelated");
+        fs::rename(&other, &c).unwrap();
+
+        match o.save_if_changed() {
+            Err(writeback::Error::ContainerChanged { recorded, found }) => {
+                assert_eq!(recorded, "report.pdf");
+                assert_eq!(found, "plan.dwg");
+            }
+            other => panic!("{other:?}"),
+        }
+        // Untouched: still the other container, still its own payload name.
+        assert_eq!(
+            slpc::Container::open(&c).unwrap().payload_name(),
+            "plan.dwg"
+        );
+    }
+
+    #[test]
+    fn saying_yes_to_an_unchanged_payload_rebuilds_nothing() {
+        // `close` used to take the answer as a `bool` and repack on it without
+        // asking whether anything had changed. That signature is gone, so this
+        // cannot be made to fail by reverting the fix the way the two above
+        // can; it pins the behaviour rather than the defect. What it is worth
+        // is that rewriting the only copy of a container is not a free
+        // operation, and answering *yes* to a question about a payload nobody
+        // edited should cost nothing.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let mut o = open(&root, &c, &Default_, &Recording::default()).unwrap();
+
+        assert!(!o.save_if_changed().unwrap());
+        assert_eq!(o.session().record().write_backs, 0);
+    }
+
+    #[test]
+    fn an_edit_is_written_back_once_however_many_times_it_is_asked_for() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let mut o = open(&root, &c, &Default_, &Recording::default()).unwrap();
+
+        fs::write(o.payload_path(), b"edited").unwrap();
+        assert!(o.save_if_changed().unwrap());
+        assert!(!o.save_if_changed().unwrap());
+        assert!(!o.save_if_changed().unwrap());
+        assert_eq!(o.session().record().write_backs, 1);
     }
 
     #[test]
@@ -574,7 +684,7 @@ mod tests {
         let launcher = Recording::default();
 
         let o = open(&root, &c, &Default_, &launcher).unwrap();
-        assert_eq!(o.close(false).unwrap(), Closed::Cleared);
+        assert_eq!(o.close().unwrap(), Closed::Cleared);
         assert!(crate::session::scan(&root).unwrap().is_empty());
     }
 }

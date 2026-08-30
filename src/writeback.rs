@@ -51,6 +51,19 @@ pub enum Error {
     /// recorded it. Concept 6.4: a container may move or go while a session
     /// runs, and this is not a failure of the edit.
     Container(std::io::Error),
+    /// The file at the recorded path is not the container this session was
+    /// opened against — its payload goes by another name. Writing back would
+    /// rename the payload of a container somebody else may be holding, so it
+    /// refuses. Concept 6.3 asks the same question on the recovery side; this
+    /// is the guard on the acting side, and it belongs here because it is a
+    /// safety property of the write-back rather than an optimisation in
+    /// whatever called it.
+    ContainerChanged {
+        /// What the session recorded.
+        recorded: String,
+        /// What the file at that path says now.
+        found: String,
+    },
     /// The repack itself failed. Nothing was replaced.
     Repack(slpc::Error),
     /// What the repack produced was not a conformant container, so it was not
@@ -68,6 +81,11 @@ impl fmt::Display for Error {
         match self {
             Self::Payload(e) => write!(f, "the edited payload could not be read: {e}"),
             Self::Container(e) => write!(f, "the container could not be opened: {e}"),
+            Self::ContainerChanged { recorded, found } => write!(
+                f,
+                "the container now holds {found} rather than {recorded}, so this is not the \
+                 container this session was opened against. Nothing was changed."
+            ),
             Self::Repack(e) => write!(f, "the container could not be rebuilt: {e}"),
             Self::WouldNotBeConformant(v) => write!(
                 f,
@@ -97,6 +115,25 @@ pub fn write_back(session: &mut Session) -> Result<(), Error> {
     let payload_path = session.payload_path();
 
     let edited = File::open(&payload_path).map_err(Error::Payload)?;
+
+    // Asked before anything is written. A different container at the recorded
+    // path is not a container to repack into: the payload would be renamed to
+    // this session's `payload.file`, which is a change nobody asked for made to
+    // a file this session was never opened against.
+    let found = slpc::Container::open(&container)
+        .map_err(|e| match e {
+            slpc::Error::Io(e) => Error::Container(e),
+            other => Error::Repack(other),
+        })?
+        .payload_name()
+        .to_string();
+    if found != session.record().payload {
+        return Err(Error::ContainerChanged {
+            recorded: session.record().payload.clone(),
+            found,
+        });
+    }
+
     let source = File::open(&container).map_err(Error::Container)?;
 
     // `in_place` resolves the path and reads the mode off the file it is going

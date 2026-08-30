@@ -46,6 +46,13 @@ pub enum Error {
     /// Where the container came from could not be carried onto the payload, so
     /// opening the payload would not raise the warning opening the container
     /// would have.
+    ///
+    /// Untested, and this says so rather than implying otherwise: reaching it
+    /// needs a platform that gates opening on a mark and then refuses the
+    /// write, which Linux does not do — it keeps provenance as a note. The
+    /// arms that can be reached here are, and `flow::open` re-asks the
+    /// filesystem before reporting `payload_removed`, because the sentence has
+    /// to be true when it is printed rather than when it was built.
     Unmarked {
         /// What the carry reported.
         cause: slpc::Error,

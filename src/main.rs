@@ -136,13 +136,19 @@ fn open(root: &std::path::Path, a: &Open) -> Result<(), Box<dyn std::error::Erro
     // fires when somebody saves to a different location, so a session that saw
     // nothing may still have an edit that belongs in the container. Asking is
     // not detection and the question says so.
-    let final_save = if opened.saw_a_change() {
-        false
-    } else {
-        ask("The payload was not seen to change. Write it back anyway?")?
-    };
+    //
+    // The answer goes through the same comparison every other write-back does,
+    // so saying yes when the payload already matches the container reports that
+    // rather than rebuilding it to no purpose.
+    if !opened.saw_a_change() && ask("The payload was not seen to change. Write it back anyway?")? {
+        match opened.save_if_changed() {
+            Ok(true) => println!("  Written back."),
+            Ok(false) => println!("  The payload matches the container; nothing to write back."),
+            Err(e) => eprintln!("  Could not write back: {e}"),
+        }
+    }
 
-    match opened.close(final_save)? {
+    match opened.close()? {
         flow::Closed::Cleared => println!("Session closed."),
         flow::Closed::LeftForRecovery => println!(
             "Session closed, and the application still has the payload open.\n\
