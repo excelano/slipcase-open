@@ -167,6 +167,8 @@ name = "slipcase-open"
 version = "0.1.0"
 dependencies = [
  "slpc",
+ "tempfile",
+ "toml_edit",
 ]
 
 [[package]]

@@ -16,3 +16,4 @@
 pub mod content;
 pub mod extension;
 pub mod policy;
+pub mod session;

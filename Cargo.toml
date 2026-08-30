@@ -20,6 +20,16 @@ rust-version = "1.88"
 # is the mark carried onto the replacement — `fs` implies the second, and both
 # are named because this crate uses both directly.
 slpc = { path = "../slpc-rust/slpc", features = ["fs", "provenance"] }
+# The session record. Already in the tree under `slpc`, which parses the
+# metadata member with it, so this costs a line rather than a dependency — and
+# a payload name may carry a quote or a backslash, which is where hand-rolling
+# the writing side goes wrong.
+toml_edit = "0.25"
+
+[dev-dependencies]
+# A root of its own per test, so the suite never touches the real state
+# directory and two tests never share one.
+tempfile = "3.27"
 
 [lints.rust]
 # The engine reads containers and replaces files. Nothing here needs to reach
