@@ -18,3 +18,4 @@ pub mod extension;
 pub mod extract;
 pub mod policy;
 pub mod session;
+pub mod watch;

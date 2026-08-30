@@ -25,6 +25,13 @@ slpc = { path = "../slpc-rust/slpc", features = ["fs", "provenance"] }
 # a payload name may carry a quote or a backslash, which is where hand-rolling
 # the writing side goes wrong.
 toml_edit = "0.25"
+# Watching the payload directory. Concept 6 needs the watch on the directory
+# rather than the file, because a serious editor saves by writing a temporary
+# sibling and renaming over the target, and a watcher holding the file loses its
+# handle on the first save. `notify` does that on all three platforms —
+# ReadDirectoryChangesW, FSEvents, inotify — but only if set up that way
+# deliberately.
+notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
 
 [dev-dependencies]
 # A root of its own per test, so the suite never touches the real state
