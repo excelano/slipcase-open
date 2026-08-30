@@ -32,6 +32,12 @@ toml_edit = "0.25"
 # ReadDirectoryChangesW, FSEvents, inotify — but only if set up that way
 # deliberately.
 notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
+# Recovery compares the extracted payload against the CRC-32 the container
+# already records for it (concept 6.3). Already compiled in the tree under
+# `zip`, so this is a manifest line rather than a dependency. It answers whether
+# a file changed and never whether it can be proved untampered — SPEC 5 defines
+# no fixity key and this is not one.
+crc32fast = "1.5"
 
 [dev-dependencies]
 # A root of its own per test, so the suite never touches the real state

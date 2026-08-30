@@ -17,5 +17,7 @@ pub mod content;
 pub mod extension;
 pub mod extract;
 pub mod policy;
+pub mod recover;
 pub mod session;
 pub mod watch;
+pub mod writeback;
