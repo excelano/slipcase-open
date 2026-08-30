@@ -321,7 +321,6 @@ mod tests {
     use super::{open, Closed, Error};
     use crate::platform::testing::Recording;
     use crate::policy::{Layer, Origin, Source};
-    use crate::recover;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::time::Duration;
