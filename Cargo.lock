@@ -168,7 +168,9 @@ version = "0.1.0"
 dependencies = [
  "slpc",
  "tempfile",
+ "testsupport",
  "toml_edit",
+ "zip",
 ]
 
 [[package]]
@@ -203,6 +205,14 @@ dependencies = [
  "once_cell",
  "rustix",
  "windows-sys",
+]
+
+[[package]]
+name = "testsupport"
+version = "0.0.0"
+source = "git+https://github.com/excelano/slpc-rust#3fc7a66dca909ee29964f5e2c70bea2f9693a7af"
+dependencies = [
+ "xattr",
 ]
 
 [[package]]

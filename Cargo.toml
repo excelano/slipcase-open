@@ -30,6 +30,16 @@ toml_edit = "0.25"
 # A root of its own per test, so the suite never touches the real state
 # directory and two tests never share one.
 tempfile = "3.27"
+# Marking a file the way a platform's downloader marks one. Taken from
+# `slpc-rust` rather than written again: that crate exists because two copies of
+# this helper disagreed about the Windows arm within an hour of being written,
+# and a third here would undo that on purpose. `publish = false` and no version,
+# so a git dependency is the route from outside that workspace. PLAN.md.
+testsupport = { git = "https://github.com/excelano/slpc-rust" }
+# One test builds a container the writer will not produce: a payload with
+# general purpose bit 0 set, which is what `check_payload_readable` refuses.
+# Already in the tree under `slpc`.
+zip = { version = "8.6", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [lints.rust]
 # The engine reads containers and replaces files. Nothing here needs to reach
