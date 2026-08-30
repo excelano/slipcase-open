@@ -259,6 +259,27 @@ pub fn scan(root: &Path) -> io::Result<Vec<Session>> {
     Ok(found)
 }
 
+/// The session under `root` with this directory name.
+///
+/// The name is what [`scan`] shows, so it is what a person types back.
+///
+/// # Errors
+///
+/// Where there is no such session, or its record cannot be read.
+pub fn find(root: &Path, id: &str) -> io::Result<Session> {
+    // Rejected rather than joined. A name carrying a separator would reach out
+    // of the root, and the only names this answers to are ones `scan` printed.
+    if id.is_empty() || id.contains(['/', '\\']) || id == "." || id == ".." {
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            format!("no session {id}"),
+        ));
+    }
+    let dir = root.join(id);
+    let record = read_record(&dir)?;
+    Ok(Session { dir, record })
+}
+
 fn seconds_since_epoch() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)

@@ -38,6 +38,10 @@ notify = { version = "8", default-features = false, features = ["macos_fsevent"]
 # a file changed and never whether it can be proved untampered — SPEC 5 defines
 # no fixity key and this is not one.
 crc32fast = "1.5"
+# The verbs. Concept 9 keeps the command line as the floor beneath the
+# notifications and the tray, so this is a shipped interface and not only the
+# harness the engine is driven by.
+clap = { version = "4.6", features = ["derive"] }
 
 [dev-dependencies]
 # A root of its own per test, so the suite never touches the real state

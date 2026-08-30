@@ -79,18 +79,36 @@ pub enum EventKind {
 }
 
 impl EventKind {
-    /// Reduce one of `notify`'s events. `Any` and `Other` are treated as a
-    /// touch rather than discarded: an unrecognised event in this directory is
-    /// still something happening in it, and treating it as a save costs a
-    /// repack that finds nothing changed.
-    fn of(kind: notify::EventKind) -> Self {
-        use notify::event::{ModifyKind, RenameMode};
+    /// Reduce one of `notify`'s events, or discard it.
+    ///
+    /// **Reading a file is not changing it, and getting that wrong makes the
+    /// write-back its own trigger.** Write-back opens the payload to read it,
+    /// which `inotify` reports as an access on the watched file; treating that
+    /// as a save means every write-back schedules the next one. Measured on
+    /// 2026-08-30 through the command line: one edit produced three repacks and
+    /// would have produced more had the session stayed open longer. There is a
+    /// test for it, because the loop is invisible from the outside — every
+    /// repack writes the same bytes, so the container is right and only the
+    /// work is wrong.
+    ///
+    /// The exception is a close after writing, which is the one access event
+    /// that means a save finished. Linux reports it and the other platforms do
+    /// not, so it is a signal to take where it is offered rather than one to
+    /// depend on.
+    ///
+    /// `Any` and `Other` stay a touch. An unrecognised event in this directory
+    /// is still something happening in it, and the cost of treating one as a
+    /// save is a repack that writes what is already there.
+    fn of(kind: notify::EventKind) -> Option<Self> {
+        use notify::event::{AccessKind, AccessMode, ModifyKind, RenameMode};
         match kind {
             // A removal, and the half of a rename that names where the file
             // was. The other half names where it went, which is a touch.
             notify::EventKind::Remove(_)
-            | notify::EventKind::Modify(ModifyKind::Name(RenameMode::From)) => Self::Gone,
-            _ => Self::Touched,
+            | notify::EventKind::Modify(ModifyKind::Name(RenameMode::From)) => Some(Self::Gone),
+            notify::EventKind::Access(AccessKind::Close(AccessMode::Write)) => Some(Self::Touched),
+            notify::EventKind::Access(_) => None,
+            _ => Some(Self::Touched),
         }
     }
 }
@@ -125,8 +143,11 @@ impl Watch {
                     // misses.
                     return;
                 };
+                let Some(kind) = EventKind::of(event.kind) else {
+                    return;
+                };
                 let paths: Vec<&Path> = event.paths.iter().map(AsRef::as_ref).collect();
-                for change in classify(&payload, &paths, EventKind::of(event.kind)) {
+                for change in classify(&payload, &paths, kind) {
                     // A closed receiver means the session is gone and there is
                     // nobody to tell.
                     if tx.send(change).is_err() {
@@ -272,6 +293,33 @@ mod tests {
 
         std::fs::remove_file(tmp.path().join("~$report.pdf")).unwrap();
         assert!(!siblings_present(tmp.path(), "report.pdf").unwrap());
+    }
+
+    #[test]
+    fn reading_the_payload_is_not_a_change_to_it() {
+        // Write-back opens the payload to read it, which inotify reports as an
+        // access on the watched file. Treating that as a save makes the
+        // write-back its own trigger: measured on 2026-08-30, one edit produced
+        // three repacks and would have produced more had the session stayed
+        // open.
+        let tmp = tempfile::tempdir().unwrap();
+        let payload = tmp.path().join("report.pdf");
+        std::fs::write(&payload, b"first").unwrap();
+
+        let watch = Watch::on(tmp.path(), "report.pdf").unwrap();
+        let _ = std::fs::read(&payload).unwrap();
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        let mut seen = Vec::new();
+        while std::time::Instant::now() < deadline {
+            if let Some(c) = watch.next_change(Duration::from_millis(100)) {
+                seen.push(c);
+            }
+        }
+        assert!(
+            !seen.contains(&Change::Payload),
+            "reading the payload was reported as a change: {seen:?}"
+        );
     }
 
     #[test]
