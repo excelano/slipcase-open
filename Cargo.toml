@@ -1,0 +1,33 @@
+[package]
+name = "slipcase-open"
+description = "Open the payload of a slipcase container in its own application, and write edits back into the container"
+version = "0.1.0"
+edition = "2021"
+authors = ["David M. Anderson"]
+license = "MIT"
+repository = "https://github.com/excelano/slipcase-open"
+# Not published. The binary ships through the channels in PLAN.md 15, and
+# nothing depends on this as a library — `src/lib.rs` exists so the engine can
+# be tested without the command line, not to be consumed.
+publish = false
+# `slpc`'s floor, which is `zip`'s floor, which is a number nobody here chose.
+# It moves when that one does.
+rust-version = "1.88"
+
+[dependencies]
+# Path until the release carrying `payload_crc` is out; then a version. PLAN.md
+# Phase 0. `fs` is the atomic file placement write-back needs and `provenance`
+# is the mark carried onto the replacement — `fs` implies the second, and both
+# are named because this crate uses both directly.
+slpc = { path = "../slpc-rust/slpc", features = ["fs", "provenance"] }
+
+[lints.rust]
+# The engine reads containers and replaces files. Nothing here needs to reach
+# past the borrow checker to do it, and the two modules that will — the Windows
+# and macOS platform arms — are not written yet. `slipcase-desktop` DESIGN 3
+# records why this is `forbid` in a library root and `deny` where a platform
+# eventually has to lift it.
+unsafe_code = "forbid"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
