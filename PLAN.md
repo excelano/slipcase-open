@@ -54,8 +54,19 @@ same shared borrow. The doc comment says it is the ZIP field rather than a
 slipcase one and disclaims fixity, because SPEC §5 defines no fixity key and a
 format library exposing a checksum invites the reading it declined to license.
 
-Lands in `slpc-rust` as a patch release. `slipcase-open` develops against a path
-dependency and switches to the published version before it ships.
+**Committed, not released.** The changelog entry sits under `[Unreleased]` and
+0.3.11 waits until Phase 3 or 4. Nothing published consumes the accessor;
+`slipcase-open` is on a path dependency through Phase 2 by design; `slpc` and
+`slipcase` version in lockstep, so a release is the full cycle in
+`RELEASING.md` including the apt push that document flags as the step a release
+loses; and the design work so far has turned up three separate places where the
+answer was *`slpc` already does that, or should*, which makes a second release a
+fortnight later the likely outcome of cutting one now.
+
+The switch off the path dependency is the Phase 3 or 4 task that forces it, and
+it is also what finally exercises `slpc` as a published crate — concept §14's
+argument, which nothing in the workspace can make on its own because the CLI
+reaches the library by path.
 
 ## Phase 1 — the engine, headless
 

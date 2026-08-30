@@ -13,4 +13,5 @@
 //! `src/main.rs` is the command line over it, which concept 9 keeps as the
 //! floor beneath the notifications and the tray.
 
+pub mod content;
 pub mod extension;
