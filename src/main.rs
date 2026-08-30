@@ -10,6 +10,21 @@
 use std::io::Read;
 use std::process::ExitCode;
 
+use slipcase_open::policy::{self, Decision, Layer, Origin, Source};
+
+/// The stand-in for the platform policy sources, which arrive with the
+/// platform arms in PLAN.md Phases 3 and 4. Saying nothing at every layer is
+/// what makes `policy::resolve` fall through to the set this build ships,
+/// which is the right behaviour for a machine with no policy applied and so is
+/// not a lie in the meantime.
+struct Unconfigured;
+
+impl Source for Unconfigured {
+    fn layer(&self, _origin: Origin) -> Option<Layer> {
+        None
+    }
+}
+
 /// Fill as much of `head` as the payload has, treating a short payload as the
 /// short answer it is rather than as a failure. SPEC 2.3 permits a payload of
 /// zero length.
@@ -43,11 +58,25 @@ fn main() -> ExitCode {
     // payload name, and a refusal message is a display path like any other.
     // Owned, because reading the payload below needs the container mutably.
     let name = slpc::display_name(container.payload_name()).to_string();
-    let key = slipcase_open::extension::policy_key(container.payload_name());
-    match &key {
-        Some(k) => println!("{name}: policy key {k}"),
-        None => println!("{name}: no usable extension"),
-    }
+    let decision = policy::decide(&Unconfigured, container.payload_name());
+    let key = match &decision {
+        Decision::Open { key } => {
+            println!("{name}: permitted ({key})");
+            Some(key.clone())
+        }
+        Decision::Denied { key } => {
+            println!("{name}: refused — {key} is on the deny list");
+            Some(key.clone())
+        }
+        Decision::NotPermitted { key } => {
+            println!("{name}: refused — {key} is not in the allowed set");
+            Some(key.clone())
+        }
+        Decision::NoUsableExtension => {
+            println!("{name}: refused — no usable extension");
+            None
+        }
+    };
 
     // Read from the container rather than from an extracted copy, so the
     // warning is available before anything is written to disk. Concept 5.1
