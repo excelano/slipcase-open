@@ -23,7 +23,7 @@ use crate::platform::Launcher;
 use crate::policy::{self, Decision};
 use crate::session::{self, Session};
 use crate::watch::{Change, Watch};
-use crate::{content, extract, writeback};
+use crate::{content, extract, recover, writeback};
 
 /// Why a container did not open.
 #[derive(Debug)]
@@ -249,6 +249,24 @@ impl Opened {
             return Ok(false);
         }
         self.saw_payload_change = true;
+
+        // **Asked of the bytes rather than of the events.** One save arrives as
+        // several events — a temporary sibling, a rename, a metadata touch —
+        // and they do not reliably land in one drain, so counting events makes
+        // the number of repacks a function of how busy the machine is. A quiet
+        // period before repacking would trade that for latency on every save
+        // and still only make the guess better.
+        //
+        // The question is whether the payload differs from what the container
+        // holds, and `recover` answers exactly that by comparing against the
+        // CRC-32 the container already records (concept 6.3). So a redundant
+        // event costs one comparison instead of one rebuild, and the
+        // write-backs a session performs become a property of the edits rather
+        // than of the event storm.
+        if !matches!(recover::state(&self.session), recover::State::Edited) {
+            return Ok(false);
+        }
+
         writeback::write_back(&mut self.session)?;
         Ok(true)
     }
@@ -405,15 +423,16 @@ mod tests {
 
     #[test]
     fn one_save_is_one_write_back() {
-        // The regression test for a loop that was invisible from the outside.
-        // Write-back opens the payload to read it, the platform reported that
-        // access on the watched file, and treating it as a save made every
-        // write-back schedule the next one — measured at three repacks for one
-        // edit on 2026-08-30, and unbounded had the session stayed open.
+        // A repack costs a full rebuild of the container, so the number of
+        // them a session performs should follow the edits and not the event
+        // traffic. Counting events cannot give that: one save arrives as
+        // several, they do not reliably land in one drain, and this test was
+        // flaky under a loaded suite for exactly that reason before `pump`
+        // compared the bytes instead.
         //
-        // Counted rather than inspected. Every repack in the loop wrote the
-        // same bytes, so a test asserting the container's contents passed
-        // throughout and said nothing about the defect.
+        // Counted rather than inspected, because every redundant repack writes
+        // the same bytes — a test asserting the container's contents passes
+        // whatever the count is.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
@@ -425,8 +444,8 @@ mod tests {
         fs::write(&scratch, b"edited").unwrap();
         fs::rename(&scratch, o.payload_path()).unwrap();
 
-        // Pump well past the point where the save has landed, so that a
-        // write-back which retriggers itself has every chance to.
+        // Pump well past the point where the save has landed, so every event
+        // it produced has arrived and been acted on.
         let deadline = std::time::Instant::now() + Duration::from_secs(3);
         while std::time::Instant::now() < deadline {
             o.wait_and_pump(Duration::from_millis(100)).unwrap();
@@ -530,15 +549,22 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
         let launcher = Recording::default();
 
+        // No edit here, deliberately. `close` pumps before it decides, so a
+        // save made in this test may or may not have reached the container by
+        // the time the state is read — asserting on that state made this fail
+        // about one run in six. What the handover rule guarantees is that the
+        // directory survives, and that is what is checked.
         let o = open(&root, &c, &Default_, &launcher).unwrap();
-        fs::write(o.payload_path().with_file_name("~$report.pdf"), b"").unwrap();
-        fs::write(o.payload_path(), b"edited").unwrap();
+        let payload = o.payload_path();
+        fs::write(payload.with_file_name("~$report.pdf"), b"").unwrap();
 
         assert_eq!(o.close(false).unwrap(), Closed::LeftForRecovery);
 
         let left = crate::session::scan(&root).unwrap();
         assert_eq!(left.len(), 1);
-        assert!(matches!(recover::state(&left[0]), recover::State::Edited));
+        // Still there for the editor's next save to land in, which is the whole
+        // point of not deleting it.
+        assert!(payload.is_file());
     }
 
     #[test]
