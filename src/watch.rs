@@ -81,15 +81,17 @@ pub enum EventKind {
 impl EventKind {
     /// Reduce one of `notify`'s events, or discard it.
     ///
-    /// **Reading a file is not changing it, and getting that wrong makes the
-    /// write-back its own trigger.** Write-back opens the payload to read it,
-    /// which `inotify` reports as an access on the watched file; treating that
-    /// as a save means every write-back schedules the next one. Measured on
-    /// 2026-08-30 through the command line: one edit produced three repacks and
-    /// would have produced more had the session stayed open longer. There is a
-    /// test for it, because the loop is invisible from the outside — every
-    /// repack writes the same bytes, so the container is right and only the
-    /// work is wrong.
+    /// **Reading a file is not changing it.** A plain read of the watched
+    /// payload emits `Access(Open(Any))` on Linux — measured on 2026-08-30 —
+    /// and treating that as a save makes every reader of the payload a source
+    /// of spurious write-backs. Anything that reads it counts: the write-back
+    /// itself opens the payload, and so does `recover::state`, which is called
+    /// once per session by `sessions`. Running `sessions` in a loop beside an
+    /// open session produced a repack per poll before this arm existed.
+    ///
+    /// The repacks are invisible from outside, which is why this is a rule and
+    /// a test rather than something anyone would notice: each one writes the
+    /// same bytes, so the container stays right and only the work is wrong.
     ///
     /// The exception is a close after writing, which is the one access event
     /// that means a save finished. Linux reports it and the other platforms do

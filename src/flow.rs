@@ -226,7 +226,20 @@ impl Opened {
     /// the close at the user's hand, and a failed save is a reason to tell them
     /// rather than to give up on the container.
     pub fn pump(&mut self) -> Result<bool, writeback::Error> {
-        let mut payload_changed = false;
+        self.pump_including(None)
+    }
+
+    /// [`pump`](Self::pump), counting a change already taken off the channel.
+    ///
+    /// **A change that has been received is a change that has happened.**
+    /// `wait_and_pump` blocks by taking one change off the channel, so passing
+    /// it in here is what stops that one being dropped on the floor. No save is
+    /// known to have been lost to the earlier version — every save measured
+    /// emits more than one event, and the next drain collects the rest — but it
+    /// relied on that being true of every application on three platforms, which
+    /// is not a thing this code is in a position to know.
+    fn pump_including(&mut self, first: Option<Change>) -> Result<bool, writeback::Error> {
+        let mut payload_changed = first == Some(Change::Payload);
         for change in self.watch.drain() {
             if change == Change::Payload {
                 payload_changed = true;
@@ -246,8 +259,8 @@ impl Opened {
     ///
     /// As [`pump`](Self::pump).
     pub fn wait_and_pump(&mut self, within: Duration) -> Result<bool, writeback::Error> {
-        let _ = self.watch.next_change(within);
-        self.pump()
+        let first = self.watch.next_change(within);
+        self.pump_including(first)
     }
 
     /// Close the session: a final write-back where asked, then clean up.
@@ -362,6 +375,69 @@ mod tests {
         let mut got = Vec::new();
         std::io::copy(&mut back.payload().unwrap(), &mut got).unwrap();
         assert_eq!(got, b"edited");
+    }
+
+    #[test]
+    fn a_save_that_emits_one_event_still_reaches_the_container() {
+        // Concept 6 is written about editors that save atomically, and the
+        // tests followed it there. This is the other shape: a plain write in
+        // place, which emits fewer events. It passes either side of the
+        // `pump_including` change rather than pinning it — what it pins is that
+        // the simple save works at all, which nothing else asserted.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let mut o = open(&root, &c, &Default_, &Recording::default()).unwrap();
+
+        fs::write(o.payload_path(), b"edited in place").unwrap();
+
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while std::time::Instant::now() < deadline && !o.saw_a_change() {
+            o.wait_and_pump(Duration::from_millis(250)).unwrap();
+        }
+        assert!(o.saw_a_change(), "a single-event save was never noticed");
+
+        let mut back = slpc::Container::open(&c).unwrap();
+        let mut got = Vec::new();
+        std::io::copy(&mut back.payload().unwrap(), &mut got).unwrap();
+        assert_eq!(got, b"edited in place");
+    }
+
+    #[test]
+    fn one_save_is_one_write_back() {
+        // The regression test for a loop that was invisible from the outside.
+        // Write-back opens the payload to read it, the platform reported that
+        // access on the watched file, and treating it as a save made every
+        // write-back schedule the next one — measured at three repacks for one
+        // edit on 2026-08-30, and unbounded had the session stayed open.
+        //
+        // Counted rather than inspected. Every repack in the loop wrote the
+        // same bytes, so a test asserting the container's contents passed
+        // throughout and said nothing about the defect.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let launcher = Recording::default();
+
+        let mut o = open(&root, &c, &Default_, &launcher).unwrap();
+
+        let scratch = o.payload_path().with_extension("pdf.tmp");
+        fs::write(&scratch, b"edited").unwrap();
+        fs::rename(&scratch, o.payload_path()).unwrap();
+
+        // Pump well past the point where the save has landed, so that a
+        // write-back which retriggers itself has every chance to.
+        let deadline = std::time::Instant::now() + Duration::from_secs(3);
+        while std::time::Instant::now() < deadline {
+            o.wait_and_pump(Duration::from_millis(100)).unwrap();
+        }
+
+        assert!(o.saw_a_change(), "the save never reached the session");
+        assert_eq!(
+            o.session().record().write_backs,
+            1,
+            "one save produced more than one write-back"
+        );
     }
 
     #[test]
