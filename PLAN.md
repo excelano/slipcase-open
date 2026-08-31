@@ -55,7 +55,7 @@ slipcase one and disclaims fixity, because SPEC §5 defines no fixity key and a
 format library exposing a checksum invites the reading it declined to license.
 
 **Committed, not released.** The changelog entry sits under `[Unreleased]` and
-0.3.11 waits until Phase 3 or 4. Nothing published consumes the accessor;
+0.3.11 waits. Nothing published consumes the accessor;
 `slipcase-open` is on a path dependency through Phase 2 by design; `slpc` and
 `slipcase` version in lockstep, so a release is the full cycle in
 `RELEASING.md` including the apt push that document flags as the step a release
@@ -63,10 +63,12 @@ loses; and the design work so far has turned up three separate places where the
 answer was *`slpc` already does that, or should*, which makes a second release a
 fortnight later the likely outcome of cutting one now.
 
-The switch off the path dependency is the Phase 3 or 4 task that forces it, and
-it is also what finally exercises `slpc` as a published crate — concept §14's
-argument, which nothing in the workspace can make on its own because the CLI
-reaches the library by path.
+**Phase 3 is what forces it, and that is where the wait ends.** The apt push is
+the last item in that phase and needs a tagged release here, which needs this
+crate off the path dependency, which needs 0.3.11 published. It is also what
+finally exercises `slpc` as a published crate — concept §14's argument, which
+nothing in the workspace can make on its own, because the CLI reaches the
+library by path.
 
 ## Phase 1 — the engine, headless
 
@@ -113,16 +115,13 @@ Phase 3 the tool starts from a desktop entry rather than a shell, where there is
 no terminal to hold. An invocation that loses the race to bind hands over to
 whoever won it rather than failing.
 
-**Done except the linger.** Concept 8 says a closed session whose editor is
-still working should keep the process alive, so a live watcher notices the save
-and prompts once. There is nothing to prompt through until §9's notifications
-arrive in Phase 3, and observing a save this tool may not act on (§6.3) is worth
-nothing on its own — so the instance exits when the table empties, and the
-recovery item waits on disk for the next launch, which is where it would have
-ended up anyway. The linger belongs with the channel that makes it useful.
-
-For the same reason, *the recovery question comes first* is a refusal naming the
-two commands rather than a prompt. It becomes a prompt when there is one.
+**Done except the linger, which Phase 3 finished.** Concept 8 says a closed
+session whose editor is still working should keep the process alive, so a live
+watcher notices the save and prompts once. There was nothing to prompt through
+until §9's notifications, and observing a save this tool may not act on (§6.3)
+is worth nothing on its own — so this phase left the instance exiting when the
+table emptied, and *the recovery question comes first* as a refusal naming two
+commands. Both became what concept 8 asks for once there was somewhere to ask.
 
 **The recovery sweep lands here rather than in Phase 1, and it was blocked rather
 than forgotten.** Concept §6.3 says a recovered payload matching its container
@@ -136,9 +135,26 @@ the sweep is written against it.
 ## Phase 3 — Linux front end and packaging
 
 `org.freedesktop.Notifications` with actions, the CLI session list, the desktop
-entry and shared-mime-info type plus the `NoDisplay` secondary entry (§4), the
-root-owned `/etc/slipcase` policy source, `cargo-deb`, and the Excelano apt
-repository.
+entry and shared-mime-info type, the root-owned `/etc/slipcase` policy source,
+`cargo-deb`, and the Excelano apt repository.
+
+**Done except the apt push.** Concept 9's channel is a trait the engine narrates
+and asks through, with D-Bus behind it and the terminal beneath that, and the
+two things it unblocks are in: concept 8's linger, where a closed session the
+application has not finished with keeps its watch until the last save lands, and
+the recovery question, which is a question with buttons rather than a refusal
+naming two commands. `packaging/README.md` says what was measured.
+
+**`NoDisplay` on the desktop entry was wrong and the line above no longer asks
+for it.** Concept §4 is amended with the finding: on Linux the Open With list is
+built from applications registered against the media type, so the single entry
+is both the association and the secondary verb, and `NoDisplay=true` takes it
+out of the one list §4 needs it in. There is no second entry to ship.
+
+What is left is the apt repository, and it is the end of a chain rather than a
+task of its own. It needs a tagged release, which needs the switch off the
+`slpc` path dependency, which needs `slpc` 0.3.11 on crates.io — Phase 0's held
+release, and the thing that finally exercises `slpc` as a published crate.
 
 The tool is complete and shippable on one platform at the end of this.
 

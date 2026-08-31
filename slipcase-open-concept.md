@@ -1,7 +1,9 @@
 # slipcase-open — concept
 
-*Status: parked. Not scheduled for build. The design is settled; what is left
-is implementation, and §17 lists what was deliberately left to it.*
+*Status: building. The design is settled and this document is it; `PLAN.md` has
+the order and what is done. Amendments found while building are marked in place
+rather than folded away, so the reason a paragraph changed stays with it. §17
+lists what was deliberately left to implementation.*
 
 ---
 
@@ -56,10 +58,21 @@ and the user can change it once in the platform's own default-application UI.
 Two things follow. Each product registers a secondary verb alongside the
 association it claims, "Open payload" here and "View metadata" in the viewer, so
 that whichever is not the default is one click away rather than unreachable.
+
 And neither product re-asserts the association at launch or asks to be made the
 default. Registering at install time and accepting the user's override is
 ordinary behaviour; a prompt on every start is how two tools sharing an
 extension turn into a support problem.
+
+**Amended while building it: on Linux there is no second thing to register.** A
+desktop entry naming the media type is already in the Open With list, so the one
+entry is both the association and the verb, and the work is to keep it visible
+rather than to add anything. `NoDisplay=true` is what would take it out —
+measured, an entry carrying it answers false to `g_app_info_should_show()`, the
+predicate GIO documents for menu display — and hiding it there would leave the
+non-default product unreachable, which is what this paragraph exists to prevent.
+Windows and macOS keep the second registration, since a ProgID verb and a
+bundle's document role are separate declarations there.
 
 The command line stays a first-class entry point regardless of any of that. It
 makes the tool testable and scriptable with no association registered at all,
@@ -589,6 +602,14 @@ directories (§6.4), so depth is structural rather than something to pass along.
 The UI should indicate when settings are administratively managed, both to set
 user expectations and to reduce support load from "the app randomly refuses to
 open files."
+
+**Managed means a layer set something, not that one is present.** The Linux
+package installs `/etc/slipcase/open.toml` documenting every key above and
+setting none of them, which is how an administrator finds out what the keys are.
+A rule counting the file's existence would tell every machine that installed the
+package that its settings were administered when nothing had been, which is this
+paragraph's own support load arriving by the front door. An empty allow list is
+not the same thing: a layer permitting nothing says a great deal.
 
 ## 11. Honest limits
 
