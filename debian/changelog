@@ -1,3 +1,13 @@
+slipcase-open (0.1.2-1) unstable; urgency=low
+
+  * Ship a Debian changelog. 0.1.0 and 0.1.1 had none, so there was no way to
+    see from apt what changed between them. Debian policy makes its absence an
+    error and this package had been failing that quietly.
+  * Ship a manual page. slipcase-open(1) covers the four verbs, the two
+    configuration files and their keys, and what the allowed set is and is not.
+
+ -- David M. Anderson <david.anderson@excelano.com>  Mon, 31 Aug 2026 16:00:00 -0500
+
 slipcase-open (0.1.1-1) unstable; urgency=low
 
   * A session announces its first write-back and then stays quiet. A
