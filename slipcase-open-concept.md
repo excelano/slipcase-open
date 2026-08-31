@@ -403,13 +403,34 @@ and brings the application forward, which is what a second double-click on an
 open document does everywhere else. No refusal, no second session directory, no
 divergent copies.
 
-**The table is keyed on file identity rather than on a path.** Device and inode
-on Unix, volume serial and file index on Windows. Canonicalising a path resolves
-symbolic links and does nothing about the container reachable under two hard
-links that §7 already warns about, and two names for one inode are two paths and
-one file. Where a filesystem returns no stable identity, which some network
-mounts do not, fall back to the canonicalised path and accept the narrower
-guarantee.
+**The table is keyed on file identity and on the path, because neither holds
+alone.** Device and inode on Unix, volume serial and file index on Windows.
+Canonicalising a path resolves symbolic links and does nothing about the
+container reachable under two hard links that §7 already warns about, and two
+names for one inode are two paths and one file.
+
+**Amended, found while building it: the identity does not survive a
+write-back.** §7 replaces the container by renaming a new file over it, so a
+container acquires a new inode every time a session saves. An identity recorded
+when the session opened stops matching the file at that path after the first
+save, and the next invocation of the same container finds no entry and opens the
+second session all of this exists to prevent. The path is stable across
+replacement and blind to hard links; the identity is the opposite. So a lookup
+matches on either, and the identity is re-read after each write-back so that the
+hard-link half does not quietly lapse for the rest of a session.
+
+The case where the two keys disagree comes out right rather than by accident.
+After a write-back through one of two hard links, §7 says the other name still
+points at the original holding the old contents — so by then they really are
+different files, neither key matches, and opening the other one is a new session,
+which is correct.
+
+Where a filesystem returns no stable identity, which some network mounts do not,
+fall back to the canonicalised path and accept the narrower guarantee. A zero
+inode is that case rather than an answer: some mounts report one for every file,
+and a key that collapsed every container on such a mount into one entry would
+refuse to open the second container somebody asked for, believing it already had
+it.
 
 **A pending recovery item is resolved before a new session opens on the same
 container.** A session left behind by a crash is not in the live table, so
