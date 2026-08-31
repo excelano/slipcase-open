@@ -180,7 +180,11 @@ pub fn connect(_at: &std::path::Path) -> io::Result<std::net::TcpStream> {
     ))
 }
 
-#[cfg(test)]
+// Unix, because that is what there is. `bind` and `connect` are the Unix socket
+// and are configured out elsewhere; concept 8's named pipe arrives with Phase 4
+// and brings its own tests. Gated at the module rather than per test, so that
+// the day the pipe lands the gate is one line to reconsider rather than six.
+#[cfg(all(test, unix))]
 mod tests {
     use super::{bind, connect, path, prepare};
     use crate::ipc::{answer, ask, take, Request, Response};

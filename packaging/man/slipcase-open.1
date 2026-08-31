@@ -1,0 +1,113 @@
+.TH SLIPCASE\-OPEN 1 "2026-08-31" "slipcase\-open 0.1.1" "User Commands"
+.SH NAME
+slipcase\-open \- open the payload of a slipcase container in its own application
+.SH SYNOPSIS
+.B slipcase\-open open
+.I CONTAINER
+.br
+.B slipcase\-open sessions
+.br
+.B slipcase\-open close
+.I SESSION
+.br
+.B slipcase\-open recover
+.I SESSION
+.RB { \-\-write\-back | \-\-discard }
+.SH DESCRIPTION
+Opens the payload of a
+.B .slpc
+container in whatever application the desktop normally handles that kind of file
+with, watches for edits, and writes them back into the container.
+.PP
+Opening a container starts a
+.BR session .
+The payload is extracted into a private directory under the user's own state
+directory, the platform's trust\-zone mark is carried onto the copy, the
+directory is watched, and every save that reaches it is repacked into the
+container atomically.
+.PP
+Sessions are explicit, because no platform reports reliably that an application
+has finished with a file. They are listed, they are closed by hand, and one that
+survives a crash is offered back rather than written back unasked: the tool was
+not watching when the process died, so it cannot tell a complete save from a
+half\-written one.
+.PP
+The first invocation becomes a resident instance and holds the terminal. Every
+later invocation hands its container to that one and exits.
+.SH COMMANDS
+.TP
+.BI open " CONTAINER"
+Start a session and hold it. On a desktop with a notification service, the
+instance reports and asks through notifications carrying buttons.
+.TP
+.B sessions
+List what is open on this machine and what was left behind by a session that did
+not close.
+.TP
+.BI close " SESSION"
+Write back what the session has and clean it up. Where the application still has
+the payload open, the directory is handed to recovery instead of being removed,
+so the application's next save has somewhere to land.
+.TP
+.BI recover " SESSION"
+Act on a session left behind. Requires
+.B \-\-write\-back
+to put the payload into its container, or
+.B \-\-discard
+to throw it away. Naming a session without either reports its state and does
+nothing.
+.SH FILES
+.TP
+.I /etc/slipcase/open.toml
+Machine policy. Root\-owned, takes precedence over the user's own configuration,
+and installed documenting every key and setting none of them.
+.TP
+.I ~/.config/slipcase\-open/policy.toml
+The user's own configuration. Not created by the package.
+.TP
+.I ~/.local/state/slipcase\-open/sessions
+Where a session's payload lives while it is open. Deliberately not the temporary
+directory, which a reboot or a cleaner may empty underneath an edit that has not
+been written back.
+.SH CONFIGURATION
+Both files are TOML and take the same keys. In order of authority: machine
+policy, then user policy, then the user's own configuration, then the built\-in
+default.
+.TP
+.B allowed
+The payload extensions that may be opened, compared with ASCII case folded.
+.TP
+.B mode
+Whether
+.B allowed
+replaces the built\-in set or adds to it. Must be said out loud; "replace" is the
+default.
+.TP
+.B denied
+Extensions refused, whatever every other setting says.
+.TP
+.B user_may_extend
+Whether the user's own configuration is consulted at all.
+.TP
+.B confirm_each_write_back
+Ask before each write\-back rather than repacking as the payload is saved.
+.TP
+.B notify
+How much is said without being asked: "important" by default, or "everything"
+for a notification on every write\-back. Nothing here can silence a question.
+.SH SECURITY
+The allowed set is a guardrail against user error and social engineering in the
+convenient path, and not a security boundary. A container is a plain ZIP and any
+user can extract its payload with standard tools. The boundary is application
+control.
+.PP
+A payload whose bytes are an executable image under an extension that is not one
+is reported and still opened: the extension governs what runs, so refusing would
+assert a control this path does not carry. A payload with no usable extension is
+refused, because the desktop would otherwise ask which application to run it
+with, inside a flow the person reads as opening a document.
+.SH SEE ALSO
+.BR slipcase (1),
+.BR slipcase\-desktop (1)
+.SH AUTHOR
+David M. Anderson

@@ -163,6 +163,37 @@ media type, `slipcase-desktop` 0.1.4 onto it, and then this.
 
 The tool is complete and shipped on one platform. Phase 4 is next.
 
+## Before Phase 4 — what CI found
+
+`.github/workflows/linux.yml` runs the gate, the cross-target checks, and the
+package on every push. Writing it turned up four things nobody had seen, which
+is the argument for having had it sooner.
+
+**The Windows arm of `identity.rs` never compiled.** It used
+`MetadataExt::volume_serial_number` and `file_index`, which have been behind the
+unstable `windows_by_handle` feature since 2019, and this crate builds on
+stable. It answers `None` now, which concept §8 already provides for — the
+lookup falls back to the canonicalised path and accepts the narrower guarantee,
+losing the hard-link arm visibly rather than by an approximation. **Phase 4 has
+to settle it**: `GetFileInformationByHandle` through a crate carrying the unsafe
+(`same-file` is the obvious one) or `windows-sys` with `forbid` lifted in that
+module alone.
+
+**The binary cannot be built for Windows at all**, because the front door and
+the resident loop are `cfg(unix)` until concept §8's named pipe is written. CI
+checks the library for Windows and everything for macOS, which is the truth
+rather than an oversight — macOS is a Unix and compiles whole.
+
+**The shipped package had no Debian changelog**, which policy makes an error.
+0.1.0 and 0.1.1 went out without one, so nobody installing from apt could see
+what changed. cargo-deb needs `changelog = "debian/changelog"` named explicitly;
+it looks at neither `./changelog` nor `debian/changelog` on its own, which is
+measured.
+
+**And no manual page**, which is a lintian warning and which this repository now
+fails on. Concept §9 keeps the command line a shipped interface rather than a
+test harness, so it earned one.
+
 ## Phase 4 — Windows
 
 `ShellExecuteEx` and `IAttachmentExecute`, registry policy with the ADMX/ADML

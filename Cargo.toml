@@ -107,6 +107,12 @@ priority = "optional"
 # `shared-mime-info` in behind it, which is why that is not named here.
 depends = "libc6, libgcc-s1, slipcase-common, desktop-file-utils"
 license-file = ["LICENSE", "0"]
+# Debian policy makes this an error rather than a warning, and lintian agrees:
+# somebody installing from an apt repository has no other way to see what
+# changed between two versions. cargo-deb compresses it into
+# `changelog.Debian.gz` and finds it nowhere by default — neither `./changelog`
+# nor `debian/changelog` is looked at without this key, which is measured.
+changelog = "debian/changelog"
 
 # Naming any asset means naming all of them, the binary included. The
 # `target/release` prefix is the one path here that is not literal: cargo-deb
@@ -128,5 +134,11 @@ assets = [
     ["target/release/slipcase-open", "usr/bin/", "755"],
     ["packaging/linux/slipcase-open.desktop", "usr/share/applications/", "644"],
     ["packaging/linux/open.toml", "etc/slipcase/open.toml", "644"],
+    # cargo-deb compresses anything under `man` on its way in, so this is
+    # listed uncompressed and arrives as `.1.gz`. lintian makes its absence a
+    # warning and CI fails on warnings, which is the right weight for it:
+    # concept 9 keeps the command line a shipped interface rather than a test
+    # harness, and a shipped interface with no manual page is half a promise.
+    ["packaging/man/slipcase-open.1", "usr/share/man/man1/", "644"],
     ["README.md", "usr/share/doc/slipcase-open/README.md", "644"],
 ]

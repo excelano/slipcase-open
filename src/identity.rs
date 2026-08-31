@@ -82,19 +82,29 @@ fn numbers(meta: &std::fs::Metadata) -> Option<(u64, u64)> {
     }
 }
 
-/// The volume serial number and file index.
+/// Not yet on Windows, and deliberately not approximated.
 ///
-/// Both are documented as unreliable on some filesystems — ReFS returns a
-/// 128-bit identifier that does not fit the 64-bit field, and network redirectors
-/// may return nothing — and Windows reports that as zero rather than as an
-/// error, which is why this checks rather than trusting.
+/// Concept 8 names the volume serial number and the file index, which is the
+/// right pair. `std::os::windows::fs::MetadataExt` exposes both and has kept
+/// them behind the unstable `windows_by_handle` feature since 2019, so the
+/// obvious implementation is nightly-only and this crate builds on stable.
+/// Written and never compiled until a cross-target check was added, which is
+/// the argument for having one.
+///
+/// Answering `None` is not a gap: concept 8 already says that where a
+/// filesystem returns no stable identity the lookup falls back to the
+/// canonicalised path and accepts the narrower guarantee. What Windows loses
+/// until Phase 4 is the hard-link arm, and it loses it visibly rather than by
+/// an approximation that looks like an answer — the same rule `platform.rs`
+/// follows for the launcher there.
+///
+/// Phase 4 has two ways to settle it and neither needs this file to change its
+/// shape: `GetFileInformationByHandle` through a crate that carries the unsafe,
+/// `same-file` being the obvious one, or `windows-sys` and a lifted `forbid`
+/// in this module alone.
 #[cfg(windows)]
-fn numbers(meta: &std::fs::Metadata) -> Option<(u64, u64)> {
-    use std::os::windows::fs::MetadataExt as _;
-    match (meta.volume_serial_number(), meta.file_index()) {
-        (Some(volume), Some(file)) if file != 0 => Some((u64::from(volume), file)),
-        _ => None,
-    }
+fn numbers(_meta: &std::fs::Metadata) -> Option<(u64, u64)> {
+    None
 }
 
 #[cfg(not(any(unix, windows)))]

@@ -1,0 +1,18 @@
+slipcase-open (0.1.1-1) unstable; urgency=low
+
+  * A session announces its first write-back and then stays quiet. A
+    notification on every save meant an hour's editing produced dozens of them
+    about the same fact.
+  * How much is said is settable, as `notify` in the policy file: "important"
+    by default, or "everything" for the per-save notification. Nothing there can
+    silence a question.
+
+ -- David M. Anderson <david.anderson@excelano.com>  Mon, 31 Aug 2026 14:00:00 -0500
+
+slipcase-open (0.1.0-1) unstable; urgency=low
+
+  * First release. Open a container's payload in the application that normally
+    handles it, watch for edits, and write them back.
+  * Linux only. Windows and macOS are planned.
+
+ -- David M. Anderson <david.anderson@excelano.com>  Mon, 31 Aug 2026 12:00:00 -0500

@@ -1,0 +1,157 @@
+# Run the gate, the cross-target checks, and the package on Linux.
+#
+# `check.sh` is what a person runs and this is the same three things on every
+# push, plus the two nobody runs by hand: whether the arms for the platforms
+# that are not built yet still compile, and whether the association actually
+# resolves on a machine that was not the one it was written on.
+#
+# What it reaches and what it does not, stated because a green tick invites more
+# faith than it has earned.
+#
+# **The suite runs three times rather than once.** `CLAUDE.md` says why, and a
+# runner is the case it was written about: the tests watch real directories
+# through the platform's notifier, and event timing moves with load. Three
+# rather than five only because the runner is slower than a desk, and the
+# deadlines the suite waits on are seconds where the events are milliseconds.
+#
+# **Nothing here reaches a notification service.** The two tests that talk to
+# `org.freedesktop.Notifications` are `#[ignore]`d and stay that way: there is
+# no session bus on a runner, and a test that quietly passed by finding none
+# would be worse than no test. What they check is measured by hand on a desktop
+# and recorded in the module that holds them.
+#
+# **Nothing here opens a document.** `platform::testing::Recording` is what the
+# suite launches through, so `xdg-open` is never called and no application is
+# ever handed a payload. The whole of concept 5 step 7 is unexercised here and
+# is checked by hand.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+
+name: Linux
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: What is installed
+        run: rustc -V && cargo -V && dpkg-deb --version | head -1
+
+      - name: Formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build
+        run: cargo build --all-targets
+
+      # Three runs, for the reason in the header. Not `check.sh`, because that
+      # would run fmt and clippy again inside a step that says it is testing.
+      - name: Test, three times
+        run: for i in 1 2 3; do echo "run $i"; cargo test --quiet; done
+
+      # The arms for the platforms `PLAN.md` has not reached. Written against
+      # Windows' requirements while only Linux exists, which is worth nothing if
+      # nobody compiles them — and when this step was first written, they did
+      # not compile: `identity.rs` used `windows_by_handle`, unstable since
+      # 2019, and the endpoint's tests imported a Unix-only function.
+      #
+      # The library on Windows and everything on macOS, and the asymmetry is the
+      # truth rather than an oversight. macOS is a Unix, so the front door and
+      # the resident loop compile there; Windows needs concept 8's named pipe,
+      # which is Phase 4, so the binary cannot build for it yet and this does
+      # not pretend otherwise.
+      - name: The arms for the other platforms still compile
+        run: |
+          rustup target add x86_64-pc-windows-msvc x86_64-apple-darwin
+          cargo check --lib --target x86_64-pc-windows-msvc
+          cargo check --all-targets --target x86_64-apple-darwin
+
+      - name: Build the package
+        run: |
+          cargo install cargo-deb --locked
+          cargo build --release
+          # cargo-deb prints the path it wrote, which is the only reliable way
+          # to find it: `[build] target-dir` moves the target directory and no
+          # environment variable then says so.
+          cargo deb --no-build | tee /tmp/deb-path
+
+      # Two things worth reading every time. `/etc/slipcase/open.toml` must be a
+      # conffile or dpkg overwrites an administrator's policy on the next
+      # upgrade, which is the whole reason it is under `/etc`. And the binary
+      # must be in there at all: the asset list names it as
+      # `target/release/slipcase-open`, a path cargo-deb rewrites to wherever
+      # the target directory really is.
+      - name: The package holds up
+        run: |
+          deb=$(cat /tmp/deb-path)
+          echo "package: $deb"
+          dpkg-deb -c "$deb"
+          dpkg-deb -I "$deb" conffiles | grep -qx '/etc/slipcase/open.toml' ||
+              { echo "the policy file is not a conffile" >&2; exit 1; }
+          dpkg-deb -c "$deb" | grep -q 'usr/bin/slipcase-open' ||
+              { echo "no binary in the package" >&2; exit 1; }
+          dpkg-deb -f "$deb" Depends | grep -q slipcase-common ||
+              { echo "the package does not depend on slipcase-common" >&2; exit 1; }
+
+      - name: What lintian says
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lintian
+          lintian --info --tag-display-limit 0 --fail-on error,warning "$(cat /tmp/deb-path)"
+
+      # The only step that asks the platform anything. Concept 4 wants this
+      # tool's entry in the Open With list, and that is two questions with no
+      # eyes in them.
+      #
+      # `gio` rather than `xdg-mime`: it asks GLib for the content type, which
+      # is the path a GTK file manager takes, and it needs no session. The
+      # sibling repository's workflow found that `xdg-mime` without a session
+      # falls back to `file`, which reads magic bytes — and SPEC §4 reserves
+      # none, so it would answer `application/zip` however well the glob was
+      # installed.
+      #
+      # `slipcase-common` declares the type and this package does not, so it is
+      # installed first or there is nothing for the entry to resolve against.
+      # Pinned, because this clones another repository and runs a shell script
+      # out of it: whoever can land a commit there executes code here. Bump it
+      # deliberately.
+      #
+      # COMMON-PIN: 2d204380f8bdc0b96b91dcbcbbcd6c3ba5a44d1a
+      - name: The type and the entry are ours
+        run: |
+          sudo apt-get install -y -qq shared-mime-info desktop-file-utils libglib2.0-bin
+
+          git clone --filter=blob:none --no-checkout \
+              https://github.com/excelano/slipcase-common.git "${RUNNER_TEMP}/common"
+          git -C "${RUNNER_TEMP}/common" checkout --detach \
+              2d204380f8bdc0b96b91dcbcbbcd6c3ba5a44d1a
+          "${RUNNER_TEMP}/common/install.sh"
+          ./packaging/linux/install.sh
+
+          # A real container, because an empty file answers
+          # `application/x-zerosize` whatever the glob says. Built here rather
+          # than committed: a fixture in the tree would be one more thing that
+          # can drift from what SPEC §2 requires.
+          python3 -c 'import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("slipcase.metadata.toml","slipcase_version = \"1.0\"\n\n[payload]\nfile = \"report.txt\"\n"); z.writestr("report.txt","a report\n"); z.close()' "${RUNNER_TEMP}/sample.slpc"
+
+          type=$(gio info -a standard::content-type "${RUNNER_TEMP}/sample.slpc" |
+              sed -n 's/.*standard::content-type: //p')
+          echo "content type: ${type}"
+          [ "$type" = "application/x.slipcase+zip" ] ||
+              { echo "the type is not ours" >&2; exit 1; }
+
+          gio mime application/x.slipcase+zip | grep -q 'slipcase-open.desktop' ||
+              { echo "this tool is not registered against the type" >&2; exit 1; }
+          gio mime application/x.slipcase+zip
