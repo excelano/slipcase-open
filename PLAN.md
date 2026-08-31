@@ -144,7 +144,7 @@ Excelano apt repository. The shared-mime-info type moved out during the phase:
 `slipcase-common` declares it and ships the icon, and both products depend on
 that rather than each carrying a copy dpkg would refuse.
 
-**Done except the apt push.** Concept 9's channel is a trait the engine narrates
+**Done, and released as 0.1.0 on 2026-08-31.** Concept 9's channel is a trait the engine narrates
 and asks through, with D-Bus behind it and the terminal beneath that, and the
 two things it unblocks are in: concept 8's linger, where a closed session the
 application has not finished with keeps its watch until the last save lands, and
@@ -157,12 +157,11 @@ built from applications registered against the media type, so the single entry
 is both the association and the secondary verb, and `NoDisplay=true` takes it
 out of the one list §4 needs it in. There is no second entry to ship.
 
-What is left is the apt repository, and it is the end of a chain rather than a
-task of its own. It needs a tagged release, which needs the switch off the
-`slpc` path dependency, which needs `slpc` 0.3.11 on crates.io — Phase 0's held
-release, and the thing that finally exercises `slpc` as a published crate.
+The chain that stood in front of the apt push ran in order: `slpc` 0.3.11 to
+crates.io, this crate off the path dependency, `slipcase-common` 1.0.0 for the
+media type, `slipcase-desktop` 0.1.4 onto it, and then this.
 
-The tool is complete and shippable on one platform at the end of this.
+The tool is complete and shipped on one platform. Phase 4 is next.
 
 ## Phase 4 — Windows
 
