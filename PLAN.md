@@ -107,6 +107,12 @@ recovery-before-new-session ordering, and the exit rules. Unix socket first,
 with the trait shaped so a named pipe drops in. The `close` verb, which has
 something to talk to from here on.
 
+**The instance runs in the foreground.** Detaching means `fork` and this crate
+forbids `unsafe`; nothing in concept §8 asks for a background process, and from
+Phase 3 the tool starts from a desktop entry rather than a shell, where there is
+no terminal to hold. An invocation that loses the race to bind hands over to
+whoever won it rather than failing.
+
 **Done except the linger.** Concept 8 says a closed session whose editor is
 still working should keep the process alive, so a live watcher notices the save
 and prompts once. There is nothing to prompt through until §9's notifications
