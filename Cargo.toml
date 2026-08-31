@@ -43,6 +43,21 @@ crc32fast = "1.5"
 # harness the engine is driven by.
 clap = { version = "4.6", features = ["derive"] }
 
+# Linux's half of concept 9. `org.freedesktop.Notifications` has carried an
+# actions parameter for as long as it has existed, and a notification with
+# buttons is the portable primitive the design needs — so this is a D-Bus client
+# and not a notification library. Pure Rust, which keeps `forbid(unsafe_code)`
+# honest for the crate and does not put libdbus in the link line of a `.deb`.
+#
+# `notify-send` was the alternative and is the wrong shape rather than
+# incapable: recent libnotify can pass `--action` and print the key that was
+# pressed, but it does so by blocking one process per notification, and it
+# offers no way to withdraw one or to hold several questions at once. It is also
+# not guaranteed to be installed, where the bus interface is what a desktop
+# provides.
+[target.'cfg(target_os = "linux")'.dependencies]
+zbus = { version = "5", default-features = false, features = ["blocking-api", "async-io"] }
+
 [dev-dependencies]
 # A root of its own per test, so the suite never touches the real state
 # directory and two tests never share one.

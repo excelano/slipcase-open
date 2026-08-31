@@ -227,7 +227,7 @@ pub enum Decision {
 ///
 /// Where a layer exists and cannot be read. Nothing is decided in that case,
 /// because a policy that cannot be established is not a policy that permits.
-pub fn decide(source: &impl Source, payload_name: &str) -> std::result::Result<Decision, Error> {
+pub fn decide(source: &dyn Source, payload_name: &str) -> std::result::Result<Decision, Error> {
     let Some(key) = extension::policy_key(payload_name) else {
         return Ok(Decision::NoUsableExtension);
     };
@@ -247,7 +247,7 @@ pub fn decide(source: &impl Source, payload_name: &str) -> std::result::Result<D
 /// # Errors
 ///
 /// Where a layer exists and cannot be read.
-pub fn resolve(source: &impl Source) -> std::result::Result<Effective, Error> {
+pub fn resolve(source: &dyn Source) -> std::result::Result<Effective, Error> {
     let mut uncomparable = Vec::new();
 
     // Highest authority first, so that `user_may_extend` is known before the

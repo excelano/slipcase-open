@@ -17,9 +17,9 @@
 
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use crate::platform::Launcher;
+use crate::outside::Outside;
 use crate::policy::{self, Decision};
 use crate::session::{self, Session};
 use crate::watch::{Change, Watch};
@@ -88,7 +88,6 @@ pub struct Opened {
 }
 
 /// What closing a session did.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Closed {
     /// Written back where asked, and the session directory removed.
     Cleared,
@@ -97,7 +96,68 @@ pub enum Closed {
     /// removed. Concept 6.2: the close is honoured, but deleting the directory
     /// underneath a running editor sends its next save nowhere this tool will
     /// ever look.
-    LeftForRecovery,
+    ///
+    /// The watch comes with it. Concept 8: what a resident process is good for
+    /// on this path is noticing the application's last save when it happens,
+    /// rather than leaving the question until somebody next opens a container.
+    LeftForRecovery(Lingering),
+}
+
+/// A closed session the target application has not finished with, still
+/// watched.
+///
+/// **Nothing here writes back, and that is concept 6.3 rather than an
+/// omission.** The session is closed; a save arriving now is one this tool was
+/// not watching for when the user said they were done, and it cannot tell a
+/// complete save from a half-written one. So the watch is used to know when the
+/// application has stopped, which is the moment at which asking is worth
+/// anything, and the answer comes from the person.
+pub struct Lingering {
+    session: Session,
+    watch: Watch,
+    quiet_since: Instant,
+}
+
+impl Lingering {
+    /// The session on disk.
+    #[must_use]
+    pub fn session(&self) -> &Session {
+        &self.session
+    }
+
+    /// Whether the application appears to have finished: nothing of its own
+    /// left in the payload directory (concept 6.1), and nothing written there
+    /// for `quiet`.
+    ///
+    /// **Both halves, because either alone is wrong.** Siblings gone is the
+    /// signal concept 6.1 settles on, and it says the application cleaned up;
+    /// it says nothing about a save still being flushed. A quiet period alone
+    /// would fire in the middle of somebody's afternoon, between two edits.
+    ///
+    /// Takes `&mut self` because asking is also draining: a change seen here is
+    /// what resets the quiet period.
+    pub fn has_settled(&mut self, quiet: Duration) -> bool {
+        if self.watch.drain().next().is_some() {
+            self.quiet_since = Instant::now();
+        }
+        if self.quiet_since.elapsed() < quiet {
+            return false;
+        }
+        // Unreadable means the answer is not known, and the safe reading of not
+        // known is that the application is still there. A directory that has
+        // gone is the other case and settles: there is nothing left to wait
+        // for, and what remains is a recovery record naming a payload that is
+        // not on disk, which `recover` reports.
+        !crate::watch::siblings_present(&self.session.payload_dir(), &self.session.record().payload)
+            .unwrap_or(true)
+    }
+
+    /// Give up the watch and hand back the session, for the caller that is
+    /// about to act on it.
+    #[must_use]
+    pub fn into_session(self) -> Session {
+        self.session
+    }
 }
 
 /// Open a container: concept 5, steps 1 through 7.
@@ -107,18 +167,14 @@ pub enum Closed {
 /// See [`Error`]. Nothing is left behind on any of them except
 /// [`Error::Extract`] carrying [`extract::Error::Unmarked`] with
 /// `payload_removed` false, which says so.
-pub fn open(
-    root: &Path,
-    container_path: &Path,
-    source: &impl policy::Source,
-    launcher: &impl Launcher,
-) -> Result<Opened, Error> {
+pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result<Opened, Error> {
     // Step 1. Opening is validating: `Container::open` applies SPEC 3 and the
     // limits SPEC 6 asks for before it will answer any question about the file.
     let mut container = slpc::Container::open(container_path).map_err(Error::Container)?;
 
     // Step 2, and step 3's refusals. Resolved here rather than passed in.
-    let decision = policy::decide(source, container.payload_name()).map_err(Error::Policy)?;
+    let decision =
+        policy::decide(outside.policy, container.payload_name()).map_err(Error::Policy)?;
     if !matches!(decision, Decision::Open { .. }) {
         return Err(Error::Refused(decision));
     }
@@ -167,7 +223,7 @@ pub fn open(
         }
     };
 
-    if let Err(e) = launcher.launch(&session.payload_path()) {
+    if let Err(e) = outside.launcher.launch(&session.payload_path()) {
         let _ = session.clone().remove();
         return Err(Error::Launch(e));
     }
@@ -340,7 +396,11 @@ impl Opened {
         // editor still holding the payload has somewhere for its next save to
         // land and the next launch asks about it.
         if self.application_is_working().unwrap_or(true) {
-            return Ok(Closed::LeftForRecovery);
+            return Ok(Closed::LeftForRecovery(Lingering {
+                session: self.session,
+                watch: self.watch,
+                quiet_since: Instant::now(),
+            }));
         }
         // A failure to remove leaves a session recovery will pick up, which is
         // the same outcome by another road and not worth a second error type.
@@ -352,8 +412,10 @@ impl Opened {
 #[cfg(test)]
 mod tests {
     use super::{open, Closed, Error};
+    use crate::outside::Outside;
     use crate::platform::testing::Recording;
     use crate::policy::{Layer, Origin, Source};
+    use crate::present::testing::Silent;
     use crate::writeback;
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -395,7 +457,7 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"%PDF first");
         let launcher = Recording::default();
 
-        let o = open(&root, &c, &Default_, &launcher).unwrap();
+        let o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
         assert_eq!(launcher.launched(), [o.payload_path()]);
         assert_eq!(fs::read(o.payload_path()).unwrap(), b"%PDF first");
         assert!(!o.saw_a_change());
@@ -408,7 +470,7 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
         let launcher = Recording::default();
 
-        let mut o = open(&root, &c, &Default_, &launcher).unwrap();
+        let mut o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
 
         // The way a serious editor saves: a temporary sibling renamed over the
         // target, which is the case a watch on the file would miss.
@@ -438,7 +500,12 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let mut o = open(&root, &c, &Default_, &Recording::default()).unwrap();
+        let mut o = open(
+            &root,
+            &c,
+            &Outside::new(&Default_, &Recording::default(), &Silent),
+        )
+        .unwrap();
 
         fs::write(o.payload_path(), b"edited in place").unwrap();
 
@@ -471,7 +538,7 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
         let launcher = Recording::default();
 
-        let mut o = open(&root, &c, &Default_, &launcher).unwrap();
+        let mut o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
 
         let scratch = o.payload_path().with_extension("pdf.tmp");
         fs::write(&scratch, b"edited").unwrap();
@@ -502,7 +569,7 @@ mod tests {
         let launcher = Recording::default();
 
         assert!(matches!(
-            open(&root, &c, &DenyAll, &launcher),
+            open(&root, &c, &Outside::new(&DenyAll, &launcher, &Silent)),
             Err(Error::Refused(_))
         ));
         assert!(launcher.launched().is_empty());
@@ -516,7 +583,7 @@ mod tests {
         let c = container(tmp.path(), "README", b"hello");
         let launcher = Recording::default();
 
-        match open(&root, &c, &Default_, &launcher) {
+        match open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)) {
             Err(e) => assert!(e.to_string().contains("no usable extension"), "{e}"),
             Ok(_) => panic!("a payload with no usable extension was opened"),
         }
@@ -533,7 +600,7 @@ mod tests {
         let c = container(tmp.path(), "invoice.pdf", b"MZ\x90\x00 not a pdf");
         let launcher = Recording::default();
 
-        let o = open(&root, &c, &Default_, &launcher).unwrap();
+        let o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
         assert_eq!(o.misrepresented, Some(crate::content::Executable::Pe));
         assert_eq!(launcher.launched().len(), 1);
     }
@@ -545,7 +612,11 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
 
         assert!(matches!(
-            open(&root, &c, &Default_, &Recording::refusing()),
+            open(
+                &root,
+                &c,
+                &Outside::new(&Default_, &Recording::refusing(), &Silent)
+            ),
             Err(Error::Launch(_))
         ));
         assert!(crate::session::scan(&root).unwrap().is_empty());
@@ -561,11 +632,11 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
         let launcher = Recording::default();
 
-        let mut o = open(&root, &c, &Default_, &launcher).unwrap();
+        let mut o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
         fs::write(o.payload_path(), b"edited quietly").unwrap();
         // Deliberately not pumped: this is the path where nothing was seen.
         assert!(o.save_if_changed().unwrap());
-        assert_eq!(o.close().unwrap(), Closed::Cleared);
+        assert!(matches!(o.close().unwrap(), Closed::Cleared));
 
         let mut back = slpc::Container::open(&c).unwrap();
         let mut got = Vec::new();
@@ -588,11 +659,11 @@ mod tests {
         // the time the state is read — asserting on that state made this fail
         // about one run in six. What the handover rule guarantees is that the
         // directory survives, and that is what is checked.
-        let o = open(&root, &c, &Default_, &launcher).unwrap();
+        let o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
         let payload = o.payload_path();
         fs::write(payload.with_file_name("~$report.pdf"), b"").unwrap();
 
-        assert_eq!(o.close().unwrap(), Closed::LeftForRecovery);
+        assert!(matches!(o.close().unwrap(), Closed::LeftForRecovery(_)));
 
         let left = crate::session::scan(&root).unwrap();
         assert_eq!(left.len(), 1);
@@ -610,7 +681,12 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let mut o = open(&root, &c, &Default_, &Recording::default()).unwrap();
+        let mut o = open(
+            &root,
+            &c,
+            &Outside::new(&Default_, &Recording::default(), &Silent),
+        )
+        .unwrap();
 
         fs::write(o.payload_path(), b"edited").unwrap();
         fs::remove_file(&c).unwrap();
@@ -629,7 +705,12 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let mut o = open(&root, &c, &Default_, &Recording::default()).unwrap();
+        let mut o = open(
+            &root,
+            &c,
+            &Outside::new(&Default_, &Recording::default(), &Silent),
+        )
+        .unwrap();
 
         fs::write(o.payload_path(), b"edited").unwrap();
         let other = container(tmp.path(), "plan.dwg", b"unrelated");
@@ -661,7 +742,12 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let mut o = open(&root, &c, &Default_, &Recording::default()).unwrap();
+        let mut o = open(
+            &root,
+            &c,
+            &Outside::new(&Default_, &Recording::default(), &Silent),
+        )
+        .unwrap();
 
         assert!(!o.save_if_changed().unwrap());
         assert_eq!(o.session().record().write_backs, 0);
@@ -672,7 +758,12 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let mut o = open(&root, &c, &Default_, &Recording::default()).unwrap();
+        let mut o = open(
+            &root,
+            &c,
+            &Outside::new(&Default_, &Recording::default(), &Silent),
+        )
+        .unwrap();
 
         fs::write(o.payload_path(), b"edited").unwrap();
         assert!(o.save_if_changed().unwrap());
@@ -688,8 +779,8 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
         let launcher = Recording::default();
 
-        let o = open(&root, &c, &Default_, &launcher).unwrap();
-        assert_eq!(o.close().unwrap(), Closed::Cleared);
+        let o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
+        assert!(matches!(o.close().unwrap(), Closed::Cleared));
         assert!(crate::session::scan(&root).unwrap().is_empty());
     }
 }

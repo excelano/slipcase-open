@@ -19,16 +19,18 @@
 //! it rather than closing its sessions leaves them recoverable, which is the
 //! crash path working as designed.
 
-use std::io::Write as _;
+use std::io::IsTerminal as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Args, Parser, Subcommand};
 
 use slipcase_open::endpoint;
-use slipcase_open::ipc::{self, Request, Response};
+use slipcase_open::ipc::{self, Request, Response, Voice};
+use slipcase_open::outside::Outside;
 use slipcase_open::platform::Host;
 use slipcase_open::policy;
+use slipcase_open::present::{self, Channel, Report};
 use slipcase_open::resident::{self, Resident};
 use slipcase_open::{recover, session};
 
@@ -128,7 +130,19 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
     // matches against its table are the same file rather than two spellings.
     let container = std::fs::canonicalize(&a.container)
         .map_err(|e| format!("{}: {e}", a.container.display()))?;
-    let request = Request::Open(container);
+    let request = Request::Open {
+        container,
+        // Concept 9. A double-click has no terminal, so the lines handed back
+        // here go nowhere and the instance has to speak for this invocation.
+        // Asked of the error stream because that is where this program's own
+        // messages go; a run whose output is piped into something still has
+        // somewhere to show a refusal.
+        voice: if std::io::stderr().is_terminal() {
+            Voice::Client
+        } else {
+            Voice::Instance
+        },
+    };
 
     if let Some(response) = hand_over(door, &request)? {
         return say(&response);
@@ -144,30 +158,48 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
         };
     };
 
+    let channel = channel();
     let source = policy::files::Files::for_this_platform();
-    report_policy(&source);
+    let outside = Outside::new(&source, &Host, channel.as_ref());
+    report_policy(&outside);
 
     // Before the first session, and with nothing live yet to protect. Concept
     // 6.3: an unchanged leftover means nothing was lost, so it goes quietly.
     let _ = resident::sweep(root, &[]);
 
     let mut instance = Resident::new(root);
-    say(&instance.handle(request, &source, &Host))?;
+    say(&instance.handle(request, &outside))?;
     if instance.is_idle() {
         // The open was refused, so there is nothing to hold and no reason to
         // keep the front door.
         return Ok(());
     }
 
-    println!("Watching. Interrupt to leave the sessions recoverable, or:");
-    println!("  slipcase-open close <session>");
-    resident::run(listener, &mut instance, &source, &Host, &mut |line| {
-        println!("{line}");
-    })?;
-    for line in instance.close_all() {
-        eprintln!("{line}");
+    if std::io::stderr().is_terminal() {
+        // Only where somebody is looking at it. As a notification this would be
+        // the tool announcing that it had started, which is what the document
+        // opening already said.
+        eprintln!("Watching. Interrupt to leave the sessions recoverable, or:");
+        eprintln!("  slipcase-open close <session>");
     }
+
+    resident::run(listener, &mut instance, &outside)?;
+    instance.stand_down(&outside);
     Ok(())
+}
+
+/// Concept 9's channel, or the floor beneath it.
+///
+/// The fallback is silent on purpose. A machine with no session bus is one
+/// where the command line is the interface, and announcing that the
+/// notifications are unavailable would be the first thing this tool said on
+/// every run in an SSH session.
+fn channel() -> Box<dyn Channel> {
+    #[cfg(target_os = "linux")]
+    if let Ok(desktop) = present::freedesktop::Desktop::connect() {
+        return Box::new(desktop);
+    }
+    Box::new(present::terminal::Terminal)
 }
 
 fn sessions(root: &Path, door: &Path) -> Fallible {
@@ -255,20 +287,22 @@ fn recover_one(root: &Path, door: &Path, a: &Recover) -> Fallible {
 /// again — it has to, because §10 puts the decision in the launch path and not
 /// in whatever ran before it — and refuses with that reason. Two copies of one
 /// message is noise.
-fn report_policy(source: &impl policy::Source) {
-    let Ok(effective) = policy::resolve(source) else {
+fn report_policy(outside: &Outside<'_>) {
+    let Ok(effective) = policy::resolve(outside.policy) else {
         return;
     };
     if effective.managed {
-        println!("Settings on this machine are administered.");
-    }
-    if effective.configuration_suppressed {
-        println!("  Your own configuration is not being consulted.");
+        let mut report = Report::ordinary("Settings on this machine are administered.");
+        if effective.configuration_suppressed {
+            report = report.and("Your own configuration is not being consulted.");
+        }
+        outside.channel.report(&report);
     }
     for entry in &effective.uncomparable_entries {
-        eprintln!("  Ignored: `{entry}` in a policy list cannot match any payload.");
+        outside.channel.report(&Report::ordinary(format!(
+            "Ignored: `{entry}` in a policy list cannot match any payload."
+        )));
     }
-    let _ = std::io::stdout().flush();
 }
 
 /// The name `sessions` prints and the other verbs take back.

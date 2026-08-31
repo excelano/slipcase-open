@@ -7,19 +7,27 @@
 //! reaches it through the front door and exits.
 //!
 //! **Requests are served on the loop's own thread and the accepting is not.** A
-//! blocking `accept` would starve the watchers for as long as nobody connected,
-//! and the watchers are the whole reason this process exists. So a thread does
-//! nothing but accept and hand connections over, and the loop alternates
-//! between answering one and pumping the sessions.
+//! blocking `accept` would starve the watchers, and the watchers are the whole
+//! reason this process exists. So a thread does nothing but accept and hand
+//! connections over, and the loop alternates between answering one, pumping the
+//! sessions, and collecting whatever concept 9's channel has been told.
+//!
+//! ## Three lists rather than one
+//!
+//! A session is open, or it is closed and the application has not finished with
+//! it (concept 6.2), or a question has been asked about it and nothing may
+//! happen until somebody answers (concept 6.3). Concept 8 says the process
+//! lives while any of the three exists and stops when none does, so they are
+//! three lists and `is_idle` is all of them being empty.
 
 use std::io;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use crate::flow::{self, Opened};
-use crate::ipc::{Request, Response};
-use crate::platform::Launcher;
-use crate::policy;
+use crate::flow::{self, Lingering, Opened};
+use crate::ipc::{Request, Response, Voice};
+use crate::outside::Outside;
+use crate::present::{Answer, Choice, Question, Report};
 use crate::recover;
 use crate::session::{self, Session};
 use crate::table::Table;
@@ -27,10 +35,55 @@ use crate::table::Table;
 /// How long the loop waits for a request before going round to pump.
 const TICK: Duration = Duration::from_millis(250);
 
+/// How long a closed session's payload directory must go untouched before the
+/// application is taken to have finished with it (concept 8).
+///
+/// Short, because it is the second of two conditions rather than the whole
+/// test: the siblings have to be gone as well, and an application that has
+/// cleaned up after itself is not about to write again. What this guards is the
+/// gap between the last write and the last unlink.
+const SETTLED: Duration = Duration::from_secs(2);
+
+/// How long the instance stays alive holding a question nobody has answered.
+///
+/// **A judgement, and worth naming as one.** Concept 8 says to bound the linger
+/// and does not say where, because there is no measurement that settles it:
+/// what it trades is a resident process against a question that can still be
+/// acted on. Five minutes is long enough that somebody who saw the notification
+/// and finished a sentence first still finds the buttons live, and short enough
+/// that a process nobody is talking to does not sit there for the afternoon.
+/// When it expires the question is taken back rather than left standing, and
+/// what replaces it says how to reach the same decision from the command line —
+/// a button that does nothing is worse than no button.
+const HELD: Duration = Duration::from_secs(300);
+
+/// A question the instance has asked and is holding open so that it can act on
+/// the answer.
+struct Pending {
+    /// The session it is about, as `sessions` names it.
+    about: String,
+    /// What the answer acts on.
+    session: Session,
+    /// A container to open once this is settled, where the question was raised
+    /// by an `open` that could not proceed until it was (concept 8).
+    then_open: Option<PathBuf>,
+    /// When it was last put in front of somebody. Reset by a `Reveal`, which is
+    /// somebody saying *not yet* rather than declining to answer.
+    asked: Instant,
+}
+
 /// The sessions this instance is holding.
 pub struct Resident {
     root: PathBuf,
     sessions: Table<Opened>,
+    lingering: Vec<Lingering>,
+    pending: Vec<Pending>,
+    /// [`SETTLED`] and [`HELD`], held rather than read, so that the rules they
+    /// express can be tested instead of waited out. Nothing outside the tests
+    /// changes them: a five-minute hold is not a setting concept 10 asks for,
+    /// and making it one would put a second answer to *how long* in a file.
+    settles_after: Duration,
+    holds_for: Duration,
 }
 
 impl Resident {
@@ -40,48 +93,56 @@ impl Resident {
         Self {
             root: root.into(),
             sessions: Table::new(),
+            lingering: Vec::new(),
+            pending: Vec::new(),
+            settles_after: SETTLED,
+            holds_for: HELD,
         }
+    }
+
+    /// Set the two waits, for the tests of what happens on either side of
+    /// them. A five-minute hold has no other way of being tested, and a
+    /// two-second settle has no other way of being tested quickly.
+    #[cfg(test)]
+    fn waiting(mut self, settles_after: Duration, holds_for: Duration) -> Self {
+        self.settles_after = settles_after;
+        self.holds_for = holds_for;
+        self
     }
 
     /// Whether there is anything left to hold, which is concept 8's exit rule.
     #[must_use]
     pub fn is_idle(&self) -> bool {
-        self.sessions.is_empty()
+        self.sessions.is_empty() && self.lingering.is_empty() && self.pending.is_empty()
     }
 
     /// Answer one request.
-    pub fn handle(
-        &mut self,
-        request: Request,
-        source: &impl policy::Source,
-        launcher: &impl Launcher,
-    ) -> Response {
+    pub fn handle(&mut self, request: Request, outside: &Outside<'_>) -> Response {
         match request {
             Request::Ping => Response::Ok(Vec::new()),
             Request::List => self.list(),
-            Request::Open(path) => self.open(&path, source, launcher),
+            Request::Open { container, voice } => self.open(&container, voice, outside),
             Request::Close(id) => self.close(&id),
         }
     }
 
     /// Open a container, or bring forward the session that already has it.
-    fn open(
-        &mut self,
-        container: &Path,
-        source: &impl policy::Source,
-        launcher: &impl Launcher,
-    ) -> Response {
+    fn open(&mut self, container: &Path, voice: Voice, outside: &Outside<'_>) -> Response {
         // Concept 8: a container that already has a live session is not opened
         // twice. Two sessions would both repack it and the second write-back
         // would overwrite the first with nothing said. Re-launching is what a
         // second double-click on an open document does everywhere else.
         if let Some(open) = self.sessions.find_mut(container) {
-            return match launcher.launch(&open.payload_path()) {
-                Ok(()) => Response::Ok(vec![format!(
-                    "{} is already open; brought forward.",
-                    slpc::display_name(&open.session().record().payload)
-                )]),
-                Err(e) => Response::Err(format!("could not bring it forward: {e}")),
+            return match outside.launcher.launch(&open.payload_path()) {
+                Ok(()) => say(
+                    voice,
+                    outside,
+                    Report::ordinary(format!(
+                        "{} is already open; brought forward.",
+                        slpc::display_name(&open.session().record().payload)
+                    )),
+                ),
+                Err(e) => refuse(voice, outside, format!("could not bring it forward: {e}")),
             };
         }
 
@@ -89,42 +150,66 @@ impl Resident {
         // by a crash is not in the live table, so nothing refuses it — but
         // opening a fresh one would extract the container's current payload and
         // leave the recovered edit with nowhere to go.
-        match self.pending_recovery(container) {
-            Err(e) => return Response::Err(e),
-            Ok(Some(response)) => return response,
-            Ok(None) => {}
+        match self.ask_about_what_was_left(container, outside) {
+            Err(e) => return refuse(voice, outside, e),
+            Ok(true) => {
+                return refuse(
+                    voice,
+                    outside,
+                    "a session on this container was left behind, and what to do with it \
+                     comes first"
+                        .to_string(),
+                )
+            }
+            Ok(false) => {}
         }
 
-        match flow::open(&self.root, container, source, launcher) {
-            Err(e) => Response::Err(e.to_string()),
+        match flow::open(&self.root, container, outside) {
+            Err(e) => refuse(voice, outside, e.to_string()),
             Ok(opened) => {
-                let mut lines = vec![format!(
-                    "{} is open.",
-                    slpc::display_name(&opened.session().record().payload)
-                )];
+                let name = slpc::display_name(&opened.session().record().payload).into_owned();
+                let mut report = Report::ordinary(format!("{name} is open."))
+                    .and(format!("Session {}", id_of(opened.session())));
                 if opened.mark != slpc::provenance::Mark::Silent {
-                    lines.push("  It came from somewhere else, and the copy says so.".into());
+                    report = report.and("It came from somewhere else, and the copy says so.");
                 }
+                // Concept 5.1: this one earns an interrupt rather than a badge
+                // somewhere quiet, so it is its own report at its own weight
+                // and not a line appended to the one above. Said whoever is
+                // speaking, because a client that prints it to a terminal is
+                // not what concept 5.1 means by an interrupt.
                 if let Some(what) = opened.misrepresented {
-                    lines.push(format!("  Warning: the payload is {}.", what.describes()));
+                    outside.channel.report(
+                        &Report::interrupt(format!("{name} is not what its name says."))
+                            .and(format!("The payload is {}.", what.describes()))
+                            .and("That is the shape of a phishing attachment.")
+                            .and("It has been opened; nothing here has decided it is safe."),
+                    );
                 }
-                lines.push(format!("  Session {}", id_of(opened.session())));
                 if let Err(e) = self.sessions.insert(container, opened) {
-                    return Response::Err(format!("the session could not be tracked: {e}"));
+                    return refuse(
+                        voice,
+                        outside,
+                        format!("the session could not be tracked: {e}"),
+                    );
                 }
-                Response::Ok(lines)
+                say(voice, outside, report)
             }
         }
     }
 
-    /// A session left behind on this same container, where there is one worth
-    /// asking about.
+    /// Put concept 6.3's question about a session left behind on this
+    /// container, where there is one worth asking about, and hold it.
     ///
-    /// Answered with a refusal rather than a prompt, because Phase 2 has no
-    /// channel to ask through: §9's notifications carry the question and arrive
-    /// in Phase 3. Naming the commands is the honest form of *the recovery
-    /// question comes first* until then.
-    fn pending_recovery(&self, container: &Path) -> Result<Option<Response>, String> {
+    /// Answers `true` where the open must wait for it. Concept 8: *the recovery
+    /// question comes first, and the new session follows the answer* — so the
+    /// container is remembered against the question and opened once it is
+    /// settled, rather than the person having to double-click a second time.
+    fn ask_about_what_was_left(
+        &mut self,
+        container: &Path,
+        outside: &Outside<'_>,
+    ) -> Result<bool, String> {
         let want = crate::identity::of(container).map_err(|e| e.to_string())?;
         let sessions = session::scan(&self.root).map_err(|e| e.to_string())?;
         for left in sessions {
@@ -134,17 +219,39 @@ impl Resident {
                 continue;
             }
             let state = recover::state(&left);
-            if state.needs_a_person() {
-                let id = id_of(&left);
-                return Ok(Some(Response::Err(format!(
-                    "a session on this container was left behind and is {state}.\n\
-                     Resolve it first:\n  \
-                     slipcase-open recover {id} --write-back\n  \
-                     slipcase-open recover {id} --discard"
-                ))));
+            if !state.needs_a_person() {
+                continue;
             }
+            let about = id_of(&left);
+            // Already asked, and still waiting. Asking again would put a second
+            // copy of the same question in the message list, and answering
+            // either would leave the other one behind.
+            if self.pending.iter().any(|p| p.about == about) {
+                return Ok(true);
+            }
+            outside.channel.ask(&Question {
+                about: about.clone(),
+                summary: format!(
+                    "{} was left behind.",
+                    slpc::display_name(&left.record().payload)
+                ),
+                detail: vec![
+                    format!("It is {state}."),
+                    format!("From {}", slpc::display_path(&left.record().container)),
+                    format!("The payload is in {}", left.payload_dir().display()),
+                    "It will open once you have decided.".into(),
+                ],
+                choices: vec![Choice::WriteBack, Choice::Discard, Choice::Reveal],
+            });
+            self.pending.push(Pending {
+                about,
+                session: left,
+                then_open: Some(container.to_path_buf()),
+                asked: Instant::now(),
+            });
+            return Ok(true);
         }
-        Ok(None)
+        Ok(false)
     }
 
     fn list(&self) -> Response {
@@ -160,16 +267,29 @@ impl Resident {
                 )
             })
             .collect();
+        lines.extend(self.lingering.iter().map(|l| {
+            format!(
+                "{}  {}  closed, waiting for the application to finish",
+                id_of(l.session()),
+                slpc::display_name(&l.session().record().payload)
+            )
+        }));
+        lines.extend(self.pending.iter().map(|p| {
+            format!(
+                "{}  {}  {}, waiting for you",
+                p.about,
+                slpc::display_name(&p.session.record().payload),
+                recover::state(&p.session)
+            )
+        }));
 
-        let live: Vec<PathBuf> = self
-            .sessions
-            .iter()
-            .map(|o| o.session().dir().to_path_buf())
-            .collect();
+        // Everything above is also a directory under the root, so a scan that
+        // did not know what was held would report each of them twice.
+        let held = self.held_directories();
         if let Ok(left) = session::scan(&self.root) {
             for s in left
                 .iter()
-                .filter(|s| !live.contains(&s.dir().to_path_buf()))
+                .filter(|s| !held.contains(&s.dir().to_path_buf()))
             {
                 lines.push(format!(
                     "{}  {}  {}",
@@ -183,6 +303,21 @@ impl Resident {
             lines.push("No sessions.".into());
         }
         Response::Ok(lines)
+    }
+
+    /// Every session directory this instance is holding, in any of its three
+    /// lists.
+    fn held_directories(&self) -> Vec<PathBuf> {
+        self.sessions
+            .iter()
+            .map(|o| o.session().dir().to_path_buf())
+            .chain(
+                self.lingering
+                    .iter()
+                    .map(|l| l.session().dir().to_path_buf()),
+            )
+            .chain(self.pending.iter().map(|p| p.session.dir().to_path_buf()))
+            .collect()
     }
 
     fn close(&mut self, id: &str) -> Response {
@@ -199,37 +334,54 @@ impl Resident {
         };
         match opened.close() {
             Ok(flow::Closed::Cleared) => Response::Ok(vec!["Session closed.".into()]),
-            Ok(flow::Closed::LeftForRecovery) => Response::Ok(vec![
-                "Session closed, and the application still has the payload open.".into(),
-                "It has been left for recovery: run `slipcase-open sessions`.".into(),
-            ]),
+            // Concept 6.2 and 8. The close is honoured; the directory is not
+            // removed, and the watch stays on it so that the application's last
+            // save is noticed when it happens rather than at the next launch.
+            Ok(flow::Closed::LeftForRecovery(lingering)) => {
+                self.lingering.push(lingering);
+                Response::Ok(vec![
+                    "Session closed, and the application still has the payload open.".into(),
+                    "It is being watched until the application finishes.".into(),
+                ])
+            }
             Err(e) => Response::Err(e.to_string()),
         }
     }
 
-    /// Give every session's watch a turn, and report what came of it.
-    ///
-    /// # Errors
-    ///
-    /// Never as a whole: a session that could not write back is reported and
-    /// the others still run, because one failing container is not a reason to
-    /// stop watching the rest.
-    pub fn pump_all(&mut self) -> Vec<String> {
-        let mut notices = Vec::new();
+    /// One turn: pump the open sessions, move on whatever has settled, and act
+    /// on whatever has been answered.
+    pub fn turn(&mut self, outside: &Outside<'_>) {
+        self.pump_all(outside);
+        self.ask_about_what_has_settled(outside);
+        self.act_on_answers(outside);
+        self.let_go_of_the_unanswered(outside);
+    }
+
+    /// Give every open session's watch a turn, and report what came of it.
+    fn pump_all(&mut self, outside: &Outside<'_>) {
         let mut wrote_back = Vec::new();
         for open in self.sessions.iter_mut() {
             match open.pump() {
                 Ok(true) => {
                     let s = open.session();
-                    notices.push(format!(
-                        "{}: written back ({}).",
-                        slpc::display_name(&s.record().payload),
-                        s.record().write_backs
-                    ));
+                    outside.channel.report(&Report::ordinary(format!(
+                        "{} written back.",
+                        slpc::display_name(&s.record().payload)
+                    )));
                     wrote_back.push(s.record().container.clone());
                 }
                 Ok(false) => {}
-                Err(e) => notices.push(format!("could not write back: {e}")),
+                // One failing container is not a reason to stop watching the
+                // rest, and it is a reason to say so: concept 6.2 puts the
+                // close at the user's hand, and a save that did not land is the
+                // thing they most need to know did not.
+                Err(e) => outside.channel.report(
+                    &Report::interrupt(format!(
+                        "{} could not be written back.",
+                        slpc::display_name(&open.session().record().payload)
+                    ))
+                    .and(e.to_string()),
+                ),
             }
         }
         // A write-back renamed a new file over the container, so the identity
@@ -237,18 +389,204 @@ impl Resident {
         for container in wrote_back {
             self.sessions.refresh(&container);
         }
-        notices
     }
 
-    /// Close every session, for a shutdown that is not a crash.
-    pub fn close_all(&mut self) -> Vec<String> {
-        self.sessions
-            .drain()
-            .filter_map(|open| match open.close() {
-                Ok(_) => None,
-                Err(e) => Some(format!("could not close a session: {e}")),
-            })
-            .collect()
+    /// Ask about every lingering session the application has finished with.
+    fn ask_about_what_has_settled(&mut self, outside: &Outside<'_>) {
+        let mut still_waiting = Vec::new();
+        for mut lingering in std::mem::take(&mut self.lingering) {
+            if !lingering.has_settled(self.settles_after) {
+                still_waiting.push(lingering);
+                continue;
+            }
+            let about = id_of(lingering.session());
+            let session = lingering.into_session();
+            let state = recover::state(&session);
+            let name = slpc::display_name(&session.record().payload).into_owned();
+            // Concept 6.3: equal to what the container holds means nothing was
+            // lost, so clean up and say nothing. This is that case arriving
+            // while the process is still alive to see it, which is what concept
+            // 8 keeps it alive for.
+            if !state.needs_a_person() {
+                let _ = session.remove();
+                continue;
+            }
+            outside.channel.ask(&Question {
+                about: about.clone(),
+                summary: format!("{name} was saved after you closed the session."),
+                detail: vec![
+                    format!("It is {state}."),
+                    format!("Into {}", slpc::display_path(&session.record().container)),
+                    format!("The payload is in {}", session.payload_dir().display()),
+                ],
+                choices: vec![Choice::WriteBack, Choice::Discard, Choice::Reveal],
+            });
+            self.pending.push(Pending {
+                about,
+                session,
+                then_open: None,
+                asked: Instant::now(),
+            });
+        }
+        self.lingering = still_waiting;
+    }
+
+    /// Do what somebody chose.
+    fn act_on_answers(&mut self, outside: &Outside<'_>) {
+        for answer in outside.channel.answers() {
+            self.settle(&answer, outside);
+        }
+    }
+
+    fn settle(&mut self, answer: &Answer, outside: &Outside<'_>) {
+        let Some(at) = self.pending.iter().position(|p| p.about == answer.about) else {
+            // A button from a question this instance is no longer holding: the
+            // same decision taken at the command line in the meantime, or a
+            // notification that outlived the process that asked. Saying so
+            // beats a click that appears to do nothing.
+            outside.channel.report(&Report::ordinary(format!(
+                "{} has already been dealt with.",
+                answer.about
+            )));
+            return;
+        };
+
+        // Reveal is *not yet* rather than an answer, so the question stays and
+        // is put again. A service that closes a notification when one of its
+        // actions is invoked — which GNOME Shell does — would otherwise leave
+        // somebody looking at the folder with no way back to the decision.
+        if answer.choice == Choice::Reveal {
+            let pending = &mut self.pending[at];
+            pending.asked = Instant::now();
+            let dir = pending.session.payload_dir();
+            let question = Question {
+                about: pending.about.clone(),
+                summary: format!(
+                    "{} is still waiting.",
+                    slpc::display_name(&pending.session.record().payload)
+                ),
+                detail: vec![format!("The payload is in {}", dir.display())],
+                choices: vec![Choice::WriteBack, Choice::Discard, Choice::Reveal],
+            };
+            if let Err(e) = outside.launcher.launch(&dir) {
+                outside.channel.report(&Report::ordinary(format!(
+                    "{} could not be shown: {e}",
+                    dir.display()
+                )));
+            }
+            outside.channel.ask(&question);
+            return;
+        }
+
+        let mut pending = self.pending.remove(at);
+        outside.channel.withdraw(&pending.about);
+        // Owned, because what follows moves the session out from under it.
+        let name = slpc::display_name(&pending.session.record().payload).into_owned();
+        match answer.choice {
+            Choice::WriteBack => match crate::writeback::write_back(&mut pending.session) {
+                Ok(()) => {
+                    outside.channel.report(&Report::ordinary(format!(
+                        "{name} written back to {}.",
+                        slpc::display_path(&pending.session.record().container)
+                    )));
+                    let _ = pending.session.remove();
+                }
+                Err(e) => {
+                    // Nothing is removed. The session stays where it
+                    // was, which is what makes a second attempt possible, and
+                    // the question goes back so there is something to make it
+                    // with.
+                    outside.channel.report(
+                        &Report::interrupt(format!("{name} could not be written back."))
+                            .and(e.to_string()),
+                    );
+                    pending.asked = Instant::now();
+                    self.pending.push(pending);
+                    return;
+                }
+            },
+            Choice::Discard => {
+                let _ = pending.session.remove();
+                outside
+                    .channel
+                    .report(&Report::ordinary(format!("{name} discarded.")));
+            }
+            Choice::Reveal => unreachable!("answered above"),
+        }
+
+        // Concept 8: the new session follows the answer.
+        if let Some(container) = pending.then_open {
+            if let Response::Err(why) = self.open(&container, Voice::Instance, outside) {
+                outside
+                    .channel
+                    .report(&Report::interrupt(format!("{name} did not open: {why}")));
+            }
+        }
+    }
+
+    /// Take back the questions nobody has answered inside [`HELD`], and say
+    /// where the same decision still lives.
+    fn let_go_of_the_unanswered(&mut self, outside: &Outside<'_>) {
+        let (gone, kept) = std::mem::take(&mut self.pending)
+            .into_iter()
+            .partition::<Vec<_>, _>(|p| p.asked.elapsed() >= self.holds_for);
+        self.pending = kept;
+        for p in &gone {
+            Self::stop_asking(p, outside);
+        }
+    }
+
+    /// Withdraw one question and leave the command line in its place.
+    fn stop_asking(pending: &Pending, outside: &Outside<'_>) {
+        outside.channel.withdraw(&pending.about);
+        outside.channel.report(
+            &Report::ordinary(format!(
+                "{} is still undecided.",
+                slpc::display_name(&pending.session.record().payload)
+            ))
+            .and(format!(
+                "slipcase-open recover {} --write-back",
+                pending.about
+            ))
+            .and(format!("slipcase-open recover {} --discard", pending.about)),
+        );
+    }
+
+    /// Close every open session, and put down every question, for a shutdown
+    /// that is not a crash.
+    ///
+    /// A question left standing when this process goes is a button with nobody
+    /// behind it, so each is withdrawn and replaced by the two commands that
+    /// reach the same decision. The session directories stay: concept 6.3
+    /// carries them to the next launch, which is where they were always going
+    /// to be answered if nobody answered here.
+    pub fn stand_down(&mut self, outside: &Outside<'_>) {
+        for open in self.sessions.drain().collect::<Vec<_>>() {
+            match open.close() {
+                Ok(flow::Closed::Cleared) => {}
+                Ok(flow::Closed::LeftForRecovery(lingering)) => self.lingering.push(lingering),
+                Err(e) => outside
+                    .channel
+                    .report(&Report::interrupt(format!("a session did not close: {e}"))),
+            }
+        }
+        for lingering in std::mem::take(&mut self.lingering) {
+            let session = lingering.into_session();
+            if recover::state(&session).needs_a_person() {
+                outside.channel.report(
+                    &Report::ordinary(format!(
+                        "{} was closed while its application was still working.",
+                        slpc::display_name(&session.record().payload)
+                    ))
+                    .and("It is left for recovery: run `slipcase-open sessions`."),
+                );
+            } else {
+                let _ = session.remove();
+            }
+        }
+        for pending in &std::mem::take(&mut self.pending) {
+            Self::stop_asking(pending, outside);
+        }
     }
 }
 
@@ -257,6 +595,34 @@ fn id_of(s: &Session) -> String {
     s.dir()
         .file_name()
         .map_or_else(|| "?".to_string(), |n| n.to_string_lossy().into_owned())
+}
+
+/// A report said once: through the channel where the client has nowhere to show
+/// it, and back to the client where it has.
+fn say(voice: Voice, outside: &Outside<'_>, report: Report) -> Response {
+    if voice == Voice::Instance {
+        outside.channel.report(&report);
+    }
+    Response::Ok(
+        std::iter::once(report.summary)
+            .chain(report.detail.into_iter().map(|d| format!("  {d}")))
+            .collect(),
+    )
+}
+
+/// A refusal said once, on the same rule.
+///
+/// Weighted as an interrupt through the channel. A refusal answers something
+/// somebody just double-clicked, and concept 5.1's extensionless case is one of
+/// the things it can be: a quiet refusal there reads as the document simply not
+/// opening.
+fn refuse(voice: Voice, outside: &Outside<'_>, why: String) -> Response {
+    if voice == Voice::Instance {
+        outside
+            .channel
+            .report(&Report::interrupt("Not opened.").and(why.clone()));
+    }
+    Response::Err(why)
 }
 
 /// Remove the sessions left behind that have nothing to say.
@@ -300,9 +666,7 @@ pub fn sweep(root: &Path, live: &[PathBuf]) -> io::Result<usize> {
 pub fn run(
     listener: crate::endpoint::Listener,
     resident: &mut Resident,
-    source: &impl policy::Source,
-    launcher: &impl Launcher,
-    notice: &mut impl FnMut(&str),
+    outside: &Outside<'_>,
 ) -> io::Result<()> {
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
@@ -319,7 +683,7 @@ pub fn run(
         match rx.recv_timeout(TICK) {
             Ok(mut stream) => {
                 let response = match crate::ipc::take(&mut stream) {
-                    Ok(request) => resident.handle(request, source, launcher),
+                    Ok(request) => resident.handle(request, outside),
                     // A request this build cannot read is answered rather than
                     // dropped, so a client waiting on the front door is not
                     // left waiting on it.
@@ -332,11 +696,10 @@ pub fn run(
             Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => break,
         }
 
-        for line in resident.pump_all() {
-            notice(&line);
-        }
+        resident.turn(outside);
 
-        // Concept 8's exit rule. Staying resident does nothing for the crash
+        // Concept 8's exit rule: nothing open, nothing lingering, nothing
+        // waiting on somebody. Staying resident does nothing for the crash
         // case, where this process is dead by definition.
         if resident.is_idle() {
             break;
@@ -348,17 +711,60 @@ pub fn run(
 #[cfg(test)]
 mod tests {
     use super::{sweep, Resident};
-    use crate::ipc::{Request, Response};
+    use crate::ipc::{Request, Response, Voice};
+    use crate::outside::Outside;
     use crate::platform::testing::Recording;
     use crate::policy::{Origin, Read, Source};
+    use crate::present::testing::Recording as Told;
+    use crate::present::Choice;
     use crate::{extract, recover, session};
     use std::fs;
     use std::path::{Path, PathBuf};
+    use std::time::Duration;
 
     struct Default_;
     impl Source for Default_ {
         fn layer(&self, _o: Origin) -> Read {
             Ok(None)
+        }
+    }
+
+    /// The three things the engine works against, kept together so a test can
+    /// hand them over as one and then ask each of them what it saw.
+    struct World {
+        policy: Default_,
+        launcher: Recording,
+        channel: Told,
+    }
+
+    impl World {
+        fn new() -> Self {
+            Self {
+                policy: Default_,
+                launcher: Recording::default(),
+                channel: Told::default(),
+            }
+        }
+
+        fn outside(&self) -> Outside<'_> {
+            Outside::new(&self.policy, &self.launcher, &self.channel)
+        }
+    }
+
+    /// An `open` from somewhere with a terminal, which is what most of these
+    /// are: the response is the assertion.
+    fn opening(container: PathBuf) -> Request {
+        Request::Open {
+            container,
+            voice: Voice::Client,
+        }
+    }
+
+    /// An `open` from a double-click, where the instance has to speak.
+    fn announcing(container: PathBuf) -> Request {
+        Request::Open {
+            container,
+            voice: Voice::Instance,
         }
     }
 
@@ -386,6 +792,23 @@ mod tests {
         }
     }
 
+    /// The session name the `open` response gives back.
+    fn session_named_in(lines: &[String]) -> String {
+        lines
+            .iter()
+            .find_map(|l| l.strip_prefix("  Session "))
+            .unwrap_or_else(|| panic!("no session named in {lines:?}"))
+            .to_string()
+    }
+
+    /// A session left behind by a process that died with an edit in it.
+    fn a_crashed_session(root: &Path, c: &Path, name: &str, edit: &[u8]) -> session::Session {
+        let left = session::create(root, c, name).unwrap();
+        extract::extract(&mut slpc::Container::open(c).unwrap(), &left).unwrap();
+        fs::write(left.payload_path(), edit).unwrap();
+        left
+    }
+
     #[test]
     fn opening_a_container_twice_brings_the_session_forward() {
         // Concept 8. Two sessions would both repack it and the second
@@ -393,17 +816,17 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let launcher = Recording::default();
+        let w = World::new();
         let mut r = Resident::new(&root);
 
-        ok(r.handle(Request::Open(c.clone()), &Default_, &launcher));
-        let again = ok(r.handle(Request::Open(c.clone()), &Default_, &launcher));
+        ok(r.handle(opening(c.clone()), &w.outside()));
+        let again = ok(r.handle(opening(c.clone()), &w.outside()));
 
         assert!(again[0].contains("already open"), "{again:?}");
         assert_eq!(session::scan(&root).unwrap().len(), 1);
         // Brought forward means launched again, which is what a second
         // double-click does everywhere else.
-        assert_eq!(launcher.launched().len(), 2);
+        assert_eq!(w.launcher.launched().len(), 2);
     }
 
     #[cfg(unix)]
@@ -414,11 +837,11 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
         let link = tmp.path().join("other-name.slpc");
         fs::hard_link(&c, &link).unwrap();
-        let launcher = Recording::default();
+        let w = World::new();
         let mut r = Resident::new(&root);
 
-        ok(r.handle(Request::Open(c), &Default_, &launcher));
-        let again = ok(r.handle(Request::Open(link), &Default_, &launcher));
+        ok(r.handle(opening(c), &w.outside()));
+        let again = ok(r.handle(opening(link), &w.outside()));
         assert!(again[0].contains("already open"), "{again:?}");
         assert_eq!(session::scan(&root).unwrap().len(), 1);
     }
@@ -429,11 +852,11 @@ mod tests {
         let root = tmp.path().join("sessions");
         let a = container(tmp.path(), "report.pdf", b"a");
         let b = container(tmp.path(), "notes.txt", b"b");
-        let launcher = Recording::default();
+        let w = World::new();
         let mut r = Resident::new(&root);
 
-        ok(r.handle(Request::Open(a), &Default_, &launcher));
-        ok(r.handle(Request::Open(b), &Default_, &launcher));
+        ok(r.handle(opening(a), &w.outside()));
+        ok(r.handle(opening(b), &w.outside()));
         assert_eq!(session::scan(&root).unwrap().len(), 2);
         assert!(!r.is_idle());
     }
@@ -451,45 +874,203 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let launcher = Recording::default();
+        let w = World::new();
         let mut r = Resident::new(&root);
 
-        ok(r.handle(Request::Open(c.clone()), &Default_, &launcher));
+        ok(r.handle(opening(c.clone()), &w.outside()));
         let payload = session::scan(&root).unwrap()[0].payload_path();
         fs::write(&payload, b"edited").unwrap();
 
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
-        while std::time::Instant::now() < deadline
-            && !r.pump_all().iter().any(|n| n.contains("written back"))
-        {}
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while std::time::Instant::now() < deadline && !w.channel.said().contains("written back") {
+            r.turn(&w.outside());
+        }
+        assert!(
+            w.channel.said().contains("written back"),
+            "{}",
+            w.channel.said()
+        );
 
-        let again = ok(r.handle(Request::Open(c), &Default_, &launcher));
+        let again = ok(r.handle(opening(c), &w.outside()));
         assert!(again[0].contains("already open"), "{again:?}");
         assert_eq!(session::scan(&root).unwrap().len(), 1);
     }
 
     #[test]
-    fn a_recovery_item_on_the_same_container_is_resolved_first() {
+    fn a_recovery_item_on_the_same_container_is_asked_about_first() {
         // Concept 8. Opening a fresh session would extract the container's
         // current payload and leave the recovered edit with nowhere to go.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
+        let left = a_crashed_session(&root, &c, "report.pdf", b"edited then the process died");
 
-        // What a crash leaves: a session on disk, with an edit that never
-        // landed and no process holding it.
-        let left = session::create(&root, &c, "report.pdf").unwrap();
-        extract::extract(&mut slpc::Container::open(&c).unwrap(), &left).unwrap();
-        fs::write(left.payload_path(), b"edited then the process died").unwrap();
-
-        let launcher = Recording::default();
+        let w = World::new();
         let mut r = Resident::new(&root);
-        let refused = err(r.handle(Request::Open(c), &Default_, &launcher));
+        let refused = err(r.handle(opening(c), &w.outside()));
 
         assert!(refused.contains("left behind"), "{refused}");
-        assert!(refused.contains("--write-back"), "{refused}");
-        assert!(launcher.launched().is_empty(), "nothing should have opened");
+        assert!(
+            w.launcher.launched().is_empty(),
+            "nothing should have opened"
+        );
         assert_eq!(session::scan(&root).unwrap().len(), 1);
+
+        // Concept 9 turns the Phase 2 refusal into a question, and it has to
+        // carry all three of concept 6.3's answers.
+        let asked = w.channel.questions();
+        assert_eq!(asked.len(), 1);
+        assert!(asked[0]
+            .about
+            .starts_with(left.dir().file_name().unwrap().to_str().unwrap()));
+        assert_eq!(
+            asked[0].choices,
+            vec![Choice::WriteBack, Choice::Discard, Choice::Reveal]
+        );
+        // And the instance is holding it, which is what makes an answer
+        // actionable rather than a button with nobody behind it.
+        assert!(!r.is_idle());
+    }
+
+    #[test]
+    fn one_question_is_asked_however_many_times_the_container_is_double_clicked() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        a_crashed_session(&root, &c, "report.pdf", b"edited");
+
+        let w = World::new();
+        let mut r = Resident::new(&root);
+        err(r.handle(opening(c.clone()), &w.outside()));
+        err(r.handle(opening(c), &w.outside()));
+        assert_eq!(w.channel.questions().len(), 1);
+    }
+
+    #[test]
+    fn writing_back_a_recovered_session_opens_the_one_that_was_waiting() {
+        // Concept 8: the new session follows the answer, so nobody has to
+        // double-click the container a second time.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        a_crashed_session(&root, &c, "report.pdf", b"the edit that never landed");
+
+        let w = World::new();
+        let mut r = Resident::new(&root);
+        err(r.handle(opening(c.clone()), &w.outside()));
+        let about = w.channel.questions()[0].about.clone();
+
+        w.channel.answer(&about, Choice::WriteBack);
+        r.turn(&w.outside());
+
+        // The edit is in the container, the question has been taken back, and
+        // the session that was waiting on the answer is open.
+        let mut held = slpc::Container::open(&c).unwrap();
+        let mut bytes = Vec::new();
+        std::io::Read::read_to_end(&mut held.payload().unwrap(), &mut bytes).unwrap();
+        assert_eq!(bytes, b"the edit that never landed");
+        assert_eq!(w.channel.withdrawn(), vec![about]);
+        assert_eq!(w.launcher.launched().len(), 1);
+        assert_eq!(session::scan(&root).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn discarding_a_recovered_session_opens_the_one_that_was_waiting() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        a_crashed_session(&root, &c, "report.pdf", b"edited");
+
+        let w = World::new();
+        let mut r = Resident::new(&root);
+        err(r.handle(opening(c.clone()), &w.outside()));
+        let about = w.channel.questions()[0].about.clone();
+
+        w.channel.answer(&about, Choice::Discard);
+        r.turn(&w.outside());
+
+        // Not asserted by the directory being gone: a session is named for the
+        // second it started in, so the one that follows the answer takes the
+        // same name back. What says the edit was discarded is that the session
+        // now on disk holds the container's payload rather than the edit.
+        let now = session::scan(&root).unwrap();
+        assert_eq!(now.len(), 1);
+        assert_eq!(fs::read(now[0].payload_path()).unwrap(), b"first");
+        let mut held = slpc::Container::open(&c).unwrap();
+        let mut bytes = Vec::new();
+        std::io::Read::read_to_end(&mut held.payload().unwrap(), &mut bytes).unwrap();
+        assert_eq!(bytes, b"first", "discard must not touch the container");
+        assert_eq!(w.launcher.launched().len(), 1);
+    }
+
+    #[test]
+    fn revealing_shows_the_folder_and_puts_the_question_again() {
+        // Reveal is *not yet* rather than an answer. A service that closes a
+        // notification when one of its actions is invoked would otherwise leave
+        // somebody looking at a folder with no way back to the decision.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let left = a_crashed_session(&root, &c, "report.pdf", b"edited");
+
+        let w = World::new();
+        let mut r = Resident::new(&root);
+        err(r.handle(opening(c), &w.outside()));
+        let about = w.channel.questions()[0].about.clone();
+
+        w.channel.answer(&about, Choice::Reveal);
+        r.turn(&w.outside());
+
+        assert_eq!(w.launcher.launched(), vec![left.payload_dir()]);
+        assert_eq!(w.channel.questions().len(), 2);
+        assert!(w.channel.withdrawn().is_empty());
+        assert!(left.dir().exists());
+        assert!(!r.is_idle());
+    }
+
+    #[test]
+    fn an_answer_about_a_session_nobody_is_holding_says_so() {
+        let tmp = tempfile::tempdir().unwrap();
+        let w = World::new();
+        let mut r = Resident::new(tmp.path().join("sessions"));
+        w.channel.answer("gone-0", Choice::WriteBack);
+        r.turn(&w.outside());
+        assert!(
+            w.channel.said().contains("already been dealt with"),
+            "{}",
+            w.channel.said()
+        );
+    }
+
+    #[test]
+    fn a_question_nobody_answers_is_taken_back_and_replaced_by_the_commands() {
+        // Concept 8 says to bound the linger. What it costs is that the buttons
+        // stop working, so they are removed rather than left to do nothing, and
+        // what replaces them reaches the same decision.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let left = a_crashed_session(&root, &c, "report.pdf", b"edited");
+
+        let w = World::new();
+        let mut r = Resident::new(&root).waiting(Duration::ZERO, Duration::ZERO);
+        err(r.handle(opening(c), &w.outside()));
+        let about = w.channel.questions()[0].about.clone();
+
+        r.turn(&w.outside());
+
+        assert_eq!(w.channel.withdrawn(), vec![about.clone()]);
+        assert!(w
+            .channel
+            .said()
+            .contains(&format!("recover {about} --write-back")));
+        assert!(w
+            .channel
+            .said()
+            .contains(&format!("recover {about} --discard")));
+        // The session itself stays. Concept 6.3 carries it to the next launch.
+        assert!(left.dir().exists());
+        assert!(r.is_idle());
     }
 
     #[test]
@@ -503,10 +1084,11 @@ mod tests {
         extract::extract(&mut slpc::Container::open(&c).unwrap(), &left).unwrap();
         assert!(matches!(recover::state(&left), recover::State::Unchanged));
 
-        let launcher = Recording::default();
+        let w = World::new();
         let mut r = Resident::new(&root);
-        ok(r.handle(Request::Open(c), &Default_, &launcher));
-        assert_eq!(launcher.launched().len(), 1);
+        ok(r.handle(opening(c), &w.outside()));
+        assert_eq!(w.launcher.launched().len(), 1);
+        assert!(w.channel.questions().is_empty());
     }
 
     #[test]
@@ -514,31 +1096,135 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let launcher = Recording::default();
+        let w = World::new();
         let mut r = Resident::new(&root);
 
-        let opened = ok(r.handle(Request::Open(c), &Default_, &launcher));
-        let id = opened
-            .iter()
-            .find_map(|l| l.strip_prefix("  Session "))
-            .unwrap()
-            .to_string();
-
-        ok(r.handle(Request::Close(id), &Default_, &launcher));
+        let opened = ok(r.handle(opening(c), &w.outside()));
+        ok(r.handle(Request::Close(session_named_in(&opened)), &w.outside()));
         assert!(r.is_idle());
         assert!(session::scan(&root).unwrap().is_empty());
     }
 
     #[test]
+    fn closing_while_the_application_is_working_keeps_the_watch_on_it() {
+        // Concept 6.2 and 8. The close is honoured, the directory stays, and
+        // the process keeps watching so the application's last save is noticed
+        // when it happens rather than at the next launch.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let w = World::new();
+        let mut r = Resident::new(&root);
+
+        let opened = ok(r.handle(opening(c), &w.outside()));
+        let dir = session::scan(&root).unwrap()[0].payload_dir();
+        fs::write(dir.join(".~lock.report.pdf#"), b"still working").unwrap();
+
+        let closed = ok(r.handle(Request::Close(session_named_in(&opened)), &w.outside()));
+        assert!(
+            closed
+                .iter()
+                .any(|l| l.contains("still has the payload open")),
+            "{closed:?}"
+        );
+        assert!(
+            !r.is_idle(),
+            "the process has to stay for the watch to be worth anything"
+        );
+        assert_eq!(session::scan(&root).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_lingering_session_saved_after_the_close_becomes_a_question() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let w = World::new();
+        let mut r = Resident::new(&root).waiting(Duration::ZERO, Duration::from_secs(300));
+
+        let opened = ok(r.handle(opening(c), &w.outside()));
+        let dir = session::scan(&root).unwrap()[0].payload_dir();
+        let sibling = dir.join(".~lock.report.pdf#");
+        fs::write(&sibling, b"still working").unwrap();
+        ok(r.handle(Request::Close(session_named_in(&opened)), &w.outside()));
+
+        // The application's last save, and then it tidies up after itself.
+        fs::write(dir.join("report.pdf"), b"the last save").unwrap();
+        fs::remove_file(&sibling).unwrap();
+        r.turn(&w.outside());
+
+        let asked = w.channel.questions();
+        assert_eq!(asked.len(), 1, "{asked:?}");
+        assert!(asked[0].summary.contains("after you closed"), "{asked:?}");
+        // Nothing was written back on its own. Concept 6.3: this tool was not
+        // watching when the user said they were done, so it cannot tell a
+        // complete save from a half-written one.
+        let mut held =
+            slpc::Container::open(&session::scan(&root).unwrap()[0].record().container).unwrap();
+        let mut bytes = Vec::new();
+        std::io::Read::read_to_end(&mut held.payload().unwrap(), &mut bytes).unwrap();
+        assert_eq!(bytes, b"first");
+    }
+
+    #[test]
+    fn a_lingering_session_that_matches_its_container_goes_quietly() {
+        // Concept 6.3: equal means nothing was lost, so clean up and say
+        // nothing. This is that case arriving while the process is still alive
+        // to see it, rather than at the next launch.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let w = World::new();
+        let mut r = Resident::new(&root).waiting(Duration::ZERO, Duration::from_secs(300));
+
+        let opened = ok(r.handle(opening(c), &w.outside()));
+        let dir = session::scan(&root).unwrap()[0].payload_dir();
+        let sibling = dir.join(".~lock.report.pdf#");
+        fs::write(&sibling, b"still working").unwrap();
+        ok(r.handle(Request::Close(session_named_in(&opened)), &w.outside()));
+
+        fs::remove_file(&sibling).unwrap();
+        r.turn(&w.outside());
+
+        assert!(
+            w.channel.questions().is_empty(),
+            "{:?}",
+            w.channel.questions()
+        );
+        assert!(session::scan(&root).unwrap().is_empty());
+        assert!(r.is_idle());
+    }
+
+    #[test]
     fn closing_a_session_that_is_not_open_says_so() {
         let tmp = tempfile::tempdir().unwrap();
+        let w = World::new();
         let mut r = Resident::new(tmp.path().join("sessions"));
-        let refused = err(r.handle(
-            Request::Close("nothing-0".into()),
-            &Default_,
-            &Recording::default(),
-        ));
+        let refused = err(r.handle(Request::Close("nothing-0".into()), &w.outside()));
         assert!(refused.contains("no open session"), "{refused}");
+    }
+
+    #[test]
+    fn a_double_click_is_spoken_for_and_a_terminal_is_not() {
+        // Concept 9. An invocation with nowhere to print is why the instance
+        // has a channel at all, and one with a terminal of its own would
+        // otherwise hear everything twice.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let quiet = container(tmp.path(), "quiet.pdf", b"a");
+        let loud = container(tmp.path(), "loud.pdf", b"b");
+        let w = World::new();
+        let mut r = Resident::new(&root);
+
+        ok(r.handle(opening(quiet), &w.outside()));
+        assert!(w.channel.reports().is_empty(), "{:?}", w.channel.reports());
+
+        ok(r.handle(announcing(loud), &w.outside()));
+        assert!(
+            w.channel.said().contains("loud.pdf is open"),
+            "{}",
+            w.channel.said()
+        );
     }
 
     #[test]
@@ -547,22 +1233,22 @@ mod tests {
         let root = tmp.path().join("sessions");
         let open_one = container(tmp.path(), "report.pdf", b"a");
         let crashed = container(tmp.path(), "notes.txt", b"b");
+        a_crashed_session(&root, &crashed, "notes.txt", b"edited");
 
-        let left = session::create(&root, &crashed, "notes.txt").unwrap();
-        extract::extract(&mut slpc::Container::open(&crashed).unwrap(), &left).unwrap();
-        fs::write(left.payload_path(), b"edited").unwrap();
-
-        let launcher = Recording::default();
+        let w = World::new();
         let mut r = Resident::new(&root);
-        ok(r.handle(Request::Open(open_one), &Default_, &launcher));
+        ok(r.handle(opening(open_one), &w.outside()));
 
-        let lines = ok(r.handle(Request::List, &Default_, &launcher));
+        let lines = ok(r.handle(Request::List, &w.outside()));
         assert!(lines
             .iter()
             .any(|l| l.contains("report.pdf") && l.contains("open")));
         assert!(lines
             .iter()
             .any(|l| l.contains("notes.txt") && l.contains("edited")));
+        // And each of them once. A session the instance is holding is also on
+        // disk, so a list that read both without checking would double it.
+        assert_eq!(lines.len(), 2, "{lines:?}");
     }
 
     #[test]
@@ -575,10 +1261,7 @@ mod tests {
         let quiet = session::create(&root, &a, "quiet.pdf").unwrap();
         extract::extract(&mut slpc::Container::open(&a).unwrap(), &quiet).unwrap();
 
-        let edited = session::create(&root, &b, "edited.pdf").unwrap();
-        extract::extract(&mut slpc::Container::open(&b).unwrap(), &edited).unwrap();
-        fs::write(edited.payload_path(), b"an edit that never landed").unwrap();
-
+        let edited = a_crashed_session(&root, &b, "edited.pdf", b"an edit that never landed");
         let half_made = session::create(&root, &a, "quiet.pdf").unwrap();
 
         assert_eq!(sweep(&root, &[]).unwrap(), 2);
@@ -596,9 +1279,9 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let launcher = Recording::default();
+        let w = World::new();
         let mut r = Resident::new(&root);
-        ok(r.handle(Request::Open(c), &Default_, &launcher));
+        ok(r.handle(opening(c), &w.outside()));
 
         let live: Vec<_> = session::scan(&root)
             .unwrap()
@@ -617,11 +1300,38 @@ mod tests {
     }
 
     #[test]
+    fn standing_down_takes_back_every_question_it_was_holding() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let left = a_crashed_session(&root, &c, "report.pdf", b"edited");
+
+        let w = World::new();
+        let mut r = Resident::new(&root);
+        err(r.handle(opening(c), &w.outside()));
+        let about = w.channel.questions()[0].about.clone();
+
+        r.stand_down(&w.outside());
+
+        assert_eq!(w.channel.withdrawn(), vec![about.clone()]);
+        assert!(w
+            .channel
+            .said()
+            .contains(&format!("recover {about} --write-back")));
+        assert!(
+            left.dir().exists(),
+            "the session carries the question to the next launch"
+        );
+        assert!(r.is_idle());
+    }
+
+    #[test]
     fn a_ping_is_answered_and_changes_nothing() {
         let tmp = tempfile::tempdir().unwrap();
+        let w = World::new();
         let mut r = Resident::new(tmp.path().join("sessions"));
         assert_eq!(
-            r.handle(Request::Ping, &Default_, &Recording::default()),
+            r.handle(Request::Ping, &w.outside()),
             Response::Ok(Vec::new())
         );
         assert!(r.is_idle());

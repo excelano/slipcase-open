@@ -33,11 +33,36 @@ use std::path::PathBuf;
 /// approaching this is a mistake or an attempt.
 pub const MAX_FRAME: usize = 64 * 1024;
 
+/// Who says what came of an `open`.
+///
+/// An invocation started from a desktop entry has no terminal, so the lines it
+/// is handed back go nowhere and the person who double-clicked learns nothing —
+/// including, on the paths that matter most, that the payload was refused or
+/// that it is an executable wearing a document's name (concept 5.1). An
+/// invocation from a shell has a terminal and will print them itself, and an
+/// instance that also announced them would say everything twice.
+///
+/// Only the client knows which it is, so the client says. This decides where a
+/// message is shown and nothing else: concept 8 calls the front door a control
+/// surface, and a field that moves text between two of this tool's own outputs
+/// is not one of its controls.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Voice {
+    /// The client has somewhere to print, and will.
+    Client,
+    /// The client has not, so the instance speaks through concept 9's channel.
+    Instance,
+}
+
 /// What an invocation asks the resident instance to do.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Request {
     /// Open this container, or bring its session forward if it is already open.
-    Open(PathBuf),
+    Open {
+        container: PathBuf,
+        /// Who says what came of it.
+        voice: Voice,
+    },
     /// What is open, and what is left over.
     List,
     /// Close this session, by the name `List` gives it.
@@ -87,7 +112,14 @@ impl From<io::Error> for Error {
 impl Request {
     fn fields(&self) -> Vec<Vec<u8>> {
         match self {
-            Self::Open(path) => vec![b"open".to_vec(), path_bytes(path)],
+            Self::Open { container, voice } => vec![
+                b"open".to_vec(),
+                path_bytes(container),
+                match voice {
+                    Voice::Client => b"client".to_vec(),
+                    Voice::Instance => b"instance".to_vec(),
+                },
+            ],
             Self::List => vec![b"list".to_vec()],
             Self::Close(id) => vec![b"close".to_vec(), id.as_bytes().to_vec()],
             Self::Ping => vec![b"ping".to_vec()],
@@ -97,7 +129,19 @@ impl Request {
     fn from_fields(fields: &[Vec<u8>]) -> Result<Self, Error> {
         let verb = fields.first().map(Vec::as_slice).unwrap_or_default();
         match (verb, fields.len()) {
-            (b"open", 2) => Ok(Self::Open(path_from(&fields[1]))),
+            (b"open", 3) => Ok(Self::Open {
+                container: path_from(&fields[1]),
+                voice: match fields[2].as_slice() {
+                    b"client" => Voice::Client,
+                    b"instance" => Voice::Instance,
+                    other => {
+                        return Err(Error::Malformed(format!(
+                            "open with an unknown voice {}",
+                            String::from_utf8_lossy(other)
+                        )))
+                    }
+                },
+            }),
             (b"list", 1) => Ok(Self::List),
             (b"close", 2) => Ok(Self::Close(text(&fields[1]))),
             (b"ping", 1) => Ok(Self::Ping),
@@ -216,7 +260,7 @@ pub fn answer(stream: &mut impl Write, response: &Response) -> Result<(), Error>
 
 #[cfg(test)]
 mod tests {
-    use super::{answer, ask, take, Error, Request, Response};
+    use super::{answer, ask, take, Error, Request, Response, Voice};
     use std::io::Cursor;
     use std::path::PathBuf;
 
@@ -256,7 +300,10 @@ mod tests {
     #[test]
     fn every_request_survives_the_wire() {
         for r in [
-            Request::Open(PathBuf::from("/tmp/report.slpc")),
+            Request::Open {
+                container: PathBuf::from("/tmp/report.slpc"),
+                voice: Voice::Client,
+            },
             Request::List,
             Request::Close("6a94-0".to_string()),
             Request::Ping,
@@ -276,7 +323,10 @@ mod tests {
             "/tmp/two\nlines.slpc",
             "/tmp/a \"quoted\" name.slpc",
         ] {
-            let r = Request::Open(PathBuf::from(name));
+            let r = Request::Open {
+                container: PathBuf::from(name),
+                voice: Voice::Instance,
+            };
             assert_eq!(round_trip(&r), r, "{name}");
         }
     }
@@ -291,7 +341,10 @@ mod tests {
         let name = PathBuf::from(std::ffi::OsString::from_vec(vec![
             b'/', b't', b'm', b'p', b'/', 0xff, 0xfe, b'.', b's', b'l', b'p', b'c',
         ]));
-        let r = Request::Open(name);
+        let r = Request::Open {
+            container: name,
+            voice: Voice::Client,
+        };
         assert_eq!(round_trip(&r), r);
     }
 
