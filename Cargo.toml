@@ -83,3 +83,43 @@ unsafe_code = "forbid"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
+
+# The package the Excelano apt repository ships. Concept 15: `cargo-deb` and
+# that repository are the established path in `slpc-rust`, and a `.deb` is what
+# carries the desktop entry, the media type, and the root-owned policy file
+# concept 10 wants.
+[package.metadata.deb]
+maintainer = "David M. Anderson <david.anderson@excelano.com>"
+# One line per sentence: cargo-deb re-wraps this, and a source line broken
+# mid-sentence comes out broken in `apt show`.
+extended-description = """
+slipcase-open opens the payload of a .slpc container in whatever application normally handles that kind of file, watches for edits, and writes them back into the container.
+Double-click a container and the document opens; save it and the container is repacked around it. No metadata window, no preview, no container browsing — the companion viewer is what those are for."""
+section = "utils"
+priority = "optional"
+depends = "libc6, libgcc-s1, shared-mime-info, desktop-file-utils"
+license-file = ["LICENSE", "0"]
+
+# Naming any asset means naming all of them, the binary included. The
+# `target/release` prefix is the one path here that is not literal: cargo-deb
+# rewrites it to wherever the target directory actually is, which matters on
+# every machine in this fleet, since `[build] target-dir` moves it and no
+# environment variable then says so. `dpkg-deb -c` on the result is what
+# confirms it landed.
+#
+# No maintainer scripts. `shared-mime-info` and `desktop-file-utils` own dpkg
+# triggers on the two directories written into here, so the caches are rebuilt
+# without a `postinst` asking. That is why both are in `depends` as much as for
+# anything they provide at run time.
+#
+# `/etc/slipcase/open.toml` becomes a conffile by virtue of its path, so dpkg
+# keeps an administrator's edits across an upgrade and asks before replacing
+# them. That is the behaviour concept 10 needs and the reason the file is under
+# `/etc` rather than somewhere this package would overwrite.
+assets = [
+    ["target/release/slipcase-open", "usr/bin/", "755"],
+    ["packaging/linux/slipcase-open.desktop", "usr/share/applications/", "644"],
+    ["packaging/linux/slipcase-open.xml", "usr/share/mime/packages/", "644"],
+    ["packaging/linux/open.toml", "etc/slipcase/open.toml", "644"],
+    ["README.md", "usr/share/doc/slipcase-open/README.md", "644"],
+]

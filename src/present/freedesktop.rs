@@ -44,10 +44,12 @@ use super::{Answer, Channel, Choice, Question, Report, Weight};
 const SERVICE: &str = "org.freedesktop.Notifications";
 const OBJECT: &str = "/org/freedesktop/Notifications";
 
-/// The name this appears under, and the desktop entry the service attributes it
-/// to. Kept the same as the installed `.desktop` file's basename, which is how
-/// a shell finds the icon and the application name.
-const DESKTOP_ENTRY: &str = "com.excelano.SlipcaseOpen";
+/// The desktop entry the service attributes a notification to, which is how a
+/// shell finds the name and icon to draw beside it. The installed file's
+/// basename, from `packaging/linux/slipcase-open.desktop`; a hint naming an
+/// entry that is not there is ignored rather than refused, so a mismatch here
+/// shows up as an unattributed notification and nothing else.
+const DESKTOP_ENTRY: &str = "slipcase-open";
 
 /// Until an icon of this project's own ships with the package. A stock name
 /// rather than nothing, because a missing icon renders as a blank square and

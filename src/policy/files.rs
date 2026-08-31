@@ -376,4 +376,38 @@ mod tests {
             Decision::Denied { .. }
         ));
     }
+
+    #[test]
+    fn the_policy_file_the_package_ships_says_nothing() {
+        // Concept 10 makes `/etc/slipcase/open.toml` the highest layer on this
+        // platform, so a stray uncommented line in the shipped file is a policy
+        // nobody wrote being enforced on every machine that installs the
+        // package. The file is documentation until an administrator edits it,
+        // and this is what says so.
+        let shipped =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("packaging/linux/open.toml");
+        assert!(shipped.exists(), "{} is not there", shipped.display());
+
+        let files = Files::none().at(Origin::MachinePolicy, &shipped);
+        let effective = resolve(&files).unwrap();
+        assert!(
+            !effective.managed,
+            "the shipped file must not read as policy"
+        );
+        assert!(!effective.confirm_each_write_back);
+        assert!(effective.uncomparable_entries.is_empty());
+
+        // And the built-in set is what decides, which is the same statement
+        // made from the other end.
+        for name in ["report.pdf", "notes.txt", "sheet.xlsx"] {
+            assert!(
+                matches!(decide(&files, name).unwrap(), Decision::Open { .. }),
+                "{name}"
+            );
+        }
+        assert!(matches!(
+            decide(&files, "inner.zip").unwrap(),
+            Decision::NotPermitted { .. }
+        ));
+    }
 }

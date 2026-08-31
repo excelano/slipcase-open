@@ -131,6 +131,27 @@ pub struct Layer {
     pub confirm_each_write_back: Option<bool>,
 }
 
+impl Layer {
+    /// Whether this layer sets nothing at all.
+    ///
+    /// A file that parses and holds no key is a layer that exists and has no
+    /// opinion, which is different from one that is not there — but not
+    /// different in any way a decision can see. What it changes is whether
+    /// [`Effective::managed`] should call the machine administered, and it
+    /// should not: see the note there.
+    ///
+    /// `allowed = []` is not this. An empty list is a layer permitting nothing,
+    /// which says a great deal.
+    #[must_use]
+    pub fn says_nothing(&self) -> bool {
+        self.allowed.is_none()
+            && self.mode.is_none()
+            && self.denied.is_none()
+            && self.user_may_extend.is_none()
+            && self.confirm_each_write_back.is_none()
+    }
+}
+
 /// Where layers come from. One implementation per platform, plus whatever the
 /// tests need.
 ///
@@ -184,8 +205,15 @@ pub const BUILT_IN_ALLOWED: &[&str] = &[
 pub struct Effective {
     allowed: BTreeSet<String>,
     denied: BTreeSet<String>,
-    /// Whether a policy layer contributed, so the interface can say that
+    /// Whether a policy layer set anything, so the interface can say that
     /// settings are administered.
+    ///
+    /// **Set something, rather than merely be there.** The Linux package ships
+    /// `/etc/slipcase/open.toml` documenting every key and setting none of
+    /// them, so a rule that counted the file's presence would have every
+    /// machine that installed the package told its settings were administered
+    /// when nothing had been administered — which is the support load concept
+    /// 10 wants this to reduce, arriving by the front door.
     pub managed: bool,
     /// Whether the user's own configuration was suppressed by policy.
     pub configuration_suppressed: bool,
@@ -304,7 +332,9 @@ pub fn resolve(source: &dyn Source) -> std::result::Result<Effective, Error> {
         fold_into(&mut allowed, Some(list), &mut uncomparable);
     }
 
-    let managed = stack.iter().any(|(o, l)| o.is_managed() && l.is_some());
+    let managed = stack
+        .iter()
+        .any(|(o, l)| o.is_managed() && l.as_ref().is_some_and(|l| !l.says_nothing()));
 
     let confirm = stack
         .iter()
@@ -640,11 +670,23 @@ mod tests {
     #[test]
     fn managed_says_whether_a_policy_layer_contributed() {
         assert!(!resolve(&Stack::default()).unwrap().managed);
-        let s = Stack {
+        // Present and empty is not administered. The package ships a policy
+        // file that sets nothing, and this is the rule that keeps every install
+        // of it from claiming otherwise.
+        let empty = Stack {
             user_policy: Some(Layer::default()),
             ..Stack::default()
         };
-        assert!(resolve(&s).unwrap().managed);
+        assert!(!resolve(&empty).unwrap().managed);
+        // Setting anything is, including permitting nothing.
+        let refusing_everything = Stack {
+            user_policy: Some(Layer {
+                allowed: Some(Vec::new()),
+                ..Layer::default()
+            }),
+            ..Stack::default()
+        };
+        assert!(resolve(&refusing_everything).unwrap().managed);
     }
 
     #[test]

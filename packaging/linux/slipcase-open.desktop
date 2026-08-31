@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Open payload
+GenericName=Slipcase payload opener
+Comment=Open the payload of a slipcase container in the application that normally handles it
+Exec=slipcase-open open %f
+Icon=document-open
+Terminal=false
+MimeType=application/x.slipcase+zip;
+Categories=Utility;
+Keywords=slipcase;slpc;payload;container;open;
+StartupNotify=false

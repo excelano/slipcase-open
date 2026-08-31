@@ -1,0 +1,35 @@
+# Machine policy for slipcase-open, installed at /etc/slipcase/open.toml.
+#
+# Concept 10. This is the highest layer on Linux: root-owned, and taking
+# precedence over the user's own configuration at
+# $XDG_CONFIG_HOME/slipcase-open/policy.toml. There is no per-user *policy*
+# layer here, because Linux has no mechanism that would administer one.
+#
+# Shipped saying nothing. Every key is optional, and a key that is absent means
+# this layer has no opinion about it rather than that it forbids everything —
+# so an untouched file leaves the built-in set in force. Uncomment what you mean
+# to set.
+#
+# The set of payload extensions that may be opened. Compared with ASCII case
+# folded, and an extension that is not ASCII alphanumeric cannot be allowlisted
+# at all: the shell folds ASCII and nothing more, and a rule this tool could
+# match but the shell could not would permit one thing and open another.
+# allowed = ["pdf", "docx", "xlsx", "odt"]
+
+# Whether `allowed` replaces the built-in set or is added to it. Must be said
+# out loud: an administrator who writes a list expecting it to be exhaustive and
+# instead gets it unioned with the defaults has a silent hole. "replace" is the
+# default when the key is absent.
+# mode = "replace"
+
+# Always wins, over every other setting and over the user. Folded the same way
+# as `allowed`, and reaching the same set: nothing should be refusable by a rule
+# the allow list could not have expressed.
+# denied = ["exe", "dll", "scr", "js"]
+
+# Whether the user's own additions are honoured at all.
+# user_may_extend = false
+
+# Ask before each write-back rather than repacking as the payload is saved. Off
+# by default; on for archival use.
+# confirm_each_write_back = false
