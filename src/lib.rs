@@ -14,10 +14,12 @@
 //! floor beneath the notifications and the tray.
 
 pub mod content;
+pub mod endpoint;
 pub mod extension;
 pub mod extract;
 pub mod flow;
 pub mod identity;
+pub mod ipc;
 pub mod platform;
 pub mod policy;
 pub mod recover;
