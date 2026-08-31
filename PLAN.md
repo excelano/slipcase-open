@@ -135,8 +135,10 @@ the sweep is written against it.
 ## Phase 3 — Linux front end and packaging
 
 `org.freedesktop.Notifications` with actions, the CLI session list, the desktop
-entry and shared-mime-info type, the root-owned `/etc/slipcase` policy source,
-`cargo-deb`, and the Excelano apt repository.
+entry, the root-owned `/etc/slipcase` policy source, `cargo-deb`, and the
+Excelano apt repository. The shared-mime-info type moved out during the phase:
+`slipcase-common` declares it and ships the icon, and both products depend on
+that rather than each carrying a copy dpkg would refuse.
 
 **Done except the apt push.** Concept 9's channel is a trait the engine narrates
 and asks through, with D-Bus behind it and the terminal beneath that, and the

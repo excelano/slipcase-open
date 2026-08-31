@@ -51,8 +51,12 @@ control — AppLocker, WDAC, and their equivalents.
 
 ## Installing
 
-Linux, from the Excelano apt repository, or by hand:
+Linux, from the Excelano apt repository, or by hand. `slipcase-common` declares
+the media type and ships the icon a container is drawn with; it is a hard
+dependency, because without the type declared nothing associates a `.slpc` with
+this tool.
 
+    ../slipcase-common/install.sh
     cargo build --release
     ./packaging/linux/install.sh                    # into ~/.local
     ./packaging/linux/install.sh --prefix /usr/local --policy /etc

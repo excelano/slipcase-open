@@ -1,7 +1,10 @@
 #!/bin/sh
-# Install the desktop integration concept 4 and 10 describe: the media type, the
-# desktop entry, and the machine policy file. Optionally the binary alongside
-# them.
+# Install the desktop integration concept 4 and 10 describe: the desktop entry
+# and the machine policy file. Optionally the binary alongside them.
+#
+# The media type is not here. `slipcase-common` declares it once for every
+# slipcase product, because two packages cannot ship one path; install that
+# first, or the entry below has no type to be associated with.
 #
 # For a person installing by hand and for testing the association without
 # building a package. The Excelano apt repository ships the same files, and the
@@ -69,10 +72,8 @@ elif [ "$binary" != "none" ]; then
     found_binary="$binary"
 fi
 
-mkdir -p "${prefix}/share/mime/packages" "${prefix}/share/applications"
+mkdir -p "${prefix}/share/applications"
 
-install -m 0644 "${here}/slipcase-open.xml" \
-    "${prefix}/share/mime/packages/slipcase-open.xml"
 install -m 0644 "${here}/slipcase-open.desktop" \
     "${prefix}/share/applications/slipcase-open.desktop"
 
@@ -94,15 +95,33 @@ else
     echo "no executable installed; slipcase-open must be on PATH for the entry to work"
 fi
 
-# Each is absent on a minimal system and each failure is survivable: the files
-# are in place either way, and the next login or the next package installation
-# rebuilds these caches.
-[ -x "$(command -v update-mime-database || true)" ] &&
-    update-mime-database "${prefix}/share/mime" || true
+# Absent on a minimal system and the failure is survivable: the files are in
+# place either way, and the next login or the next package installation rebuilds
+# the cache.
 [ -x "$(command -v update-desktop-database || true)" ] &&
     update-desktop-database "${prefix}/share/applications" || true
 
-echo "installed the slipcase media type and the payload entry under ${prefix}"
+echo "installed the payload entry under ${prefix}"
+
+# Said rather than assumed. An entry naming a type nothing has declared is an
+# entry no file manager will ever offer, and the symptom — double-clicking a
+# container and getting the archive tool — looks like an association fight
+# rather than a missing package.
+# Asked of the compiled database rather than of the filenames in it. Every
+# product's declaration is a differently named file and a fourth could arrive;
+# `types` is what `update-mime-database` writes and it answers the question that
+# matters, which is whether this machine knows the type at all.
+if ! grep -qsx 'application/x.slipcase+zip' \
+        "${prefix}/share/mime/types" \
+        /usr/local/share/mime/types \
+        /usr/share/mime/types
+then
+    echo
+    echo "The slipcase media type is not declared on this machine."
+    echo "Install slipcase-common, or run its install.sh, or nothing will"
+    echo "associate a .slpc with this entry."
+fi
+
 echo
 echo "check it with:"
 echo "  xdg-mime query filetype SOME.slpc     # application/x.slipcase+zip"

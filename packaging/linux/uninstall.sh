@@ -22,8 +22,10 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-rm -f "${prefix}/share/mime/packages/slipcase-open.xml" \
-      "${prefix}/share/applications/slipcase-open.desktop" \
+# The media type is `slipcase-common`'s and is left alone: removing it here
+# would take the file type away from every other slipcase product on the
+# machine.
+rm -f "${prefix}/share/applications/slipcase-open.desktop" \
       "${prefix}/bin/slipcase-open"
 
 if [ -n "$policy" ] && [ -e "${policy}/slipcase/open.toml" ]; then
@@ -36,8 +38,6 @@ if [ -n "$policy" ] && [ -e "${policy}/slipcase/open.toml" ]; then
     fi
 fi
 
-[ -x "$(command -v update-mime-database || true)" ] &&
-    update-mime-database "${prefix}/share/mime" || true
 [ -x "$(command -v update-desktop-database || true)" ] &&
     update-desktop-database "${prefix}/share/applications" || true
 

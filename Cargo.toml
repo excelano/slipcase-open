@@ -97,7 +97,12 @@ slipcase-open opens the payload of a .slpc container in whatever application nor
 Double-click a container and the document opens; save it and the container is repacked around it. No metadata window, no preview, no container browsing — the companion viewer is what those are for."""
 section = "utils"
 priority = "optional"
-depends = "libc6, libgcc-s1, shared-mime-info, desktop-file-utils"
+# `slipcase-common` declares the media type and ships the icon a container is
+# drawn with. It is a hard dependency and not a recommendation: without the
+# type declared, nothing associates a `.slpc` with the desktop entry below and
+# double-clicking one does nothing this package would recognise. It pulls
+# `shared-mime-info` in behind it, which is why that is not named here.
+depends = "libc6, libgcc-s1, slipcase-common, desktop-file-utils"
 license-file = ["LICENSE", "0"]
 
 # Naming any asset means naming all of them, the binary included. The
@@ -107,10 +112,10 @@ license-file = ["LICENSE", "0"]
 # environment variable then says so. `dpkg-deb -c` on the result is what
 # confirms it landed.
 #
-# No maintainer scripts. `shared-mime-info` and `desktop-file-utils` own dpkg
-# triggers on the two directories written into here, so the caches are rebuilt
-# without a `postinst` asking. That is why both are in `depends` as much as for
-# anything they provide at run time.
+# No maintainer scripts. `desktop-file-utils` owns the dpkg trigger on the
+# directory written into here, so the desktop cache is rebuilt without a
+# `postinst` asking. That is why it is in `depends` as much as for anything it
+# provides at run time.
 #
 # `/etc/slipcase/open.toml` becomes a conffile by virtue of its path, so dpkg
 # keeps an administrator's edits across an upgrade and asks before replacing
@@ -119,7 +124,6 @@ license-file = ["LICENSE", "0"]
 assets = [
     ["target/release/slipcase-open", "usr/bin/", "755"],
     ["packaging/linux/slipcase-open.desktop", "usr/share/applications/", "644"],
-    ["packaging/linux/slipcase-open.xml", "usr/share/mime/packages/", "644"],
     ["packaging/linux/open.toml", "etc/slipcase/open.toml", "644"],
     ["README.md", "usr/share/doc/slipcase-open/README.md", "644"],
 ]

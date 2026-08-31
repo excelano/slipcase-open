@@ -7,9 +7,11 @@ Linux channel. This directory is those three, and one platform's worth so far.
 
 ## linux
 
-The media type, the desktop entry, and the machine policy file. Install into a
-prefix, which defaults to `~/.local`:
+The desktop entry and the machine policy file. The media type is
+`slipcase-common`'s, so install that first. Into a prefix, which defaults to
+`~/.local`:
 
+    ../slipcase-common/install.sh
     cargo build --release
     ./packaging/linux/install.sh
     ./packaging/linux/install.sh --prefix /usr/local --policy /etc
@@ -42,24 +44,30 @@ cannot reach. The cost of leaving it displayed is that "Open payload" also
 appears in the applications grid, where launching it with no argument prints the
 usage and exits.
 
-### No icon, and what it costs
+### The media type is not here
 
-The icon named for a media type is one file at one path, and two packages cannot
-ship the same path — dpkg refuses the second install outright.
-`slipcase-desktop` ships it, so this package does not, and its media type
-declaration carries no `<icon>` element. Where only this package is installed a
-container draws as a plain archive, which is true, since it is one.
+`slipcase-common` declares `application/x.slipcase+zip` and ships the icon a
+container is drawn with, and both products depend on it. Two packages cannot
+ship one path — dpkg refuses the second install — so the type and the icon
+belong to neither product and are declared once.
 
-The desktop entry falls back to the stock `document-open` for the same reason,
-and the notification channel uses that name too. An icon of its own is wanted
-and is not blocking. The proper fix when both products ship together is a
-`slipcase-common` package owning the type and the icon, which is a change in two
-other repositories.
+That package's README carries the two measurements behind it: `sub-class-of
+application/zip` carries no icon, so a type declaring none draws as a blank
+generic document rather than as an archive; and the icon has to be named as the
+generic icon as well as the icon, because GTK4 searches theme-major and Adwaita
+answers `application-x-generic` before hicolor is reached.
 
-The media type declaration is a second copy of what `slipcase-desktop` ships,
-under a different filename. Either product has to work with the other absent,
-and shared-mime-info takes the union of every package in the directory, so
-installing both is not a conflict and not a redefinition.
+`install.sh` therefore installs the desktop entry and not the type, and says so
+when the machine does not have the type declared — asked of `share/mime/types`,
+the file `update-mime-database` writes, rather than of the filenames in
+`packages/`, since every product's declaration has a different name. An entry
+naming a type nothing has declared is an entry no file manager will offer, and
+the symptom looks like an association fight rather than a missing package.
+
+The desktop entry still falls back to the stock `document-open` icon, and the
+notification channel uses that name too. An application icon of its own is
+wanted here and is a different thing from the file-type icon above, which is why
+it did not come with it.
 
 ## debian
 
