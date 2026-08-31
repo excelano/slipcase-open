@@ -303,11 +303,20 @@ Support` on macOS rather than `Caches`, which the system may purge at will;
 restart without being configuration or data, and not `XDG_RUNTIME_DIR`, which is
 cleared at logout.
 
-One directory per session, holding the extracted payload and a small TOML record
-naming the container's absolute path, the payload name, the session start, and
-the write-back count. TOML because `toml_edit` is already in the tree under
-`slpc`, so the record costs no dependency. Recovery is then a scan of one tree
-rather than a record pointing at a directory that may not be there.
+One directory per session, holding a small TOML record naming the container's
+absolute path, the payload name, the session start, and the write-back count.
+TOML because `toml_edit` is already in the tree under `slpc`, so the record costs
+no dependency. Recovery is then a scan of one tree rather than a record pointing
+at a directory that may not be there.
+
+**The payload sits one level below the record, in a `payload/` directory of its
+own, and it took writing this to see why.** SPEC §2.3 permits any plain
+filename, `session.toml` among them, so a payload beside the record could
+overwrite it — a container can be built to do that deliberately. And §6.1 reads
+anything else appearing in the payload's directory as the target application's
+work, which is a sound inference only where this tool put exactly one file
+there. The record sitting alongside would make the tool its own first false
+positive. One subdirectory answers both.
 
 The record cannot settle one case and the code has to: the container moved or
 was deleted while the session ran. Recovery says so and offers to save the
@@ -601,9 +610,20 @@ platforms, and the container swap is portable too, because
 
 Structure the differences as a small trait — `launch()`, `propagate_zone()`,
 `effective_policy()`, `present()` — with three implementations, rather than
-treating cross-platform as a yes/no decision. Windows first; macOS is roughly a
-day's work once Windows is done beyond the bundle; Linux ships with the
-allowlist and a documented statement that zone propagation does not exist there.
+treating cross-platform as a yes/no decision.
+
+**Windows first means Windows is the reference, not that it is built first.**
+The trait is defined against what Windows requires — an attachment-aware launch,
+a zone to propagate, a policy subtree with an ACL — because a trait shaped
+around the platform with the weakest security story would have to be widened
+later, and widening a security interface after three implementations exist is
+how the arms drift. Which platform is implemented first is a separate question
+and belongs in `PLAN.md`, where the answer is whichever machine the work is
+happening on.
+
+macOS is roughly a day's work once Windows is done, beyond the bundle. Linux
+ships with the allowlist and a documented statement that zone propagation does
+not exist there.
 
 **These are three risk shapes rather than a ranking, and calling Linux the
 degraded one flattens the picture.** Windows has the strongest zone story and the

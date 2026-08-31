@@ -81,16 +81,32 @@ the platform trait, watch the session directory with `notify`, sibling detection
 (§6.1). Write-back through `Destination::in_place`, validated through
 `written()` before the rename (§7). Recovery by CRC comparison (§6.3).
 
-Driven entirely by CLI verbs — open, sessions, close, recover — with no
-notifications, no tray and no IPC. The CLI is the test harness before it is an
-interface, and concept §9 keeps it as the floor afterwards.
+Driven entirely by CLI verbs — open, sessions, recover — with no notifications,
+no tray and no IPC. The CLI is the test harness before it is an interface, and
+concept §9 keeps it as the floor afterwards.
+
+**`close` is not among them, and listing it here was an error.** In this phase a
+session lives inside the foreground process that opened it, so there is nothing
+for an out-of-band `close` to talk to; it would have to find another process's
+session directory and act on it blind. The verb becomes meaningful in Phase 2,
+where a resident instance holds the sessions and the front door reaches it.
 
 ## Phase 2 — the process model
 
 Single instance and the IPC front door (§8). The session table keyed on file
 identity rather than path, deduplication of a container already open,
 recovery-before-new-session ordering, and the exit rules. Unix socket first,
-with the trait shaped so a named pipe drops in.
+with the trait shaped so a named pipe drops in. The `close` verb, which has
+something to talk to from here on.
+
+**The recovery sweep lands here rather than in Phase 1, and it is blocked rather
+than forgotten.** Concept §6.3 says a recovered payload matching its container
+means nothing was lost: clean up and say nothing. Nothing implements that half,
+because in Phase 1 it cannot be done safely — a session that is open and not yet
+edited reads as unchanged, and no process can tell a live session from a dead
+one, so a sweep run from a second terminal would delete a directory out from
+under a running editor. The session table is what supplies that distinction, so
+the sweep is written against it.
 
 ## Phase 3 — Linux front end and packaging
 
