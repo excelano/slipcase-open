@@ -67,6 +67,9 @@ pub struct Desktop {
     answers: Arc<Mutex<Vec<Answer>>>,
     /// Whether the service will render buttons.
     actions: bool,
+    /// Whether the service reads the body as markup, in which case what goes
+    /// into it has to be escaped.
+    markup: bool,
 }
 
 impl Desktop {
@@ -86,12 +89,14 @@ impl Desktop {
         // the specification contemplates.
         let capabilities: Vec<String> = proxy.call("GetCapabilities", &())?;
         let actions = capabilities.iter().any(|c| c == "actions");
+        let markup = capabilities.iter().any(|c| c == "body-markup");
 
         let desktop = Self {
             connection,
             outstanding: Outstanding::default(),
             answers: Arc::default(),
             actions,
+            markup,
         };
         desktop.listen()?;
         Ok(desktop)
@@ -153,6 +158,18 @@ impl Desktop {
         weight: Weight,
     ) -> Result<u32, zbus::Error> {
         let proxy = notifications(&self.connection)?;
+        // A payload name is attacker-controlled — SPEC 2.3 constrains it only
+        // to being a plain filename — and a service advertising `body-markup`
+        // parses the body as Pango. A name carrying `<b>` would then style the
+        // sentence somebody is being asked to judge, and one carrying a stray
+        // `&` would break the parse and take the whole body with it. SPEC 3
+        // already makes a refusal message a display path; this is the same
+        // rule at the channel that has a markup parser behind it.
+        let body = if self.markup {
+            escape(body)
+        } else {
+            body.to_string()
+        };
         let mut hints: HashMap<&str, Value<'_>> = HashMap::new();
         hints.insert("desktop-entry", Value::from(DESKTOP_ENTRY));
         hints.insert(
@@ -179,7 +196,7 @@ impl Desktop {
                 0u32,
                 ICON,
                 summary,
-                body,
+                body.as_str(),
                 actions,
                 hints,
                 timeout,
@@ -267,6 +284,23 @@ impl Channel for Desktop {
     }
 }
 
+/// The three characters Pango reads as markup.
+///
+/// The summary is not markup by the specification and is left alone; the body
+/// is, wherever the service says so.
+fn escape(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for c in text.chars() {
+        match c {
+            '&' => out.push_str("&amp;"),
+            '<' => out.push_str("&lt;"),
+            '>' => out.push_str("&gt;"),
+            other => out.push(other),
+        }
+    }
+    out
+}
+
 /// A proxy onto the notification service.
 fn notifications(connection: &Connection) -> Result<Proxy<'static>, zbus::Error> {
     Proxy::new(connection, SERVICE, OBJECT, SERVICE)
@@ -274,8 +308,22 @@ fn notifications(connection: &Connection) -> Result<Proxy<'static>, zbus::Error>
 
 #[cfg(test)]
 mod tests {
-    use super::Desktop;
+    use super::{escape, Desktop};
     use crate::present::{Channel, Choice, Question, Report};
+
+    #[test]
+    fn a_payload_name_cannot_put_markup_in_the_body() {
+        // `payload.file` is attacker-controlled and the body is parsed as Pango
+        // wherever the service says `body-markup`. A name carrying a tag would
+        // otherwise style the sentence somebody is being asked to judge, and a
+        // bare ampersand would break the parse and lose the body with it.
+        assert_eq!(
+            escape("<b>invoice</b> & <i>co</i>.pdf"),
+            "&lt;b&gt;invoice&lt;/b&gt; &amp; &lt;i&gt;co&lt;/i&gt;.pdf"
+        );
+        // And an ordinary name is left exactly as it was.
+        assert_eq!(escape("quarterly report.pdf"), "quarterly report.pdf");
+    }
 
     /// Talks to the real session bus, so it is not part of the suite.
     ///

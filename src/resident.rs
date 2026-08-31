@@ -235,10 +235,13 @@ impl Resident {
                     "{} was left behind.",
                     slpc::display_name(&left.record().payload)
                 ),
+                // Short, because a notification body is one paragraph however
+                // it is written. The container is named because that is what
+                // the decision is about; the session directory is not, because
+                // `Reveal` is the button that opens it.
                 detail: vec![
                     format!("It is {state}."),
-                    format!("From {}", slpc::display_path(&left.record().container)),
-                    format!("The payload is in {}", left.payload_dir().display()),
+                    format!("From {}.", slpc::display_path(&left.record().container)),
                     "It will open once you have decided.".into(),
                 ],
                 choices: vec![Choice::WriteBack, Choice::Discard, Choice::Reveal],
@@ -416,8 +419,7 @@ impl Resident {
                 summary: format!("{name} was saved after you closed the session."),
                 detail: vec![
                     format!("It is {state}."),
-                    format!("Into {}", slpc::display_path(&session.record().container)),
-                    format!("The payload is in {}", session.payload_dir().display()),
+                    format!("Into {}.", slpc::display_path(&session.record().container)),
                 ],
                 choices: vec![Choice::WriteBack, Choice::Discard, Choice::Reveal],
             });
