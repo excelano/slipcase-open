@@ -126,9 +126,11 @@ jobs:
       # installed first or there is nothing for the entry to resolve against.
       # Pinned, because this clones another repository and runs a shell script
       # out of it: whoever can land a commit there executes code here. Bump it
-      # deliberately.
+      # deliberately, and take the hash from `git rev-parse` rather than typing
+      # it — the first version of this line was a real short hash with the rest
+      # invented, which clones fine and fails the checkout with exit 128.
       #
-      # COMMON-PIN: 2d204380f8bdc0b96b91dcbcbbcd6c3ba5a44d1a
+      # COMMON-PIN: 2d20438f1216c45b2b931ba40c0c2997f7b07671
       - name: The type and the entry are ours
         run: |
           sudo apt-get install -y -qq shared-mime-info desktop-file-utils libglib2.0-bin
@@ -136,7 +138,7 @@ jobs:
           git clone --filter=blob:none --no-checkout \
               https://github.com/excelano/slipcase-common.git "${RUNNER_TEMP}/common"
           git -C "${RUNNER_TEMP}/common" checkout --detach \
-              2d204380f8bdc0b96b91dcbcbbcd6c3ba5a44d1a
+              2d20438f1216c45b2b931ba40c0c2997f7b07671
           "${RUNNER_TEMP}/common/install.sh"
           ./packaging/linux/install.sh
 
