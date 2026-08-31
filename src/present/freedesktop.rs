@@ -304,4 +304,45 @@ mod tests {
         desktop.withdraw("test-0");
         assert!(desktop.identifiers_for("test-0").is_empty());
     }
+
+    /// Concept 9 rests on a notification that persists somewhere the person can
+    /// return to: a recovery question is worth nothing if it goes while they
+    /// are finishing a sentence. That is the desktop's behaviour rather than
+    /// this code's, so it is put on a real one and looked at.
+    ///
+    /// **Measured on GNOME Shell 48.7: a notification does not outlive the
+    /// process that sent it.** While the sender is alive the question is on
+    /// screen and in the message list, with its buttons; once the sender's bus
+    /// connection goes, the shell removes it. So concept 9's *persists
+    /// somewhere the user can return to* holds only for as long as the instance
+    /// does, and concept 8's fallback is the record on disk rather than the
+    /// notification. Amended in both places.
+    ///
+    /// Holds for a minute so there is time to look, and leaves the question
+    /// standing. Dismiss it by hand.
+    ///
+    /// `cargo test --lib -- --ignored persists`
+    #[test]
+    #[ignore = "needs a session bus, and leaves a notification behind"]
+    fn a_question_persists_in_the_message_list() {
+        let desktop = Desktop::connect().expect("no notification service");
+        desktop.ask(&Question {
+            about: "persistence-0".into(),
+            summary: "slipcase-open: does this stay?".into(),
+            detail: vec![
+                "It should still be in the message list a minute from now.".into(),
+                "Dismiss it by hand when you have looked.".into(),
+            ],
+            choices: vec![Choice::WriteBack, Choice::Discard, Choice::Reveal],
+        });
+        let held = desktop.identifiers_for("persistence-0");
+        assert_eq!(held.len(), 1);
+        println!("notification {} sent. Holding for 60 seconds.", held[0]);
+        // Alive on purpose. GNOME Shell watches the sending bus name, and what
+        // this is asking is whether a notification outlives the process that
+        // sent it — which is what concept 9 assumes and concept 8's exit rule
+        // depends on.
+        std::thread::sleep(std::time::Duration::from_secs(60));
+        println!("exiting now; watch whether it goes with me");
+    }
 }

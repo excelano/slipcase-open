@@ -470,8 +470,20 @@ closed a session while the editor still had the document open: a live process
 keeps watching that directory and notices the save when it happens, rather than
 leaving the question until somebody next opens a container. Bound it — once the
 siblings are gone and the payload has settled, prompt once, act on the answer,
-and exit; if nobody answers, §9's persistent notification holds the question and
-the record on disk carries it to the next launch.
+and exit; if nobody answers, the record on disk carries the question to the next
+launch.
+
+**Amended, measured on GNOME Shell 48.7: the notification does not carry it.**
+This sentence used to say that §9's persistent notification held the question
+alongside the record. It does not, on this platform: a notification is removed
+when the process that sent it goes, so the buttons stop working at the moment
+the instance exits. Nothing here breaks, because the record on disk was always
+the durable half and `sessions` reads it — but two things follow. The bound on
+the linger is the whole window in which a question can be answered rather than a
+courtesy on top of a durable one, so it is a real interface decision and not a
+housekeeping constant. And the message this leaves in place of a withdrawn
+question is itself sent from the dying process, so on Linux it goes too; what
+somebody actually comes back to is `slipcase-open sessions`.
 
 Autostart on login is not worth three conventions and three sets of expectations
 about what may run unbidden, for a tool invoked occasionally whose fallback
@@ -493,7 +505,9 @@ session model.
 
 **Notifications carrying actions are the portable primitive, and they are what
 the design needs.** Buttons in the notification, and a notification that
-persists somewhere the user can return to. All three platforms have both:
+persists somewhere the user can return to — with one qualification measured on
+GNOME and recorded in §8: through `org.freedesktop.Notifications` it persists
+only while the process that sent it lives. All three platforms have both:
 `org.freedesktop.Notifications` has carried an actions parameter for as long as
 it has existed, and GNOME Shell renders them as buttons and keeps the
 notification in its message list; Windows toasts carry actions and persist in
@@ -849,3 +863,16 @@ is settled by writing the code rather than by more of this document.
   route.
 - Whether the state directory's backup and sync exposure (§6.4) is said to the
   user at open time or only in the administrator documentation.
+- Whether Linux moves to `org.gtk.Notifications` with `DBusActivatable=true`.
+  §8's amendment records that a notification through
+  `org.freedesktop.Notifications` dies with the process that sent it, which
+  leaves Linux the odd platform out: a Windows toast reactivates its application
+  through the COM activator, and `UNUserNotificationCenter` relaunches a bundle
+  the same way, so on both of those a question genuinely does outlive the
+  instance. The GNOME mechanism with the same property is `org.gtk.Notifications`
+  paired with a D-Bus activatable desktop entry, and taking it would restore the
+  parity §9 assumes. What it costs is a second way into the process, which §8
+  calls a control surface and which would have to be treated as one; and it is
+  GNOME's rather than the freedesktop specification's, so the other desktops
+  would keep the current path and the current limit. Worth deciding before
+  Phase 4 builds on the assumption, and not before this one ships.
