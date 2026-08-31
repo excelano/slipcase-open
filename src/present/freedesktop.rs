@@ -174,7 +174,11 @@ impl Desktop {
         hints.insert("desktop-entry", Value::from(DESKTOP_ENTRY));
         hints.insert(
             "urgency",
+            // Low for the routine ones, so a desktop that sorts by urgency can
+            // put them where they belong even where the threshold has let them
+            // through.
             Value::from(match weight {
+                Weight::Routine => 0u8,
                 Weight::Ordinary => 1u8,
                 Weight::Interrupt => 2u8,
             }),
@@ -184,7 +188,7 @@ impl Desktop {
         // and a warning that concept 5.1 says earns an interrupt. Everything
         // else takes the service's own timeout, because a write-back notice
         // that had to be dismissed would make the ordinary case the noisy one.
-        let timeout: i32 = if actions.is_empty() && weight == Weight::Ordinary {
+        let timeout: i32 = if actions.is_empty() && weight != Weight::Interrupt {
             -1
         } else {
             0

@@ -582,10 +582,35 @@ precedence over `~/.config`.
 | Replace vs. append | Must be explicit. An administrator who sets a list expecting it to be exhaustive, and instead gets it unioned with the defaults, has a silent hole |
 | Deny list | Always wins, regardless of every other setting |
 | Confirm each write-back | Off by default; on for archival use (§6.2) |
+| How much is said | A threshold on §9's weights, not a list of switches. Added while building Phase 3; see below |
 
 There is no setting for the extensionless case. A payload the platform has no
 registration for is refused whatever the lists say (§5.1), because the dialog it
 would otherwise raise offers the user every executable on the machine.
+
+**Added while building it: how much the tool says belongs here too, and it is a
+threshold rather than a list of switches.** Most people will want fewer
+notifications than the design produces, and the honest axis is not how loud a
+message is but whether anybody asked for it. A write-back happens on its own; a
+confirmation of a button somebody just pressed does not, however routine it
+looks, and a setting that silenced the second would mean pressing a button and
+getting nothing back. So §9's weights carry that distinction and the setting is
+one word over them.
+
+Two things follow. **A question cannot be quietened**, because it goes through
+the channel's *ask* rather than its *report* and the threshold cannot reach it —
+structural rather than a rule to remember, since silencing one would strand a
+payload with nothing to say so until the next launch. And **this key needs none
+of the launch-path discipline below**: it gates no decision, so it is resolved
+once when the instance starts and held.
+
+Putting it in this chain rather than in a settings file of its own is what makes
+it work on three platforms without designing anything: it inherits the registry,
+the configuration profile, and the precedence, and an administrator can hold a
+fleet quiet through the mechanism already specified. The platforms' own
+per-application notification settings are the blunt version and are not this
+tool's to duplicate — each of the three can switch it off outright. What this
+key is for is the middle ground none of them can express.
 
 **Enforcement happens in the launch path**, immediately before execution and
 after the extension has been taken from the decoded `payload.file` and folded

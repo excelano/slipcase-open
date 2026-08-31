@@ -168,7 +168,7 @@ impl Resident {
             Err(e) => refuse(voice, outside, e.to_string()),
             Ok(opened) => {
                 let name = slpc::display_name(&opened.session().record().payload).into_owned();
-                let mut report = Report::ordinary(format!("{name} is open."))
+                let mut report = Report::routine(format!("{name} is open."))
                     .and(format!("Session {}", id_of(opened.session())));
                 if opened.mark != slpc::provenance::Mark::Silent {
                     report = report.and("It came from somewhere else, and the copy says so.");
@@ -179,7 +179,7 @@ impl Resident {
                 // speaking, because a client that prints it to a terminal is
                 // not what concept 5.1 means by an interrupt.
                 if let Some(what) = opened.misrepresented {
-                    outside.channel.report(
+                    outside.report(
                         &Report::interrupt(format!("{name} is not what its name says."))
                             .and(format!("The payload is {}.", what.describes()))
                             .and("That is the shape of a phishing attachment.")
@@ -367,10 +367,23 @@ impl Resident {
             match open.pump() {
                 Ok(true) => {
                     let s = open.session();
-                    outside.channel.report(&Report::ordinary(format!(
-                        "{} written back.",
-                        slpc::display_name(&s.record().payload)
-                    )));
+                    // **The first of a session and not each one.** A write-back
+                    // fires on every save, so an hour's editing is dozens of
+                    // notifications for the same fact. The first is worth
+                    // saying, because it is how somebody learns the loop works
+                    // at all; the rest are the tool congratulating itself.
+                    // Concept 6.2 wants a session visible and wants somewhere
+                    // to look when an edit is expected to have landed, and
+                    // `sessions` answers that better than a stream of banners.
+                    if s.record().write_backs <= 1 {
+                        outside.report(
+                            &Report::routine(format!(
+                                "{} written back.",
+                                slpc::display_name(&s.record().payload)
+                            ))
+                            .and("Saves from here on are written back quietly."),
+                        );
+                    }
                     wrote_back.push(s.record().container.clone());
                 }
                 Ok(false) => {}
@@ -378,7 +391,7 @@ impl Resident {
                 // rest, and it is a reason to say so: concept 6.2 puts the
                 // close at the user's hand, and a save that did not land is the
                 // thing they most need to know did not.
-                Err(e) => outside.channel.report(
+                Err(e) => outside.report(
                     &Report::interrupt(format!(
                         "{} could not be written back.",
                         slpc::display_name(&open.session().record().payload)
@@ -446,7 +459,7 @@ impl Resident {
             // same decision taken at the command line in the meantime, or a
             // notification that outlived the process that asked. Saying so
             // beats a click that appears to do nothing.
-            outside.channel.report(&Report::ordinary(format!(
+            outside.report(&Report::ordinary(format!(
                 "{} has already been dealt with.",
                 answer.about
             )));
@@ -471,7 +484,7 @@ impl Resident {
                 choices: vec![Choice::WriteBack, Choice::Discard, Choice::Reveal],
             };
             if let Err(e) = outside.launcher.launch(&dir) {
-                outside.channel.report(&Report::ordinary(format!(
+                outside.report(&Report::ordinary(format!(
                     "{} could not be shown: {e}",
                     dir.display()
                 )));
@@ -487,7 +500,7 @@ impl Resident {
         match answer.choice {
             Choice::WriteBack => match crate::writeback::write_back(&mut pending.session) {
                 Ok(()) => {
-                    outside.channel.report(&Report::ordinary(format!(
+                    outside.report(&Report::ordinary(format!(
                         "{name} written back to {}.",
                         slpc::display_path(&pending.session.record().container)
                     )));
@@ -498,7 +511,7 @@ impl Resident {
                     // was, which is what makes a second attempt possible, and
                     // the question goes back so there is something to make it
                     // with.
-                    outside.channel.report(
+                    outside.report(
                         &Report::interrupt(format!("{name} could not be written back."))
                             .and(e.to_string()),
                     );
@@ -509,9 +522,7 @@ impl Resident {
             },
             Choice::Discard => {
                 let _ = pending.session.remove();
-                outside
-                    .channel
-                    .report(&Report::ordinary(format!("{name} discarded.")));
+                outside.report(&Report::ordinary(format!("{name} discarded.")));
             }
             Choice::Reveal => unreachable!("answered above"),
         }
@@ -519,9 +530,7 @@ impl Resident {
         // Concept 8: the new session follows the answer.
         if let Some(container) = pending.then_open {
             if let Response::Err(why) = self.open(&container, Voice::Instance, outside) {
-                outside
-                    .channel
-                    .report(&Report::interrupt(format!("{name} did not open: {why}")));
+                outside.report(&Report::interrupt(format!("{name} did not open: {why}")));
             }
         }
     }
@@ -541,7 +550,7 @@ impl Resident {
     /// Withdraw one question and leave the command line in its place.
     fn stop_asking(pending: &Pending, outside: &Outside<'_>) {
         outside.channel.withdraw(&pending.about);
-        outside.channel.report(
+        outside.report(
             &Report::ordinary(format!(
                 "{} is still undecided.",
                 slpc::display_name(&pending.session.record().payload)
@@ -567,15 +576,15 @@ impl Resident {
             match open.close() {
                 Ok(flow::Closed::Cleared) => {}
                 Ok(flow::Closed::LeftForRecovery(lingering)) => self.lingering.push(lingering),
-                Err(e) => outside
-                    .channel
-                    .report(&Report::interrupt(format!("a session did not close: {e}"))),
+                Err(e) => {
+                    outside.report(&Report::interrupt(format!("a session did not close: {e}")));
+                }
             }
         }
         for lingering in std::mem::take(&mut self.lingering) {
             let session = lingering.into_session();
             if recover::state(&session).needs_a_person() {
-                outside.channel.report(
+                outside.report(
                     &Report::ordinary(format!(
                         "{} was closed while its application was still working.",
                         slpc::display_name(&session.record().payload)
@@ -603,7 +612,7 @@ fn id_of(s: &Session) -> String {
 /// it, and back to the client where it has.
 fn say(voice: Voice, outside: &Outside<'_>, report: Report) -> Response {
     if voice == Voice::Instance {
-        outside.channel.report(&report);
+        outside.report(&report);
     }
     Response::Ok(
         std::iter::once(report.summary)
@@ -620,9 +629,7 @@ fn say(voice: Voice, outside: &Outside<'_>, report: Report) -> Response {
 /// opening.
 fn refuse(voice: Voice, outside: &Outside<'_>, why: String) -> Response {
     if voice == Voice::Instance {
-        outside
-            .channel
-            .report(&Report::interrupt("Not opened.").and(why.clone()));
+        outside.report(&Report::interrupt("Not opened.").and(why.clone()));
     }
     Response::Err(why)
 }
@@ -750,6 +757,11 @@ mod tests {
 
         fn outside(&self) -> Outside<'_> {
             Outside::new(&self.policy, &self.launcher, &self.channel)
+        }
+
+        /// The same, with the routine reports let through.
+        fn loud(&self) -> Outside<'_> {
+            self.outside().saying(crate::policy::Notify::Everything)
         }
     }
 
@@ -883,15 +895,15 @@ mod tests {
         let payload = session::scan(&root).unwrap()[0].payload_path();
         fs::write(&payload, b"edited").unwrap();
 
+        // Watched through the record rather than through what was said. The
+        // write-back count is what `pump` guarantees; a notification is a
+        // presentation choice that a threshold may now drop.
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
-        while std::time::Instant::now() < deadline && !w.channel.said().contains("written back") {
+        let saved = || session::scan(&root).unwrap()[0].record().write_backs;
+        while std::time::Instant::now() < deadline && saved() == 0 {
             r.turn(&w.outside());
         }
-        assert!(
-            w.channel.said().contains("written back"),
-            "{}",
-            w.channel.said()
-        );
+        assert!(saved() >= 1, "nothing was written back");
 
         let again = ok(r.handle(opening(c), &w.outside()));
         assert!(again[0].contains("already open"), "{again:?}");
@@ -1218,10 +1230,10 @@ mod tests {
         let w = World::new();
         let mut r = Resident::new(&root);
 
-        ok(r.handle(opening(quiet), &w.outside()));
+        ok(r.handle(opening(quiet), &w.loud()));
         assert!(w.channel.reports().is_empty(), "{:?}", w.channel.reports());
 
-        ok(r.handle(announcing(loud), &w.outside()));
+        ok(r.handle(announcing(loud), &w.loud()));
         assert!(
             w.channel.said().contains("loud.pdf is open"),
             "{}",

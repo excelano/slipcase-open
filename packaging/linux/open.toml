@@ -33,3 +33,20 @@
 # Ask before each write-back rather than repacking as the payload is saved. Off
 # by default; on for archival use.
 # confirm_each_write_back = false
+
+# How much the tool says without being asked.
+#
+#   "important"   warnings, failures, questions, and the answer to anything you
+#                 did. The default.
+#   "everything"  the above, plus what happens on its own — a notification for
+#                 every write-back rather than for the first of a session.
+#
+# Nothing here can silence a question. A session waiting on a decision is asked
+# through a different path entirely, so no setting can quieten one into leaving
+# a payload stranded.
+#
+# The desktop's own per-application notification settings are the blunt version
+# of this and are not ours to duplicate: GNOME, Windows and macOS can each turn
+# this application off outright. What this key is for is the middle ground none
+# of them can express.
+# notify = "important"

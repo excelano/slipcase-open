@@ -29,11 +29,21 @@ pub mod terminal;
 pub mod freedesktop;
 
 /// How much of the person's attention something is worth.
+///
+/// **The axis is whether the person asked for it, not how loud it is.** That is
+/// what [`crate::policy::Notify`] thresholds on, and it is the distinction a
+/// setting called *how much the tool says without being asked* has to be able
+/// to make. A confirmation of something somebody just clicked is not chatter
+/// however routine it looks, and silencing it would mean pressing a button and
+/// getting nothing back.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Weight {
-    /// Routine, and it should not take anybody away from what they are doing. A
-    /// write-back is this: concept 6.2 keeps sessions visible, and a repack is
-    /// the visible thing working.
+    /// Happens on its own, with nobody waiting on it. A write-back is this.
+    /// The only weight a threshold may drop.
+    Routine,
+    /// The answer to something the person just did — a button pressed, a verb
+    /// run — or a standing fact about the machine they should know once, like
+    /// concept 10's *settings here are administered*.
     Ordinary,
     /// Worth being interrupted for. Concept 5.1's content check earns this and
     /// says why: it fires close to never, and when it fires it means the
@@ -52,7 +62,16 @@ pub struct Report {
 }
 
 impl Report {
-    /// A routine report.
+    /// Something that happened on its own. Droppable.
+    #[must_use]
+    pub fn routine(summary: impl Into<String>) -> Self {
+        Self {
+            weight: Weight::Routine,
+            ..Self::ordinary(summary)
+        }
+    }
+
+    /// The answer to something somebody did, or a fact worth knowing once.
     #[must_use]
     pub fn ordinary(summary: impl Into<String>) -> Self {
         Self {

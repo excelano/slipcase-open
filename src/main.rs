@@ -188,7 +188,14 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
 
     let channel = channel();
     let source = policy::files::Files::for_this_platform();
-    let outside = Outside::new(&source, &Host, channel.as_ref());
+    // Resolved once and held for the life of the instance. Concept 10's warning
+    // about caching is about what may be opened, where a value held across a
+    // policy push is a bypass; `flow::open` still resolves the lists itself on
+    // every launch. How loud to be gates no decision.
+    let volume = policy::resolve(&source)
+        .map(|e| e.notify)
+        .unwrap_or_default();
+    let outside = Outside::new(&source, &Host, channel.as_ref()).saying(volume);
     report_policy(&outside);
 
     // Before the first session, and with nothing live yet to protect. Concept
@@ -343,10 +350,10 @@ fn report_policy(outside: &Outside<'_>) {
         if effective.configuration_suppressed {
             report = report.and("Your own configuration is not being consulted.");
         }
-        outside.channel.report(&report);
+        outside.report(&report);
     }
     for entry in &effective.uncomparable_entries {
-        outside.channel.report(&Report::ordinary(format!(
+        outside.report(&Report::ordinary(format!(
             "Ignored: `{entry}` in a policy list cannot match any payload."
         )));
     }

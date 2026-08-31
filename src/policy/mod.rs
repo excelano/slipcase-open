@@ -94,6 +94,33 @@ impl Origin {
     }
 }
 
+/// How much the tool says without being asked.
+///
+/// A threshold on [`crate::present::Weight`] rather than a list of switches, so
+/// that adding a report does not add a setting: it is written at the weight it
+/// deserves and lands on the right side of the line by itself.
+///
+/// **Questions are outside this and cannot be quietened.** They go through
+/// [`crate::present::Channel::ask`] rather than `report`, so nothing here
+/// reaches them. That is structural rather than a rule somebody has to
+/// remember: a session waiting on a decision would otherwise be silenced into
+/// stranding its payload, and concept 6.3 has nothing else to offer that person
+/// until the next launch.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Notify {
+    /// Everything, including what happens on its own.
+    Everything,
+    /// Everything except [`crate::present::Weight::Routine`] — so warnings,
+    /// failures, questions, and the answer to anything the person did. **The
+    /// default**, because the routine half is a notification per save and
+    /// somebody editing a document for an hour gets dozens of them. Concept 6.2
+    /// wants a session visible and wants somewhere to look when an edit is
+    /// expected to have landed, and `sessions` answers that better than a
+    /// stream of banners.
+    #[default]
+    Important,
+}
+
 /// Whether a layer's allowed list stands alone or adds to what is beneath it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Mode {
@@ -129,6 +156,8 @@ pub struct Layer {
     /// unremarkable, and a prompt on every save is friction for everyone who is
     /// not archiving.
     pub confirm_each_write_back: Option<bool>,
+    /// How much the tool says without being asked. See [`Notify`].
+    pub notify: Option<Notify>,
 }
 
 impl Layer {
@@ -149,6 +178,7 @@ impl Layer {
             && self.denied.is_none()
             && self.user_may_extend.is_none()
             && self.confirm_each_write_back.is_none()
+            && self.notify.is_none()
     }
 }
 
@@ -219,6 +249,13 @@ pub struct Effective {
     pub configuration_suppressed: bool,
     /// See [`Layer::confirm_each_write_back`].
     pub confirm_each_write_back: bool,
+    /// See [`Notify`].
+    ///
+    /// **Read once and held, unlike the lists.** The note at the top of this
+    /// module is about what may be opened, where a value cached across a policy
+    /// push is a bypass. This one governs how loud the tool is and gates no
+    /// decision, so nothing is lost by resolving it when the instance starts.
+    pub notify: Notify,
     /// List entries that can never match anything, because they are not
     /// comparable under concept 5.2. Surfaced rather than dropped: an entry an
     /// administrator wrote and this will never honour is worth a word, and
@@ -341,6 +378,11 @@ pub fn resolve(source: &dyn Source) -> std::result::Result<Effective, Error> {
         .find_map(|(_, l)| l.as_ref().and_then(|l| l.confirm_each_write_back))
         .unwrap_or(false);
 
+    let notify = stack
+        .iter()
+        .find_map(|(_, l)| l.as_ref().and_then(|l| l.notify))
+        .unwrap_or_default();
+
     uncomparable.sort_unstable();
     uncomparable.dedup();
 
@@ -350,6 +392,7 @@ pub fn resolve(source: &dyn Source) -> std::result::Result<Effective, Error> {
         managed,
         configuration_suppressed: !may_extend,
         confirm_each_write_back: confirm,
+        notify,
         uncomparable_entries: uncomparable,
     })
 }

@@ -44,6 +44,14 @@ root-owned `/etc/slipcase/open.toml` taking precedence over
 `$XDG_CONFIG_HOME/slipcase-open/policy.toml`. The shipped policy file documents
 every key and sets none of them.
 
+The same file sets how much the tool says. `notify = "important"` is the
+default and keeps warnings, failures, questions, and the answer to anything you
+did, while dropping what happens on its own — the first write-back of a session
+is announced and the rest are quiet. `notify = "everything"` restores the
+per-save notification. Nothing there can silence a question, and your desktop's
+own per-application notification settings remain the way to switch the tool off
+outright.
+
 The allowlist is a guardrail against user error and social engineering in the
 convenient path, and not a security boundary. A container is a plain ZIP and any
 user can extract the payload with standard tools. The boundary is application

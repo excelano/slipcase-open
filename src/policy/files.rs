@@ -22,6 +22,7 @@
 //! denied = ["exe", "dll"]
 //! user_may_extend = false
 //! confirm_each_write_back = true
+//! notify = "important"             # or "everything"
 //! ```
 //!
 //! Every key is optional, and omitting one means this layer says nothing about
@@ -30,7 +31,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use super::{Error, Layer, Mode, Origin, Read, Source};
+use super::{Error, Layer, Mode, Notify, Origin, Read, Source};
 
 /// Policy layers, each read from a path.
 ///
@@ -161,12 +162,27 @@ fn parse(path: &Path, text: &str) -> std::result::Result<Layer, Error> {
         }
     };
 
+    // Spelled out for the same reason `mode` is: two values, and a third is a
+    // mistake worth a sentence rather than a silent fallback to the default.
+    let notify = match doc.get("notify").map(|v| v.as_str()) {
+        None => None,
+        Some(Some("everything")) => Some(Notify::Everything),
+        Some(Some("important")) => Some(Notify::Important),
+        Some(other) => {
+            return Err(bad(format!(
+                "`notify` must be \"everything\" or \"important\", not {}",
+                other.map_or_else(|| "that".to_string(), |s| format!("\"{s}\"")),
+            )))
+        }
+    };
+
     Ok(Layer {
         allowed: list("allowed")?,
         mode,
         denied: list("denied")?,
         user_may_extend: flag("user_may_extend")?,
         confirm_each_write_back: flag("confirm_each_write_back")?,
+        notify,
     })
 }
 
@@ -409,5 +425,45 @@ mod tests {
             decide(&files, "inner.zip").unwrap(),
             Decision::NotPermitted { .. }
         ));
+    }
+
+    #[test]
+    fn notify_is_read_and_a_third_word_is_refused() {
+        let tmp = tempfile::tempdir().unwrap();
+        let quiet = write(tmp.path(), "quiet.toml", "notify = \"important\"\n");
+        let loud = write(tmp.path(), "loud.toml", "notify = \"everything\"\n");
+        let wrong = write(tmp.path(), "wrong.toml", "notify = \"off\"\n");
+
+        let at = |p| Files::none().at(Origin::Configuration, p);
+        assert_eq!(
+            resolve(&at(quiet)).unwrap().notify,
+            crate::policy::Notify::Important
+        );
+        assert_eq!(
+            resolve(&at(loud)).unwrap().notify,
+            crate::policy::Notify::Everything
+        );
+        // Spelled out rather than derived, like `mode`: a third word is a
+        // mistake worth a sentence, not a silent fall back to the default.
+        let refused = resolve(&at(wrong)).unwrap_err().to_string();
+        assert!(refused.contains("everything"), "{refused}");
+        assert!(refused.contains("\"off\""), "{refused}");
+    }
+
+    #[test]
+    fn a_machine_can_hold_the_volume_down_over_the_user() {
+        // The whole reason this lives in concept 10's chain rather than in a
+        // settings file of its own: an administrator gets it for free, on every
+        // platform, through the mechanism already specified.
+        let tmp = tempfile::tempdir().unwrap();
+        let machine = write(tmp.path(), "machine.toml", "notify = \"important\"\n");
+        let user = write(tmp.path(), "user.toml", "notify = \"everything\"\n");
+        let files = Files::none()
+            .at(Origin::MachinePolicy, machine)
+            .at(Origin::Configuration, user);
+        assert_eq!(
+            resolve(&files).unwrap().notify,
+            crate::policy::Notify::Important
+        );
     }
 }
