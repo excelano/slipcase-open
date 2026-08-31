@@ -24,9 +24,14 @@ security-relevant decision — validation, policy, the launch path, the write-ba
 Run `./check.sh`. It is `fmt --check`, `clippy -D warnings`, and the suite five
 times.
 
-**`-D warnings` rather than a count.** A commit went out on 2026-08-30 with a
-clippy warning outstanding because the count was printed and not read. A gate
-that fails is a gate; a number is a reminder.
+**The verdict comes from the tool, never from its output.** Twice now the gate
+has looked green while something was wrong. A commit went out on 2026-08-30 with
+a clippy warning outstanding because the count was printed and not read. Then on
+2026-08-31 `cargo test | grep | head -1` reported the first test binary's result
+and exited zero while an integration test in the second was failing — measured
+by breaking one on purpose and watching `check.sh` print `ok` and exit 0. Both
+times the fix was to take the status from the command. A gate that fails is a
+gate; a line that looks reassuring is not.
 
 **Five runs rather than one, and this is not caution.** The suite watches real
 directories through the platform's notifier, and event timing moves with load.

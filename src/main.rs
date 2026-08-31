@@ -81,6 +81,23 @@ struct Recover {
 
 type Fallible = Result<(), Box<dyn std::error::Error>>;
 
+/// A failure whoever needed to see it has already seen.
+///
+/// Concept 9 puts the instance's narration on its channel, and on a machine
+/// with no notification service that channel is this program's own error
+/// stream. A refusal reported there and then returned to the top would appear
+/// in it twice. This carries the exit code and no second sentence.
+#[derive(Debug)]
+struct AlreadySaid;
+
+impl std::fmt::Display for AlreadySaid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("reported through the channel")
+    }
+}
+
+impl std::error::Error for AlreadySaid {}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let outcome = || -> Fallible {
@@ -96,7 +113,9 @@ fn main() -> ExitCode {
     match outcome {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
-            eprintln!("slipcase-open: {e}");
+            if e.downcast_ref::<AlreadySaid>().is_none() {
+                eprintln!("slipcase-open: {e}");
+            }
             ExitCode::FAILURE
         }
     }
@@ -130,19 +149,17 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
     // matches against its table are the same file rather than two spellings.
     let container = std::fs::canonicalize(&a.container)
         .map_err(|e| format!("{}: {e}", a.container.display()))?;
-    let request = Request::Open {
-        container,
-        // Concept 9. A double-click has no terminal, so the lines handed back
-        // here go nowhere and the instance has to speak for this invocation.
-        // Asked of the error stream because that is where this program's own
-        // messages go; a run whose output is piped into something still has
-        // somewhere to show a refusal.
-        voice: if std::io::stderr().is_terminal() {
-            Voice::Client
-        } else {
-            Voice::Instance
-        },
+    // Concept 9. A double-click has no terminal, so the lines handed back here
+    // go nowhere and the instance has to speak for this invocation. Asked of
+    // the error stream because that is where this program's own messages go; a
+    // run whose output is piped into something still has somewhere to show a
+    // refusal.
+    let voice = if std::io::stderr().is_terminal() {
+        Voice::Client
+    } else {
+        Voice::Instance
     };
+    let request = Request::Open { container, voice };
 
     if let Some(response) = hand_over(door, &request)? {
         return say(&response);
@@ -151,11 +168,22 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
     // Nobody is listening, so become the instance. Losing the race to bind
     // means somebody else became it between the connect and the bind, and the
     // answer is to hand over to them rather than to fail.
-    let Ok(listener) = endpoint::bind(door) else {
-        return match hand_over(door, &request)? {
-            Some(response) => say(&response),
-            None => Err("could not reach or become the instance".into()),
-        };
+    let listener = match endpoint::bind(door) {
+        Ok(listener) => listener,
+        Err(why) => {
+            // Where nobody answers either, the bind error is the only account
+            // of what went wrong, and it is worth more than a sentence saying
+            // that neither worked. A socket path over the platform's length
+            // limit fails both halves and reads as a mystery without it.
+            return match hand_over(door, &request)? {
+                Some(response) => say(&response),
+                None => Err(format!(
+                    "could not reach the instance, and {} could not be bound: {why}",
+                    door.display()
+                )
+                .into()),
+            };
+        }
     };
 
     let channel = channel();
@@ -168,11 +196,30 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
     let _ = resident::sweep(root, &[]);
 
     let mut instance = Resident::new(root);
-    say(&instance.handle(request, &outside))?;
+    let response = instance.handle(request, &outside);
     if instance.is_idle() {
-        // The open was refused, so there is nothing to hold and no reason to
-        // keep the front door.
-        return Ok(());
+        // Nothing was started and nothing is being held, so there is no reason
+        // to keep the front door.
+        return match &response {
+            Response::Ok(_) => say(&response),
+            Response::Err(_) if voice == Voice::Client => say(&response),
+            Response::Err(_) => Err(AlreadySaid.into()),
+        };
+    }
+
+    // Something is being held, and a refusal can be what is holding it.
+    // Concept 8 has an open on a container with a session left behind refuse
+    // *and* raise the recovery question, so returning on the refusal would end
+    // the process that the question's buttons have to reach — and end it
+    // without withdrawing them, which is the one thing `stand_down` exists to
+    // prevent. The refusal is reported and the loop runs anyway.
+    match &response {
+        Response::Ok(_) => say(&response)?,
+        // Said once, on the same rule the instance narrates by: where the voice
+        // is the instance's, it has already gone through the channel — which on
+        // a machine with no notification service is this same error stream.
+        Response::Err(why) if voice == Voice::Client => eprintln!("slipcase-open: {why}"),
+        Response::Err(_) => {}
     }
 
     if std::io::stderr().is_terminal() {
