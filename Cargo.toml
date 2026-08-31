@@ -15,11 +15,14 @@ publish = false
 rust-version = "1.88"
 
 [dependencies]
-# Path until the release carrying `payload_crc` is out; then a version. PLAN.md
-# Phase 0. `fs` is the atomic file placement write-back needs and `provenance`
-# is the mark carried onto the replacement — `fs` implies the second, and both
-# are named because this crate uses both directly.
-slpc = { path = "../slpc-rust/slpc", features = ["fs", "provenance"] }
+# From crates.io as of 0.3.11, which is the release carrying `payload_crc`.
+# It was a path dependency until then (PLAN.md Phase 0), and switching off it is
+# what finally exercises `slpc` as a published crate — an argument nothing in
+# that workspace can make on its own, because its own CLI reaches the library by
+# path. `fs` is the atomic file placement write-back needs and `provenance` is
+# the mark carried onto the replacement; `fs` implies the second, and both are
+# named because this crate uses both directly.
+slpc = { version = "0.3.11", features = ["fs", "provenance"] }
 # The session record. Already in the tree under `slpc`, which parses the
 # metadata member with it, so this costs a line rather than a dependency — and
 # a payload name may carry a quote or a backslash, which is where hand-rolling

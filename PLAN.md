@@ -63,12 +63,16 @@ loses; and the design work so far has turned up three separate places where the
 answer was *`slpc` already does that, or should*, which makes a second release a
 fortnight later the likely outcome of cutting one now.
 
-**Phase 3 is what forces it, and that is where the wait ends.** The apt push is
-the last item in that phase and needs a tagged release here, which needs this
-crate off the path dependency, which needs 0.3.11 published. It is also what
-finally exercises `slpc` as a published crate — concept §14's argument, which
-nothing in the workspace can make on its own, because the CLI reaches the
-library by path.
+**Released as 0.3.11 on 2026-08-31, and the switch is made.** The apt push was
+the last item in Phase 3 and needed a tagged release here, which needed this
+crate off the path dependency, which needed 0.3.11 published. `slpc` now
+resolves from the registry with a checksum, and the suite is green against it —
+which is concept §14's argument settled by measurement: the library has been
+exercised as a published crate by a consumer outside its workspace, which
+nothing in that workspace can do on its own, because the CLI reaches it by path.
+
+`testsupport` stays a git dependency. It is `publish = false` and carries no
+version, and this crate is not published either, so nothing about it changed.
 
 ## Phase 1 — the engine, headless
 

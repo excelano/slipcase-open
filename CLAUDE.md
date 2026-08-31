@@ -60,6 +60,7 @@ next reader has no way to tell it apart from a proven one.
 
 ## Where things sit
 
-`PLAN.md` has the phases and what is done. `slpc` is a path dependency on the
-sibling checkout until the release carrying `payload_crc` is out; that repository
-should be on `main`.
+`PLAN.md` has the phases and what is done. `slpc` comes from crates.io as of
+0.3.11, which carries `payload_crc`; it was a path dependency on the sibling
+checkout until that was published. `testsupport` is still a git dependency on
+`slpc-rust`, being `publish = false`.
