@@ -23,6 +23,7 @@ pub mod ipc;
 pub mod platform;
 pub mod policy;
 pub mod recover;
+pub mod resident;
 pub mod session;
 pub mod table;
 pub mod watch;

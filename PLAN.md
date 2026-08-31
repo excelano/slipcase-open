@@ -107,7 +107,18 @@ recovery-before-new-session ordering, and the exit rules. Unix socket first,
 with the trait shaped so a named pipe drops in. The `close` verb, which has
 something to talk to from here on.
 
-**The recovery sweep lands here rather than in Phase 1, and it is blocked rather
+**Done except the linger.** Concept 8 says a closed session whose editor is
+still working should keep the process alive, so a live watcher notices the save
+and prompts once. There is nothing to prompt through until §9's notifications
+arrive in Phase 3, and observing a save this tool may not act on (§6.3) is worth
+nothing on its own — so the instance exits when the table empties, and the
+recovery item waits on disk for the next launch, which is where it would have
+ended up anyway. The linger belongs with the channel that makes it useful.
+
+For the same reason, *the recovery question comes first* is a refusal naming the
+two commands rather than a prompt. It becomes a prompt when there is one.
+
+**The recovery sweep lands here rather than in Phase 1, and it was blocked rather
 than forgotten.** Concept §6.3 says a recovered payload matching its container
 means nothing was lost: clean up and say nothing. Nothing implements that half,
 because in Phase 1 it cannot be done safely — a session that is open and not yet
