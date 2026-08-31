@@ -72,11 +72,11 @@ reaches the library by path.
 
 The bulk of the work, and all of it testable without a desktop.
 
-Container open and validation through `slpc`. Extension extraction mirroring
-`slipcase-desktop`'s `Path::extension` rule so the two products never disagree
-about what a payload's extension is (§5.2). Policy as a pure function over the
-§10 precedence chain, behind a source trait whose first implementation reads a
-file. The session directory and its TOML record (§6.4). Extract, launch behind
+**Done.** Container open and validation through `slpc`. Extension extraction
+mirroring `slipcase-desktop`'s `Path::extension` rule so the two products never
+disagree about what a payload's extension is (§5.2). Policy as a pure function
+over the §10 precedence chain, behind a source trait whose first implementation
+reads TOML files at paths it is given. The session directory and its TOML record (§6.4). Extract, launch behind
 the platform trait, watch the session directory with `notify`, sibling detection
 (§6.1). Write-back through `Destination::in_place`, validated through
 `written()` before the rename (§7). Recovery by CRC comparison (§6.3).
@@ -90,6 +90,14 @@ session lives inside the foreground process that opened it, so there is nothing
 for an out-of-band `close` to talk to; it would have to find another process's
 session directory and act on it blind. The verb becomes meaningful in Phase 2,
 where a resident instance holds the sessions and the front door reaches it.
+
+One thing changed shape while it was built. Reading a layer can fail, and the
+trait says so rather than answering *says nothing*: an administrator's deny list
+that will not parse is the case §10 cares about most, and flattening that into
+silence would permit whatever the file was written to refuse, quietly, for as
+long as the typo survived. A layer policy has already suppressed is not read at
+all, so a broken file that was going to be ignored cannot fail a decision it
+would have played no part in.
 
 ## Phase 2 — the process model
 

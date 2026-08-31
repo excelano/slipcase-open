@@ -20,8 +20,53 @@
 //! rather than for the launch path to consult twice.
 
 use std::collections::BTreeSet;
+use std::fmt;
+use std::path::PathBuf;
 
 use crate::extension;
+
+pub mod files;
+
+/// Why a layer could not be read.
+///
+/// **A policy source that fails is not a policy source that says nothing.** An
+/// administrator's deny list that cannot be read is the case concept 10 cares
+/// about most, and answering `None` for it would permit whatever it was written
+/// to refuse — quietly, and for as long as the typo survives. So reading a
+/// layer can fail, and the failure travels to whoever is deciding.
+#[derive(Debug)]
+pub enum Error {
+    /// The file is there and could not be read.
+    Unreadable {
+        /// The file.
+        path: PathBuf,
+        /// What the filesystem said.
+        cause: std::io::Error,
+    },
+    /// The file is there and is not what it claims to be.
+    Malformed {
+        /// The file.
+        path: PathBuf,
+        /// What was wrong with it.
+        cause: String,
+    },
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Unreadable { path, cause } => {
+                write!(f, "{} cannot be read: {cause}", path.display())
+            }
+            Self::Malformed { path, cause } => write!(f, "{}: {cause}", path.display()),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+/// A layer, or nothing, or a reason neither could be established.
+pub type Read = std::result::Result<Option<Layer>, Error>;
 
 /// Where a layer came from, in order of authority.
 ///
@@ -94,7 +139,16 @@ pub struct Layer {
 pub trait Source {
     /// This layer, read now rather than remembered. An implementation that
     /// caches is the bypass concept 10 warns about.
-    fn layer(&self, origin: Origin) -> Option<Layer>;
+    ///
+    /// `Ok(None)` means this platform has no such source, or it is not there.
+    /// That is not an error and not a refusal. An `Err` means the source exists
+    /// and could not be understood, which is a different thing entirely and
+    /// must not be flattened into the first.
+    ///
+    /// # Errors
+    ///
+    /// See [`Error`].
+    fn layer(&self, origin: Origin) -> Read;
 }
 
 /// What this build permits when nothing else says otherwise.
@@ -168,30 +222,38 @@ pub enum Decision {
 /// decision to be made after the extension is taken and folded, and a signature
 /// accepting a key would let a caller hand in one it computed some other way.
 /// The folding is [`extension::policy_key`]'s, once, here.
-pub fn decide(source: &impl Source, payload_name: &str) -> Decision {
+///
+/// # Errors
+///
+/// Where a layer exists and cannot be read. Nothing is decided in that case,
+/// because a policy that cannot be established is not a policy that permits.
+pub fn decide(source: &impl Source, payload_name: &str) -> std::result::Result<Decision, Error> {
     let Some(key) = extension::policy_key(payload_name) else {
-        return Decision::NoUsableExtension;
+        return Ok(Decision::NoUsableExtension);
     };
-    let effective = resolve(source);
-    if effective.denied.contains(&key) {
+    let effective = resolve(source)?;
+    Ok(if effective.denied.contains(&key) {
         Decision::Denied { key }
     } else if effective.allowed.contains(&key) {
         Decision::Open { key }
     } else {
         Decision::NotPermitted { key }
-    }
+    })
 }
 
 /// Resolve the layers without deciding anything, for an interface describing
 /// the state of things.
-#[must_use]
-pub fn resolve(source: &impl Source) -> Effective {
+///
+/// # Errors
+///
+/// Where a layer exists and cannot be read.
+pub fn resolve(source: &impl Source) -> std::result::Result<Effective, Error> {
     let mut uncomparable = Vec::new();
 
     // Highest authority first, so that `user_may_extend` is known before the
     // layer it gates is looked at.
-    let machine = source.layer(Origin::MachinePolicy);
-    let user_policy = source.layer(Origin::UserPolicy);
+    let machine = source.layer(Origin::MachinePolicy)?;
+    let user_policy = source.layer(Origin::UserPolicy)?;
 
     let may_extend = machine
         .as_ref()
@@ -199,11 +261,16 @@ pub fn resolve(source: &impl Source) -> Effective {
         .or_else(|| user_policy.as_ref().and_then(|l| l.user_may_extend))
         .unwrap_or(true);
 
-    let configuration = may_extend
-        .then(|| source.layer(Origin::Configuration))
-        .flatten();
+    // Not read at all where policy has suppressed it, which is the point: a
+    // suppressed layer is not consulted, so a broken one cannot fail a decision
+    // that would have ignored it anyway.
+    let configuration = if may_extend {
+        source.layer(Origin::Configuration)?
+    } else {
+        None
+    };
 
-    let built_in = source.layer(Origin::BuiltIn).unwrap_or(Layer {
+    let built_in = source.layer(Origin::BuiltIn)?.unwrap_or(Layer {
         allowed: Some(BUILT_IN_ALLOWED.iter().map(|s| (*s).to_string()).collect()),
         ..Layer::default()
     });
@@ -247,14 +314,14 @@ pub fn resolve(source: &impl Source) -> Effective {
     uncomparable.sort_unstable();
     uncomparable.dedup();
 
-    Effective {
+    Ok(Effective {
         allowed,
         denied,
         managed,
         configuration_suppressed: !may_extend,
         confirm_each_write_back: confirm,
         uncomparable_entries: uncomparable,
-    }
+    })
 }
 
 impl Effective {
@@ -288,7 +355,7 @@ fn fold_into(into: &mut BTreeSet<String>, list: Option<&[String]>, uncomparable:
 
 #[cfg(test)]
 mod tests {
-    use super::{decide, resolve, Decision, Layer, Mode, Origin, Source, BUILT_IN_ALLOWED};
+    use super::{decide, resolve, Decision, Layer, Mode, Origin, Read, Source, BUILT_IN_ALLOWED};
 
     /// A source built from whatever a test wants to say, layer by layer.
     #[derive(Default)]
@@ -299,15 +366,15 @@ mod tests {
     }
 
     impl Source for Stack {
-        fn layer(&self, origin: Origin) -> Option<Layer> {
-            match origin {
+        fn layer(&self, origin: Origin) -> Read {
+            Ok(match origin {
                 Origin::MachinePolicy => self.machine.clone(),
                 Origin::UserPolicy => self.user_policy.clone(),
                 Origin::Configuration => self.configuration.clone(),
                 // `resolve` supplies the shipped set where a source says
                 // nothing, which is what every arm below relies on.
                 Origin::BuiltIn => None,
-            }
+            })
         }
     }
 
@@ -322,13 +389,13 @@ mod tests {
     fn with_nothing_configured_the_shipped_set_is_what_answers() {
         let s = Stack::default();
         assert_eq!(
-            decide(&s, "report.pdf"),
+            decide(&s, "report.pdf").unwrap(),
             Decision::Open {
                 key: "pdf".to_string()
             }
         );
         assert_eq!(
-            decide(&s, "setup.exe"),
+            decide(&s, "setup.exe").unwrap(),
             Decision::NotPermitted {
                 key: "exe".to_string()
             }
@@ -340,7 +407,7 @@ mod tests {
         // Concept 10. Allowlistable, and not shipped allowed.
         assert!(!BUILT_IN_ALLOWED.contains(&"slpc"));
         assert_eq!(
-            decide(&Stack::default(), "inner.slpc"),
+            decide(&Stack::default(), "inner.slpc").unwrap(),
             Decision::NotPermitted {
                 key: "slpc".to_string()
             }
@@ -360,13 +427,13 @@ mod tests {
             ..Stack::default()
         };
         assert_eq!(
-            decide(&s, "notes.txt"),
+            decide(&s, "notes.txt").unwrap(),
             Decision::Open {
                 key: "txt".to_string()
             }
         );
         assert_eq!(
-            decide(&s, "report.pdf"),
+            decide(&s, "report.pdf").unwrap(),
             Decision::NotPermitted {
                 key: "pdf".to_string()
             }
@@ -383,8 +450,14 @@ mod tests {
             }),
             ..Stack::default()
         };
-        assert!(matches!(decide(&s, "inner.slpc"), Decision::Open { .. }));
-        assert!(matches!(decide(&s, "report.pdf"), Decision::Open { .. }));
+        assert!(matches!(
+            decide(&s, "inner.slpc").unwrap(),
+            Decision::Open { .. }
+        ));
+        assert!(matches!(
+            decide(&s, "report.pdf").unwrap(),
+            Decision::Open { .. }
+        ));
     }
 
     #[test]
@@ -398,7 +471,7 @@ mod tests {
             ..Stack::default()
         };
         assert_eq!(
-            decide(&s, "report.pdf"),
+            decide(&s, "report.pdf").unwrap(),
             Decision::Denied {
                 key: "pdf".to_string()
             }
@@ -422,7 +495,10 @@ mod tests {
             }),
             ..Stack::default()
         };
-        assert!(matches!(decide(&s, "report.pdf"), Decision::Denied { .. }));
+        assert!(matches!(
+            decide(&s, "report.pdf").unwrap(),
+            Decision::Denied { .. }
+        ));
     }
 
     #[test]
@@ -441,10 +517,10 @@ mod tests {
             ..Stack::default()
         };
         assert!(matches!(
-            decide(&s, "setup.exe"),
+            decide(&s, "setup.exe").unwrap(),
             Decision::NotPermitted { .. }
         ));
-        assert!(resolve(&s).configuration_suppressed);
+        assert!(resolve(&s).unwrap().configuration_suppressed);
     }
 
     #[test]
@@ -462,7 +538,10 @@ mod tests {
             }),
             ..Stack::default()
         };
-        assert!(matches!(decide(&s, "plan.dwg"), Decision::Open { .. }));
+        assert!(matches!(
+            decide(&s, "plan.dwg").unwrap(),
+            Decision::Open { .. }
+        ));
     }
 
     #[test]
@@ -478,9 +557,12 @@ mod tests {
             }),
             ..Stack::default()
         };
-        assert!(matches!(decide(&s, "notes.txt"), Decision::Open { .. }));
         assert!(matches!(
-            decide(&s, "plan.dwg"),
+            decide(&s, "notes.txt").unwrap(),
+            Decision::Open { .. }
+        ));
+        assert!(matches!(
+            decide(&s, "plan.dwg").unwrap(),
             Decision::NotPermitted { .. }
         ));
     }
@@ -497,9 +579,12 @@ mod tests {
             }),
             ..Stack::default()
         };
-        assert_eq!(decide(&s, "README"), Decision::NoUsableExtension);
-        assert_eq!(decide(&s, ".bashrc"), Decision::NoUsableExtension);
-        assert_eq!(decide(&s, "notes.tëxt"), Decision::NoUsableExtension);
+        assert_eq!(decide(&s, "README").unwrap(), Decision::NoUsableExtension);
+        assert_eq!(decide(&s, ".bashrc").unwrap(), Decision::NoUsableExtension);
+        assert_eq!(
+            decide(&s, "notes.tëxt").unwrap(),
+            Decision::NoUsableExtension
+        );
     }
 
     #[test]
@@ -513,8 +598,14 @@ mod tests {
         };
         // Both spellings on both sides: the list may be shouted or dotted, and
         // the container may spell its own name however it likes.
-        assert!(matches!(decide(&s, "REPORT.PDF"), Decision::Open { .. }));
-        assert!(matches!(decide(&s, "notes.txt"), Decision::Open { .. }));
+        assert!(matches!(
+            decide(&s, "REPORT.PDF").unwrap(),
+            Decision::Open { .. }
+        ));
+        assert!(matches!(
+            decide(&s, "notes.txt").unwrap(),
+            Decision::Open { .. }
+        ));
     }
 
     #[test]
@@ -523,7 +614,7 @@ mod tests {
         // compared, rather than folding the name a second time and possibly
         // differently.
         assert_eq!(
-            decide(&Stack::default(), "SETUP.EXE"),
+            decide(&Stack::default(), "SETUP.EXE").unwrap(),
             Decision::NotPermitted {
                 key: "exe".to_string()
             }
@@ -541,24 +632,24 @@ mod tests {
             }),
             ..Stack::default()
         };
-        let e = resolve(&s);
+        let e = resolve(&s).unwrap();
         assert_eq!(e.uncomparable_entries, vec!["*.exe", "ex\u{212a}"]);
         assert!(e.denied().any(|d| d == "exe"));
     }
 
     #[test]
     fn managed_says_whether_a_policy_layer_contributed() {
-        assert!(!resolve(&Stack::default()).managed);
+        assert!(!resolve(&Stack::default()).unwrap().managed);
         let s = Stack {
             user_policy: Some(Layer::default()),
             ..Stack::default()
         };
-        assert!(resolve(&s).managed);
+        assert!(resolve(&s).unwrap().managed);
     }
 
     #[test]
     fn confirming_each_write_back_is_off_until_a_layer_asks() {
-        assert!(!resolve(&Stack::default()).confirm_each_write_back);
+        assert!(!resolve(&Stack::default()).unwrap().confirm_each_write_back);
         let s = Stack {
             configuration: Some(Layer {
                 confirm_each_write_back: Some(true),
@@ -566,6 +657,6 @@ mod tests {
             }),
             ..Stack::default()
         };
-        assert!(resolve(&s).confirm_each_write_back);
+        assert!(resolve(&s).unwrap().confirm_each_write_back);
     }
 }

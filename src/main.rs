@@ -26,7 +26,7 @@ use std::time::Duration;
 use clap::{Args, Parser, Subcommand};
 
 use slipcase_open::platform::Host;
-use slipcase_open::policy::{Layer, Origin, Source};
+use slipcase_open::policy;
 use slipcase_open::{flow, recover, session};
 
 /// Open the payload of a slipcase container in its own application, and write
@@ -66,19 +66,6 @@ struct Recover {
     discard: bool,
 }
 
-/// The stand-in for the platform policy sources, which arrive with the platform
-/// arms in PLAN.md Phases 3 and 4. Saying nothing at every layer is what makes
-/// `policy::resolve` fall through to the set this build ships, which is the
-/// right behaviour for a machine with no policy applied and so is not a lie in
-/// the meantime.
-struct Unconfigured;
-
-impl Source for Unconfigured {
-    fn layer(&self, _origin: Origin) -> Option<Layer> {
-        None
-    }
-}
-
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let root = match session::default_root() {
@@ -102,7 +89,31 @@ fn fail(e: &dyn std::fmt::Display) -> ExitCode {
 }
 
 fn open(root: &std::path::Path, a: &Open) -> Result<(), Box<dyn std::error::Error>> {
-    let mut opened = flow::open(root, &a.container, &Unconfigured, &Host)?;
+    let source = policy::files::Files::for_this_platform();
+
+    // Concept 10 asks the interface to say when settings are administered, both
+    // to set expectations and to keep somebody from reporting that the
+    // application randomly refuses to open files. Read before the container, so
+    // that a refusal below arrives with the reason it is being refused already
+    // on screen.
+    // Nothing is said where policy cannot be read. `flow::open` resolves it
+    // again — it has to, because concept 10 puts the decision in the launch
+    // path and not in whatever ran before it — and refuses with that reason.
+    // Two copies of one message is noise, and the one attached to the refusal
+    // is the one that explains what happened.
+    if let Ok(effective) = policy::resolve(&source) {
+        if effective.managed {
+            println!("Settings on this machine are administered.");
+        }
+        if effective.configuration_suppressed {
+            println!("  Your own configuration is not being consulted.");
+        }
+        for entry in &effective.uncomparable_entries {
+            eprintln!("  Ignored: `{entry}` in a policy list cannot match any payload.");
+        }
+    }
+
+    let mut opened = flow::open(root, &a.container, &source, &Host)?;
 
     let name = slpc::display_name(&opened.session().record().payload);
     println!("{name} is open.");

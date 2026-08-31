@@ -33,6 +33,10 @@ pub enum Error {
     /// Policy will not have it opened. Carries the decision, so the refusal can
     /// say which of the several reasons applies.
     Refused(Decision),
+    /// Policy could not be established. Distinct from a refusal: nothing has
+    /// decided that this payload may not be opened, and the remedy is to fix
+    /// the source rather than to change the lists.
+    Policy(policy::Error),
     /// The session directory could not be made.
     Session(std::io::Error),
     /// The payload did not reach the session directory.
@@ -60,6 +64,7 @@ impl fmt::Display for Error {
                 ),
                 Decision::Open { .. } => write!(f, "permitted"),
             },
+            Self::Policy(e) => write!(f, "policy could not be read: {e}"),
             Self::Session(e) => write!(f, "the session could not be started: {e}"),
             Self::Extract(e) => write!(f, "{e}"),
             Self::Launch(e) => write!(f, "the payload could not be opened: {e}"),
@@ -113,7 +118,7 @@ pub fn open(
     let mut container = slpc::Container::open(container_path).map_err(Error::Container)?;
 
     // Step 2, and step 3's refusals. Resolved here rather than passed in.
-    let decision = policy::decide(source, container.payload_name());
+    let decision = policy::decide(source, container.payload_name()).map_err(Error::Policy)?;
     if !matches!(decision, Decision::Open { .. }) {
         return Err(Error::Refused(decision));
     }
@@ -357,19 +362,19 @@ mod tests {
     /// Says nothing at every layer, so the shipped set answers.
     struct Default_;
     impl Source for Default_ {
-        fn layer(&self, _o: Origin) -> Option<Layer> {
-            None
+        fn layer(&self, _o: Origin) -> crate::policy::Read {
+            Ok(None)
         }
     }
 
     /// Denies everything, for the refusal arms.
     struct DenyAll;
     impl Source for DenyAll {
-        fn layer(&self, o: Origin) -> Option<Layer> {
-            (o == Origin::MachinePolicy).then(|| Layer {
+        fn layer(&self, o: Origin) -> crate::policy::Read {
+            Ok((o == Origin::MachinePolicy).then(|| Layer {
                 allowed: Some(Vec::new()),
                 ..Layer::default()
-            })
+            }))
         }
     }
 
