@@ -1,1 +1,23 @@
 /target
+
+# The Windows package identity Partner Center assigned. Not a credential —
+# `Publisher` is in the manifest of every package the Store distributes, and the
+# store id is in the public listing URL — but it is an account's identifiers on
+# a public record, which is the judgement `slipcase-desktop` made for its copy
+# and this is the same one. `identity.psd1.example` beside it is committed and
+# says what goes in.
+/packaging/windows/identity.psd1
+
+# A Microsoft Store submission walkthrough, if one is written here. It would
+# name the store id and whatever the submission API is given, and
+# `packaging/windows/README.md` is where everything that belongs on a public
+# record goes instead.
+/packaging/windows/SUBMITTING.local.md
+
+# Built packages, the staging tree they come from, and the throwaway
+# certificate. All of it is assembled by `packaging/windows/build-msix.ps1` from
+# what is committed, and none of it is reproducible byte-for-byte anyway: a
+# rebuild of identical source differs in the COFF and debug timestamps and the
+# PDB GUID, which is why that script makes the upload and the local copy from
+# one staging tree rather than from two builds.
+/dist/

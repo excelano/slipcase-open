@@ -1,0 +1,29 @@
+# The Visual C++ runtime is not part of Windows, and linking it dynamically is
+# how `slipcase-desktop` 0.1.1 failed Microsoft Store certification on
+# 2026-08-29: the package installed on a tester's clean machine and then refused
+# to start, because `VCRUNTIME140.dll` ships in the Visual C++ Redistributable
+# and Windows does not carry it. Every machine this project builds on has Visual
+# Studio, so every machine that could have caught it had already hidden it.
+#
+# This crate has not been through certification yet, so the borrowed lesson is
+# the whole of the evidence here — but the failure is other people's clean
+# machines rather than ours, which is the kind that is expensive to learn twice.
+# `packaging/windows/check-imports.ps1` is the check that says whether it holds,
+# and the build script will not package a binary that fails it.
+#
+# What it costs, stated rather than skipped: a CRT security fix now needs a
+# rebuild of this binary, where a dynamically linked one would have picked it up
+# from a serviced DLL.
+#
+# The alternative was to declare a `Microsoft.VCLibs.140.00.UWPDesktop` framework
+# dependency in the manifest, which is what the policy means by disclosing it.
+# Rejected for the reason the sibling gives: it answers the paperwork by making
+# the application depend on something the machine has to acquire before it can
+# start, and this one otherwise depends on nothing that is not already there.
+#
+# This key names the triple, so Linux and macOS builds are untouched.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

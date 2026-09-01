@@ -231,6 +231,41 @@ than any of this work.** CI checked Windows with `cargo check` and linted only
 the host. `windows.yml` runs the whole gate now, and `linux.yml` cross-checks
 `--all-targets` rather than the library alone.
 
+**Packaged, installed, and double-clicked, which is what the rest of this was
+for.** `packaging/windows` holds the manifest, the build script, the import
+check and the identity template; the identity itself is Partner Center's and is
+not committed. Measured on 2026-09-01 through the real association: a marked
+container opens from Explorer, the payload is extracted carrying its zone into a
+session under the real `%LOCALAPPDATA%` — MSIX redirects neither, which the
+sibling had only measured for registry writes — and the registered application
+is launched with it.
+
+**"Last installed wins" is not what Windows does, and concept §4 needs the line
+amended.** That section takes duplicated associations as settled by the platform
+and concludes the answer is to not engineer around it. With the viewer and this
+product both installed as packages and no `UserChoice` set, a double-click
+raises *How do you want to open this file?* with **Keep using this app:
+Slipcase** above and **Slipcase Open** below it, badged New. Windows keeps the
+incumbent and offers the newcomer; it does not switch. That is the opposite of
+the premise rather than a variation on it.
+
+It also generalises something `slipcase-desktop` recorded as a quirk of mixing
+mechanisms — a package installed over a script registration producing the picker
+— which is the same behaviour reached by a different route. What survives in §4
+is the consequence, that each product registers a secondary verb so the one
+which is not the default stays reachable. What fails is the reason given for it.
+
+**The console subsystem cannot ship, and this is the measurement that settles
+it.** The binary is `WINDOWS_CUI`, so a packaged double-click raises a full-size
+console window titled with its path under WindowsApps, and it stays for as long
+as the session does rather than flashing. `slipcase-desktop`'s build script
+refuses console subsystems for exactly this and ours only reports it, pending
+this run. The answer is the windows subsystem with the console attached back
+when a terminal started it — and it lands with concept 9's toast and tray rather
+than before them, because without those a double-click would then say nothing at
+all. The narration in that console is the terminal channel standing in for a
+toast that does not exist yet.
+
 **Two things are proven end to end on Windows and one is not.** A marked
 container opens, the payload is extracted carrying `ZoneId=3` and its `HostUrl`,
 the registered application is launched, an edit to the payload is written back,

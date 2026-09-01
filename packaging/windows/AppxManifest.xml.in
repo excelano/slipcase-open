@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The MSIX package manifest, templated the way the sibling's is.
+  `build-msix.ps1` substitutes the placeholders below from `identity.psd1` and
+  from the crate version; nothing here is meant to be edited per build.
+
+  WHAT MUST COME FROM PARTNER CENTER, AND WHY IT CANNOT BE GUESSED
+
+  @IDENTITY_NAME@, @PUBLISHER@ and @PUBLISHER_DISPLAY_NAME@ are assigned when
+  the name is reserved. A package whose identity disagrees with the reservation
+  is rejected at upload rather than at review, so there is no way to find out a
+  value is wrong except by trying it. @PUBLISHER@ in particular is a full X.500
+  string and not the display name, and it is also the subject a test-signing
+  certificate must carry exactly.
+
+  @VERSION_APPX@ is the crate version in the spelling the Store requires: four
+  parts with the fourth always 0. It is a different shape from `Cargo.toml`'s,
+  which is why one place computes it.
+
+  WHAT IS DECIDED HERE
+
+  **The association is the whole product.** Concept 4 opens with the
+  double-click, and this file is where that becomes true on Windows: there is no
+  freedesktop database to put a media type in, so the extension, the content
+  type and the friendly name are declared here. The type and the extension come
+  from SPEC 4 and are not this file's to choose; `Excelano.SlipcaseOpen` is the
+  identity Partner Center assigned.
+
+  **The secondary verb, because the viewer claims the same extension.** Concept
+  4 says the two products contend for it, that last installed wins, and that the
+  answer is not to engineer around it — so each registers a verb to stay one
+  click away when it is not the default. "Open payload" is this product's, and
+  without it a machine where the viewer won would have no route to this one from
+  Explorer at all.
+
+  **No capability beyond `runFullTrust`.** This is a full-trust Win32 binary
+  packaged as MSIX rather than a UWP app, so that capability is what lets it run
+  at all. It makes no network call, needs no broad filesystem access — it reads
+  the container it was launched with and writes the session directory inside its
+  own per-user state — and asks for no device. A capability requested and unused
+  is a question at certification with no good answer.
+
+  Author: David M. Anderson
+  Built with AI assistance (Claude, Anthropic)
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap2="http://schemas.microsoft.com/appx/manifest/uap/windows10/2"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap2 uap3 rescap">
+
+  <Identity
+    Name="@IDENTITY_NAME@"
+    Publisher="@PUBLISHER@"
+    Version="@VERSION_APPX@"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Slipcase Open</DisplayName>
+    <PublisherDisplayName>@PUBLISHER_DISPLAY_NAME@</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Open the payload of a slipcase container in whatever application handles that kind of file, and write edits back into the container.</Description>
+  </Properties>
+
+  <Dependencies>
+    <!-- 10.0.17763 is the oldest Windows 10 supporting the packaging features
+         used here. Raising it excludes machines for nothing; lowering it is not
+         possible. -->
+    <TargetDeviceFamily
+      Name="Windows.Desktop"
+      MinVersion="10.0.17763.0"
+      MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-gb" />
+  </Resources>
+
+  <Applications>
+    <Application
+      Id="SlipcaseOpen"
+      Executable="slipcase-open.exe"
+      EntryPoint="Windows.FullTrustApplication">
+
+      <uap:VisualElements
+        DisplayName="Slipcase Open"
+        Description="Open a slipcase container's payload in its own application and write edits back."
+        BackgroundColor="transparent"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+
+      <Extensions>
+        <uap:Extension Category="windows.fileTypeAssociation">
+          <uap3:FileTypeAssociation Name="slpc">
+            <uap:SupportedFileTypes>
+              <uap:FileType ContentType="application/x.slipcase+zip">.slpc</uap:FileType>
+            </uap:SupportedFileTypes>
+            <uap:DisplayName>Slipcase Container</uap:DisplayName>
+            <uap:Logo>Assets\slipcase.png</uap:Logo>
+            <!-- Concept 4's secondary verb. The parameters are the path alone,
+                 which is what the default activation passes too, so the verb
+                 and the double-click reach the same command. `main` reads a
+                 lone path as `open` for exactly this reason. -->
+            <uap2:SupportedVerbs>
+              <uap3:Verb Id="openpayload" Parameters="&quot;%1&quot;">Open payload</uap3:Verb>
+            </uap2:SupportedVerbs>
+          </uap3:FileTypeAssociation>
+        </uap:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <!-- A packaged desktop application needs this and nothing else. See the
+         comment at the top of this file. -->
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
