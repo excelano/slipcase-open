@@ -2,7 +2,7 @@
 #
 # `check.sh` is what a person runs and this is the same three things on every
 # push, plus the two nobody runs by hand: whether the arms for the platforms
-# that are not built yet still compile, and whether the association actually
+# this runner is not still compile, and whether the association actually
 # resolves on a machine that was not the one it was written on.
 #
 # What it reaches and what it does not, stated because a green tick invites more
@@ -61,21 +61,26 @@ jobs:
       - name: Test, three times
         run: for i in 1 2 3; do echo "run $i"; cargo test --quiet; done
 
-      # The arms for the platforms `PLAN.md` has not reached. Written against
-      # Windows' requirements while only Linux exists, which is worth nothing if
+      # The arms for the platforms this runner is not. Written against
+      # Windows' requirements while only Linux existed, which is worth nothing if
       # nobody compiles them — and when this step was first written, they did
       # not compile: `identity.rs` used `windows_by_handle`, unstable since
       # 2019, and the endpoint's tests imported a Unix-only function.
       #
-      # The library on Windows and everything on macOS, and the asymmetry is the
-      # truth rather than an oversight. macOS is a Unix, so the front door and
-      # the resident loop compile there; Windows needs concept 8's named pipe,
-      # which is Phase 4, so the binary cannot build for it yet and this does
-      # not pretend otherwise.
+      # Both are everything now. Windows was the library alone for as long as
+      # the binary could not be built for it at all — concept 8's named pipe was
+      # Phase 4 and the front door and the resident loop were Unix-only — and
+      # that landed, so the gate that said so comes off with it. `windows.yml`
+      # is what runs the suite there; this stays as the cheaper half, because a
+      # Linux runner says whether a change still compiles for Windows without
+      # anybody waiting for a Windows one.
+      #
+      # macOS is a Unix and compiles whole. It has no workflow of its own, and
+      # a compile is all this claims about it.
       - name: The arms for the other platforms still compile
         run: |
           rustup target add x86_64-pc-windows-msvc x86_64-apple-darwin
-          cargo check --lib --target x86_64-pc-windows-msvc
+          cargo check --all-targets --target x86_64-pc-windows-msvc
           cargo check --all-targets --target x86_64-apple-darwin
 
       - name: Build the package

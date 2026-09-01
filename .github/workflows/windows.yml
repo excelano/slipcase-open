@@ -1,0 +1,112 @@
+# Run the gate on Windows, and ask the platform the one thing no test can.
+#
+# `linux.yml` is the older half of this pair and its header explains the shape.
+# What is different here is worth stating rather than inferring, because a green
+# tick invites more faith than it has earned.
+#
+# **The suite runs three times rather than once.** `CLAUDE.md` says why and a
+# runner is the case it was written about: the tests watch real directories
+# through `ReadDirectoryChangesW`, and event timing moves with load. Three
+# rather than five only because the runner is slower than a desk.
+#
+# **The verdict is taken from cargo and never read out of its output.** That
+# distinction has cost this repository twice, and a loop is exactly where it
+# would cost it a third time: without the `$LASTEXITCODE` check below, a failing
+# run in the middle would scroll past and the step would pass on the last one.
+#
+# **Nothing here opens a document.** `platform::testing::Recording` is what the
+# suite launches through, and on this platform there is nothing to launch
+# through yet: `ShellExecuteEx` with `IAttachmentExecute` is still to be written,
+# so concept 5 step 7 and the whole of Mark of the Web are unexercised here.
+#
+# **Nothing here shows a notification.** There is no toast yet, so the terminal
+# channel is what runs, and concept 9's buttons are checked by hand.
+#
+# **Nothing here reads a policy file or a registry key.** `for_this_platform`
+# names no source on Windows until the registry arrives, so what the suite
+# resolves is the built-in set. The two integration tests that name Linux's
+# files are `cfg(unix)` and do not run here, which is why this workflow's count
+# is lower than the Linux one's rather than because something was skipped.
+#
+# **Nothing here packages anything.** MSIX and its signing are still to come.
+#
+# What only a machine can answer is the last step. The front door's name carries
+# the SID of the account the process runs as, read from its own token, and the
+# state directory has to be the one the environment names rather than the one
+# this account happens to have. Both were written on one desk against one
+# profile; a runner is a different account on a different machine, which is the
+# entire point of asking here.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+
+name: Windows
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: What is installed
+        run: |
+          rustc -V
+          cargo -V
+
+      - name: Formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build
+        run: cargo build --all-targets
+
+      # Not `check.sh`: that would run fmt and clippy again inside a step that
+      # says it is testing, which is the same reason `linux.yml` spells it out.
+      - name: Test, three times
+        run: |
+          foreach ($i in 1..3) {
+            Write-Host "run $i"
+            cargo test --quiet
+            if ($LASTEXITCODE -ne 0) { throw "run $i failed" }
+          }
+
+      # The two things that come out of the environment rather than the source,
+      # asked on a machine that is not the one they were written on.
+      #
+      # The door has to be this account's pipe. Its name is built from the SID
+      # in the process token, so a runner proves the lookup works against an
+      # account nobody here has seen; and the pipe namespace belongs to the
+      # machine, so the SID is what keeps two sessions off one door.
+      #
+      # The sessions have to be where `%LOCALAPPDATA%` says. That is not
+      # hypothetical: the integration suite redirected only `HOME` and the three
+      # `XDG_` variables, Windows reads none of them, and the tests were running
+      # against the real state directory until the pipe landed and it was found.
+      - name: The front door is this account's, and the state is where it is told
+        run: |
+          $world = Join-Path $env:RUNNER_TEMP 'world'
+          New-Item -ItemType Directory -Force -Path $world | Out-Null
+          $env:LOCALAPPDATA = $world
+
+          $said = (cargo run --quiet -- policy) -join "`n"
+          if ($LASTEXITCODE -ne 0) { throw 'the policy verb refused' }
+          Write-Host $said
+
+          # `Contains` rather than `-match`, because the prefix is backslashes
+          # and every one of them would have to be escaped for a regex.
+          if (-not $said.Contains('\\.\pipe\slipcase-open.S-1-')) {
+            throw "the front door is not this account's pipe"
+          }
+          if (-not $said.Contains($world)) {
+            throw 'the state directory was not the one the environment named'
+          }
