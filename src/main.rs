@@ -26,7 +26,7 @@ use std::io::IsTerminal as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, CommandFactory as _, Parser, Subcommand};
 
 use slipcase_open::endpoint;
 use slipcase_open::ipc::{self, Request, Response, Voice};
@@ -56,6 +56,8 @@ use slipcase_open::{recover, session};
     version,
     about,
     long_about = None,
+    // So that a lone container path is not read as a malformed subcommand.
+    args_conflicts_with_subcommands = true,
     after_long_help = "Settings are read from /etc/slipcase/open.toml and from\n\
 $XDG_CONFIG_HOME/slipcase-open/policy.toml, neither of which has to exist.\n\
 Run `slipcase-open policy` for the paths on this machine, or see\n\
@@ -63,7 +65,16 @@ slipcase-open(1)."
 )]
 struct Cli {
     #[command(subcommand)]
-    verb: Verb,
+    verb: Option<Verb>,
+    /// A container to open, for an invocation that names no verb.
+    ///
+    /// **The association is why this exists.** Concept 4 wants a double-click,
+    /// and on Windows a packaged handler is launched with the file path and
+    /// nothing else — there is no place in a manifest to put a verb in front of
+    /// it, the way `Exec=slipcase-open open %f` does in the desktop entry. So a
+    /// lone path means `open`, which is also what every other document handler
+    /// does and is no worse a command line for it.
+    container: Option<PathBuf>,
 }
 
 #[derive(Subcommand)]
@@ -125,10 +136,20 @@ impl std::error::Error for AlreadySaid {}
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    // A verb, or a bare path meaning `open`, or neither — and neither is what
+    // clap used to refuse for us, so it is refused here in the same shape.
+    let verb = match (cli.verb, cli.container) {
+        (Some(verb), _) => verb,
+        (None, Some(container)) => Verb::Open(Open { container }),
+        (None, None) => {
+            let _ = Cli::command().print_help();
+            return ExitCode::from(2);
+        }
+    };
     let outcome = || -> Fallible {
         let root = session::default_root()?;
         let door = endpoint::path()?;
-        match cli.verb {
+        match verb {
             Verb::Open(a) => open(&root, &door, &a),
             Verb::Sessions => sessions(&root, &door),
             Verb::Close(a) => close(&door, &a),

@@ -257,3 +257,28 @@ fn a_settings_file_that_will_not_parse_is_named_before_it_is_refused() {
     // And the refusal says what is wrong with it, which the listing does not.
     assert!(complained.contains("unclosed array"), "{complained}");
 }
+
+#[test]
+fn a_lone_path_is_an_open() {
+    // Concept 4's double-click. On Windows a packaged handler is launched with
+    // the container path and nothing else, and a manifest has nowhere to put a
+    // verb in front of it the way the desktop entry does, so the verb has to be
+    // implied. What is asserted is the implication rather than the platform,
+    // which is why this runs everywhere.
+    //
+    // The payload is one the built-in set refuses, so both invocations stop
+    // before the launcher and no application is handed anything. Comparing the
+    // two against each other rather than against a fixed string is the point:
+    // it says they are the same command, whatever that command says.
+    let world = Alone::new();
+    let c = world.container("inner.zip", b"not a document");
+
+    let bare = world.run(&[c.to_str().unwrap()]).output().unwrap();
+    let spelled = world.run(&["open", c.to_str().unwrap()]).output().unwrap();
+
+    let said = String::from_utf8_lossy(&bare.stderr).to_string();
+    assert!(!bare.status.success(), "{said}");
+    assert!(said.contains("not in the allowed set"), "{said}");
+    assert_eq!(bare.status.code(), spelled.status.code());
+    assert_eq!(said, String::from_utf8_lossy(&spelled.stderr));
+}
