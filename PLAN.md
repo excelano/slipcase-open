@@ -200,6 +200,45 @@ test harness, so it earned one.
 pair, the named pipe with its SID ACL, toast with actions, the tray, the ProgID
 and its secondary verb, MSIX and the Store, winget.
 
+**Under way.** File identity, the named pipe, a gate that runs on a Windows
+machine, and the launcher are in. The registry policy source, the toast, the
+tray, the ProgID and the packaging are not.
+
+**`IAttachmentExecute` is not what reads Mark of the Web, and the line above is
+wrong about it — as is concept §12, which needs the same amendment.** Measured
+on 2026-09-01 by asking `CheckPolicy` about ten files, marked and unmarked,
+across five extensions, and reading the raw `HRESULT` rather than the `Result`
+the bindings collapse it into: the marked and unmarked answers are identical in
+every case, and what moves them is `SetSource` and the extension. That interface
+is for a client which has *received* an attachment and is deciding whether to
+save and run it, so the zone comes from the source it is told about rather than
+from the file. This tool arrives after that point, with the payload already on
+disk and already marked by `slpc::provenance`.
+
+What does consult the mark is `ShellExecuteEx` itself, so the launcher is that
+call with the two flags that would switch the check off — `SEE_MASK_NOZONECHECKS`
+and `SEE_MASK_FLAG_NO_UI` — deliberately absent. A requirement that is a
+negative is weaker than one that is a call, so the mask is a named constant with
+a test over it. `platform::shell` holds the table and the reasoning.
+
+**The binary could not be built for Windows at all until the pipe landed**, which
+is why the order here was identity, pipe, CI, launcher rather than the order the
+line above lists. `endpoint::bind` and `resident::run` were `cfg(unix)`, so
+nothing downstream of them could be tried.
+
+**The gate had never run on this platform, and it found four clippy errors older
+than any of this work.** CI checked Windows with `cargo check` and linted only
+the host. `windows.yml` runs the whole gate now, and `linux.yml` cross-checks
+`--all-targets` rather than the library alone.
+
+**Two things are proven end to end on Windows and one is not.** A marked
+container opens, the payload is extracted carrying `ZoneId=3` and its `HostUrl`,
+the registered application is launched, an edit to the payload is written back,
+and the repacked container is still marked. What is *not* proven is that the
+zone warning is displayed for a payload that earns one: nothing automated can
+watch a modal dialog, and the suite never reaches the launcher on any platform.
+That one needs a person at a desktop.
+
 ## Phase 5 — macOS
 
 The sandbox question in §15 is resolved first, because it may move where a

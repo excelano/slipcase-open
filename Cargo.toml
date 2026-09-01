@@ -116,7 +116,22 @@ zbus = { version = "5", default-features = false, features = ["blocking-api", "a
 # it. The launcher's `IAttachmentExecute` is COM and is a decision for the arm
 # that has to make that call; if it takes the `windows` crate, this line
 # collapses into that one.
+# The launcher's half, and the reason there are two of these. `ShellExecuteEx`
+# is plain Win32, but the arm was written against `IAttachmentExecute` first and
+# COM is what `windows-sys` does not do: it binds functions and structures and
+# leaves interfaces alone, so reaching one means writing its vtable by hand. The
+# measurement in `platform::shell` ended with `IAttachmentExecute` not being
+# used, which weakens that reason without retiring it, because concept 9's toast
+# is WinRT and lands here too. So the split is COM and WinRT through `windows`,
+# plain Win32 through `windows-sys`, and neither is the other's fallback.
 [target.'cfg(windows)'.dependencies]
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_System_Registry",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Security",
