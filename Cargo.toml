@@ -117,7 +117,15 @@ zbus = { version = "5", default-features = false, features = ["blocking-api", "a
 # that has to make that call; if it takes the `windows` crate, this line
 # collapses into that one.
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_Security_Authorization",
+    "Win32_Storage_FileSystem",
+    "Win32_System_IO",
+    "Win32_System_Pipes",
+    "Win32_System_Threading",
+] }
 
 [dev-dependencies]
 # A root of its own per test, so the suite never touches the real state

@@ -33,10 +33,6 @@ use crate::session::{self, Session};
 use crate::table::Table;
 
 /// How long the loop waits for a request before going round to pump.
-///
-/// Gated with `run` below, which is the only thing that reads it. Concept 8's
-/// named pipe is what makes that loop portable, and this comes off with it.
-#[cfg(unix)]
 const TICK: Duration = Duration::from_millis(250);
 
 /// How long a closed session's payload directory must go untouched before the
@@ -57,7 +53,7 @@ const SETTLED: Duration = Duration::from_secs(2);
 /// and finished a sentence first still finds the buttons live, and short enough
 /// that a process nobody is talking to does not sit there for the afternoon.
 /// When it expires the question is taken back rather than left standing, and
-/// what replaces it says how to reach the same decision from the command line â€”
+/// what replaces it says how to reach the same decision from the command line —
 /// a button that does nothing is worse than no button.
 const HELD: Duration = Duration::from_secs(300);
 
@@ -151,7 +147,7 @@ impl Resident {
         }
 
         // Concept 8: a pending recovery item is resolved first. A session left
-        // by a crash is not in the live table, so nothing refuses it â€” but
+        // by a crash is not in the live table, so nothing refuses it — but
         // opening a fresh one would extract the container's current payload and
         // leave the recovered edit with nowhere to go.
         match self.ask_about_what_was_left(container, outside) {
@@ -206,7 +202,7 @@ impl Resident {
     /// container, where there is one worth asking about, and hold it.
     ///
     /// Answers `true` where the open must wait for it. Concept 8: *the recovery
-    /// question comes first, and the new session follows the answer* â€” so the
+    /// question comes first, and the new session follows the answer* — so the
     /// container is remembered against the question and opened once it is
     /// settled, rather than the person having to double-click a second time.
     fn ask_about_what_was_left(
@@ -472,7 +468,7 @@ impl Resident {
 
         // Reveal is *not yet* rather than an answer, so the question stays and
         // is put again. A service that closes a notification when one of its
-        // actions is invoked â€” which GNOME Shell does â€” would otherwise leave
+        // actions is invoked — which GNOME Shell does — would otherwise leave
         // somebody looking at the folder with no way back to the decision.
         if answer.choice == Choice::Reveal {
             let pending = &mut self.pending[at];
@@ -645,7 +641,7 @@ fn refuse(voice: Voice, outside: &Outside<'_>, why: String) -> Response {
 ///
 /// **This could not be done before Phase 2 and that is why it was not.** A
 /// session that is open and not yet edited reads as unchanged, and no process
-/// could tell a live session from a dead one â€” a sweep run from a second
+/// could tell a live session from a dead one — a sweep run from a second
 /// terminal would have deleted a directory out from under a running editor.
 /// `live` is what the resident instance knows and nothing else did.
 ///
@@ -675,7 +671,6 @@ pub fn sweep(root: &Path, live: &[PathBuf]) -> io::Result<usize> {
 /// # Errors
 ///
 /// Where the endpoint cannot be served.
-#[cfg(unix)]
 pub fn run(
     listener: crate::endpoint::Listener,
     resident: &mut Resident,
@@ -883,8 +878,8 @@ mod tests {
     fn a_session_survives_a_write_back_still_being_the_same_container() {
         // A session is still the same session after it has saved, even though
         // the write-back renamed a new file over the container and so gave it a
-        // new inode. This passes on the path arm alone â€” checked by reverting
-        // `refresh` and watching it stay green â€” so what it pins is that a save
+        // new inode. This passes on the path arm alone — checked by reverting
+        // `refresh` and watching it stay green — so what it pins is that a save
         // does not lose a session, not that `refresh` works. The identity arm
         // is covered where it can be seen: `table::refreshing_keeps_the_
         // identity_arm_working_after_a_save`, which reaches the container

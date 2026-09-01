@@ -11,12 +11,12 @@
 //!
 //! There is a second: what the paths resolve to. `policy` reports the files
 //! this machine reads rather than the ones the documentation names, and every
-//! one of them comes out of the environment a process was started with â€” so a
+//! one of them comes out of the environment a process was started with — so a
 //! test of it is a test of a process or it is a test of nothing.
 //!
 //! **Nothing here touches the machine it runs on.** The state directory, the
 //! front door and the configuration are all pointed at a temporary tree, and
-//! the session bus is pointed at nothing â€” so concept 9's channel falls back to
+//! the session bus is pointed at nothing — so concept 9's channel falls back to
 //! the terminal and the suite does not put notifications on somebody's screen.
 
 // The level `Cargo.toml` explains: `forbid` everywhere Windows is not.
@@ -65,6 +65,13 @@ impl Alone {
             .env("XDG_STATE_HOME", self.path().join("state"))
             .env("XDG_RUNTIME_DIR", self.path().join("run"))
             .env("XDG_CONFIG_HOME", self.path().join("config"))
+            // Windows reads none of the three above. `session::default_root`
+            // takes `%LOCALAPPDATA%`, so without this the program under test
+            // works in the real one: the world would not be alone, and the
+            // suite would leave sessions in the developer's own state
+            // directory. Found by running this suite on Windows for the first
+            // time, where `sessions` answered from a directory no test wrote.
+            .env("LOCALAPPDATA", self.path().join("state"))
             // No session bus, so `Desktop::connect` fails and the terminal
             // takes over. A test that reached the developer's own notification
             // service would put its fixtures on their screen.
@@ -111,7 +118,7 @@ fn a_refusal_that_raised_a_question_stays_to_be_answered() {
     // Concept 8: an open on a container with a session left behind refuses and
     // asks what to do about the leftover. The refusal is not the end of the
     // invocation, because the question's buttons have nothing to reach if the
-    // process goes â€” and it would go without withdrawing them.
+    // process goes — and it would go without withdrawing them.
     let world = Alone::new();
     let c = world.container("report.txt", b"first");
     world.a_crashed_session(&c, "report.txt", b"an edit that never landed");
@@ -171,6 +178,14 @@ fn asking_what_is_open_with_nobody_running_reads_the_state_directory() {
     assert!(said.contains("--write-back"), "{said}");
 }
 
+// Unix, because every path it names is one: `/etc/slipcase/open.toml`, the XDG
+// configuration file, and the socket under `$XDG_RUNTIME_DIR`. Concept 10 gives
+// Windows a registry subtree instead of the first two and concept 8 gives it a
+// named pipe instead of the third, so the counterpart is a different test rather
+// than this one widened. It arrives with the registry source in PLAN.md Phase 4;
+// until then `Files::for_this_platform` reads nothing there and this would be
+// asserting Linux's answers against Windows.
+#[cfg(unix)]
 #[test]
 fn the_settings_verb_names_the_files_this_world_would_read() {
     // What the verb is for. The paths come out of `XDG_CONFIG_HOME` and
@@ -178,8 +193,8 @@ fn the_settings_verb_names_the_files_this_world_would_read() {
     // of the build, and this world's spellings are what should come back.
     //
     // Nothing is asserted about the resolved lists. `/etc/slipcase/open.toml`
-    // is the one layer no environment variable moves â€” deliberately, since a
-    // machine policy that could be redirected is not one â€” so a machine with a
+    // is the one layer no environment variable moves — deliberately, since a
+    // machine policy that could be redirected is not one — so a machine with a
     // real policy applied would fail an assertion about what is permitted, and
     // that assertion would be measuring the machine rather than the code.
     let world = Alone::new();
@@ -214,12 +229,15 @@ fn the_settings_verb_names_the_files_this_world_would_read() {
     assert!(said.contains("not there"), "{said}");
 }
 
+// Unix, for the reason above: the file it breaks on is the XDG one, and Windows
+// has no file layer to break until Phase 4 gives it one.
+#[cfg(unix)]
 #[test]
 fn a_settings_file_that_will_not_parse_is_named_before_it_is_refused() {
     // The reason the locations are printed before anything is resolved. A
     // person runs this verb *because* something is wrong, and a resolution that
     // refuses to guess past a broken layer would otherwise print nothing at all
-    // â€” leaving them with a complaint about a file and no list of the files
+    // — leaving them with a complaint about a file and no list of the files
     // there are.
     let world = Alone::new();
     let config = world.path().join("config/slipcase-open");
