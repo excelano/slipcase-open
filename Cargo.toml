@@ -6,9 +6,33 @@ edition = "2021"
 authors = ["David M. Anderson"]
 license = "MIT"
 repository = "https://github.com/excelano/slipcase-open"
-# Not published. The binary ships through the channels in PLAN.md 15, and
-# nothing depends on this as a library — `src/lib.rs` exists so the engine can
-# be tested without the command line, not to be consumed.
+# Not published, and the reason is the product rather than the library. What
+# this tool is for is the double-click, which is the desktop entry, the media
+# type `slipcase-common` declares, and the policy file under `/etc`. A crate
+# carries none of those. `cargo install slipcase-open` would hand somebody
+# concept 9's command-line floor with no association above it, and the symptom
+# of the missing media type is the one `packaging/linux/install.sh` warns
+# about: a double-clicked container opens the archive tool, which reads as an
+# association fight rather than as a missing package. The binary ships through
+# the channels in PLAN.md 15 because those carry the rest of it.
+#
+# The same test sorts the rest of the family. `slipcase` and `slpc` install
+# usefully from crates.io and are there; `slipcase-desktop` and
+# `slipcase-common` do not and are not.
+#
+# That nothing depends on this as a library is the second reason and the weaker
+# one: `src/lib.rs` exists so the engine can be tested without the command line,
+# and that argument ends the day the viewer imports it. The first one does not,
+# and the two are siblings in one tree, so a path dependency would serve that
+# case without crates.io being involved at all.
+#
+# Publishing would work and would be quietly broken, which is worth writing down
+# rather than rediscovering. `cargo publish` strips the `testsupport`
+# dev-dependency below — a git dependency carrying no version — while still
+# shipping the two unit tests that call it, so `cargo test` on the published
+# crate would not compile. The verify step builds the package and not its tests,
+# so it does not catch this. Measured 2026-08-31 with `cargo publish --dry-run`,
+# which exits zero.
 publish = false
 # `slpc`'s floor, which is `zip`'s floor, which is a number nobody here chose.
 # It moves when that one does.
