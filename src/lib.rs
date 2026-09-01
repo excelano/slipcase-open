@@ -13,6 +13,9 @@
 //! `src/main.rs` is the command line over it, which concept 9 keeps as the
 //! floor beneath the notifications and the tray.
 
+// The level `Cargo.toml` explains: `forbid` everywhere Windows is not.
+#![cfg_attr(not(windows), forbid(unsafe_code))]
+
 pub mod content;
 pub mod endpoint;
 pub mod extension;

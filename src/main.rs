@@ -19,6 +19,9 @@
 //! it rather than closing its sessions leaves them recoverable, which is the
 //! crash path working as designed.
 
+// The level `Cargo.toml` explains: `forbid` everywhere Windows is not.
+#![cfg_attr(not(windows), forbid(unsafe_code))]
+
 use std::io::IsTerminal as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;

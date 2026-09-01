@@ -788,6 +788,7 @@ dependencies = [
  "tempfile",
  "testsupport",
  "toml_edit",
+ "windows-sys 0.61.2",
  "zbus",
  "zip",
 ]

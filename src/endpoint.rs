@@ -7,15 +7,15 @@
 //! over; where one is, it hands over and exits.
 //!
 //! **The endpoint is restricted to its owner by the directory it sits in**,
-//! which is the platform's own mechanism and, §8 says, a requirement rather
-//! than a hardening measure. A socket's own permission bits are not portable —
-//! some kernels ignore them on connect — so the guarantee is the traversal bit
+//! which is the platform's own mechanism and, Â§8 says, a requirement rather
+//! than a hardening measure. A socket's own permission bits are not portable â€”
+//! some kernels ignore them on connect â€” so the guarantee is the traversal bit
 //! on a directory nobody else can enter, set before the socket is bound.
 //!
 //! **It is runtime state and not saved state**, which is the opposite of the
-//! choice §6.4 made for sessions. A stale socket from a crashed instance is
+//! choice Â§6.4 made for sessions. A stale socket from a crashed instance is
 //! debris to be cleared, where a stale session directory holds somebody's edit;
-//! so this goes in `$XDG_RUNTIME_DIR` where a platform offers one — cleared at
+//! so this goes in `$XDG_RUNTIME_DIR` where a platform offers one â€” cleared at
 //! logout, which is exactly right for this and exactly wrong for a session.
 
 use std::io;
@@ -56,7 +56,7 @@ fn runtime_dir() -> Option<PathBuf> {
 ///
 /// Set after creation rather than left to the umask, which is the user's: a
 /// permissive one would leave the front door reachable by every account on the
-/// machine, and §8 puts that among the requirements rather than the
+/// machine, and Â§8 puts that among the requirements rather than the
 /// improvements.
 ///
 /// # Errors
@@ -74,6 +74,10 @@ fn private(dir: &std::path::Path) -> io::Result<()> {
     std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))
 }
 
+/// Nothing to narrow. Windows scopes this by the inherited ACL on the directory
+/// above rather than by a mode, so this is the shape of the platform and not a
+/// stub waiting to be filled. `Result` because the Unix arm has one to give.
+#[allow(clippy::unnecessary_wraps)]
 #[cfg(not(unix))]
 fn private(_dir: &std::path::Path) -> io::Result<()> {
     Ok(())
@@ -131,7 +135,7 @@ mod unix {
     /// crashed instance leaves the file behind and nothing listening on it, so
     /// binding fails with *address in use* forever until somebody removes it.
     /// Removing it is only safe after a connection has been refused, which is
-    /// what says nobody is on the other end — deleting an endpoint somebody is
+    /// what says nobody is on the other end â€” deleting an endpoint somebody is
     /// serving would take the running instance's front door away and leave two
     /// processes holding sessions.
     ///
@@ -172,6 +176,10 @@ mod unix {
 /// That is the platform's own mechanism, and it is what makes the front door
 /// this user's rather than the machine's. A pipe with a default descriptor is a
 /// different thing wearing the same name. PLAN.md Phase 4.
+///
+/// # Errors
+///
+/// Always, until that pipe is written.
 #[cfg(not(unix))]
 pub fn connect(_at: &std::path::Path) -> io::Result<std::net::TcpStream> {
     Err(io::Error::new(
@@ -242,7 +250,7 @@ mod tests {
     fn a_socket_a_crash_left_behind_is_cleared_rather_than_blocking_forever() {
         // What a crash leaves: the file on disk and no descriptor behind it.
         // `std::os::unix::net::UnixListener` does not unlink on drop, so
-        // dropping one is exactly that state — where `mem::forget` would keep
+        // dropping one is exactly that state â€” where `mem::forget` would keep
         // the descriptor open in this process and still be listening, which is
         // the opposite of the case.
         //

@@ -59,7 +59,7 @@ pub fn of(path: &Path) -> io::Result<Identity> {
     let real = std::fs::canonicalize(path)?;
     let meta = std::fs::metadata(&real)?;
     Ok(
-        numbers(&meta).map_or(Identity::Path(real), |(volume, file)| Identity::File {
+        numbers(&real, &meta).map_or(Identity::Path(real), |(volume, file)| Identity::File {
             volume,
             file,
         }),
@@ -74,7 +74,7 @@ pub fn of(path: &Path) -> io::Result<Identity> {
 /// it would refuse to open the second container the user asked for, believing
 /// it already had it.
 #[cfg(unix)]
-fn numbers(meta: &std::fs::Metadata) -> Option<(u64, u64)> {
+fn numbers(_path: &Path, meta: &std::fs::Metadata) -> Option<(u64, u64)> {
     use std::os::unix::fs::MetadataExt as _;
     match (meta.dev(), meta.ino()) {
         (_, 0) => None,
@@ -82,33 +82,64 @@ fn numbers(meta: &std::fs::Metadata) -> Option<(u64, u64)> {
     }
 }
 
-/// Not yet on Windows, and deliberately not approximated.
+/// The volume serial number and the file index, through
+/// `GetFileInformationByHandle`.
 ///
-/// Concept 8 names the volume serial number and the file index, which is the
-/// right pair. `std::os::windows::fs::MetadataExt` exposes both and has kept
-/// them behind the unstable `windows_by_handle` feature since 2019, so the
-/// obvious implementation is nightly-only and this crate builds on stable.
-/// Written and never compiled until a cross-target check was added, which is
-/// the argument for having one.
+/// Concept 8 names that pair and this answered `None` until Phase 4, so Windows
+/// had no hard-link arm — which is the case the whole module exists for.
+/// `std::os::windows::fs::MetadataExt` exposes both and has kept them behind the
+/// unstable `windows_by_handle` feature since 2019, and this crate builds on
+/// stable, so the obvious implementation was never available.
 ///
-/// Answering `None` is not a gap: concept 8 already says that where a
-/// filesystem returns no stable identity the lookup falls back to the
-/// canonicalised path and accepts the narrower guarantee. What Windows loses
-/// until Phase 4 is the hard-link arm, and it loses it visibly rather than by
-/// an approximation that looks like an answer — the same rule `platform.rs`
-/// follows for the launcher there.
+/// **`same-file` was the other route PLAN.md named, and it does not fit.** Its
+/// `Handle` keys on exactly this pair and compares on it, but `key` and the
+/// `Key` type behind it are both private with no accessor, and a `Handle` holds
+/// the file open for as long as it lives. [`Identity`] is owned data held in the
+/// session table across a whole session and printed by `Display`, so the two
+/// numbers have to come out. Measured by reading `same-file-1.0.6/src/win.rs`.
+/// That leaves the call itself, and the `deny` `Cargo.toml` now carries in place
+/// of `forbid` so that this one module can lift it.
 ///
-/// Phase 4 has two ways to settle it and neither needs this file to change its
-/// shape: `GetFileInformationByHandle` through a crate that carries the unsafe,
-/// `same-file` being the obvious one, or `windows-sys` and a lifted `forbid`
-/// in this module alone.
+/// **Opened for its attributes and nothing more.** `FILE_READ_ATTRIBUTES` is
+/// what the call needs and the least it can ask for, and the share mode is
+/// `std`'s default of read, write and delete. Nothing here may stand in the way
+/// of the application editing its payload, and measured on 2026-09-01: a
+/// container already held open by another handle for reading and writing still
+/// answers.
+///
+/// A zero index is the tell the Unix arm reads from a zero inode, and gets the
+/// same answer — no stable number, so the caller falls back to the canonicalised
+/// path and the narrower guarantee that comes with it.
 #[cfg(windows)]
-fn numbers(_meta: &std::fs::Metadata) -> Option<(u64, u64)> {
-    None
+#[allow(unsafe_code)]
+fn numbers(path: &Path, _meta: &std::fs::Metadata) -> Option<(u64, u64)> {
+    use std::os::windows::fs::OpenOptionsExt as _;
+    use std::os::windows::io::AsRawHandle as _;
+    use windows_sys::Win32::Storage::FileSystem::{
+        GetFileInformationByHandle, BY_HANDLE_FILE_INFORMATION, FILE_READ_ATTRIBUTES,
+    };
+
+    let file = std::fs::OpenOptions::new()
+        .access_mode(FILE_READ_ATTRIBUTES)
+        .open(path)
+        .ok()?;
+    let mut info = BY_HANDLE_FILE_INFORMATION::default();
+    // SAFETY: the handle is open and owned by `file`, which outlives the call;
+    // `info` is a live, correctly typed allocation the callee only writes. The
+    // return value is checked before anything in `info` is read.
+    let got = unsafe { GetFileInformationByHandle(file.as_raw_handle(), &raw mut info) };
+    if got == 0 {
+        return None;
+    }
+    let index = (u64::from(info.nFileIndexHigh) << 32) | u64::from(info.nFileIndexLow);
+    match (u64::from(info.dwVolumeSerialNumber), index) {
+        (_, 0) => None,
+        pair => Some(pair),
+    }
 }
 
 #[cfg(not(any(unix, windows)))]
-fn numbers(_meta: &std::fs::Metadata) -> Option<(u64, u64)> {
+fn numbers(_path: &Path, _meta: &std::fs::Metadata) -> Option<(u64, u64)> {
     None
 }
 
@@ -160,12 +191,15 @@ mod tests {
         assert_eq!(of(&link).unwrap(), of(&real).unwrap());
     }
 
-    #[cfg(unix)]
     #[test]
     fn two_hard_links_are_one_container() {
         // The case a canonicalised path cannot see, and the reason concept 8
         // keys on identity. Both names resolve to themselves and differ, and
         // both are the same file.
+        //
+        // Not `cfg(unix)` since Phase 4. This is the test the Windows arm was
+        // written for, and gating it there would have left the arm asserting
+        // nothing on the platform it was added for.
         let tmp = tempfile::tempdir().unwrap();
         let a = tmp.path().join("a.slpc");
         let b = tmp.path().join("b.slpc");

@@ -304,6 +304,9 @@ fn private(at: &Path) -> io::Result<()> {
     fs::set_permissions(at, fs::Permissions::from_mode(0o700))
 }
 
+/// Nothing to narrow, for the reason the arm above gives. `Result` because that
+/// arm has one to give.
+#[allow(clippy::unnecessary_wraps)]
 #[cfg(not(unix))]
 fn private(_at: &Path) -> io::Result<()> {
     Ok(())

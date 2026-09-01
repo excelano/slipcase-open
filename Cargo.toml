@@ -94,6 +94,31 @@ clap = { version = "4.6", features = ["derive"] }
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { version = "5", default-features = false, features = ["blocking-api", "async-io"] }
 
+# Windows' half of concept 8's file identity: one function,
+# `GetFileInformationByHandle`, for the volume serial number and file index that
+# keep two hard links to one container from opening two sessions on it.
+#
+# Already compiled for this target under `clap`, `tempfile` and `notify`, so
+# this is a manifest line rather than a dependency — `cargo tree -i
+# windows-sys@0.61.2` names all three, and `Cargo.lock` gained one edge and no
+# package.
+#
+# `same-file` was the other route PLAN.md named, and it does not fit. It keys on
+# exactly this pair and compares on it, but `key` and its `Key` type are both
+# private with no accessor, and a `Handle` holds the file open for as long as it
+# lives — where `Identity` is owned data held across a whole session and
+# printed. Measured by reading `same-file-1.0.6/src/win.rs` rather than inferred
+# from its documentation. Not a question of weight: `walkdir` puts `same-file`
+# in the tree already, so taking that route would have cost a line too. It is
+# the shape that is wrong.
+#
+# `windows-sys` and not `windows`, because this is plain Win32 with no COM in
+# it. The launcher's `IAttachmentExecute` is COM and is a decision for the arm
+# that has to make that call; if it takes the `windows` crate, this line
+# collapses into that one.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Storage_FileSystem"] }
+
 [dev-dependencies]
 # A root of its own per test, so the suite never touches the real state
 # directory and two tests never share one.
@@ -111,11 +136,22 @@ zip = { version = "8.6", default-features = false, features = ["deflate-flate2-z
 
 [lints.rust]
 # The engine reads containers and replaces files. Nothing here needs to reach
-# past the borrow checker to do it, and the two modules that will — the Windows
-# and macOS platform arms — are not written yet. `slipcase-desktop` DESIGN 3
+# past the borrow checker to do it, and of the two modules that will — the
+# Windows and macOS platform arms — the first is written and the second is not.
+# `slipcase-desktop` DESIGN 3
 # records why this is `forbid` in a library root and `deny` where a platform
-# eventually has to lift it.
-unsafe_code = "forbid"
+# eventually has to lift it. Windows is the first platform to, for
+# `GetFileInformationByHandle` in `identity.rs`.
+#
+# `deny` rather than `forbid`, and the two are not interchangeable here: an
+# inner `allow` cannot override a `forbid`, which is the entire point of the
+# stronger level. Measured 2026-09-01: `[target.'cfg(windows)'.lints]` is not a
+# table cargo reads — it answers `warning: unused manifest key` and applies
+# nothing at all — so this key cannot be narrowed to one platform from here.
+# What narrows it is the `cfg_attr` in each of the three crate roots, which puts
+# `forbid` back everywhere Windows is not. Linux and macOS keep exactly the
+# level they have always had, and the relaxation reaches one module.
+unsafe_code = "deny"
 
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
