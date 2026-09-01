@@ -29,10 +29,19 @@ repository = "https://github.com/excelano/slipcase-open"
 # Publishing would work and would be quietly broken, which is worth writing down
 # rather than rediscovering. `cargo publish` strips the `testsupport`
 # dev-dependency below — a git dependency carrying no version — while still
-# shipping the two unit tests that call it, so `cargo test` on the published
-# crate would not compile. The verify step builds the package and not its tests,
-# so it does not catch this. Measured 2026-08-31 with `cargo publish --dry-run`,
-# which exits zero.
+# shipping the two unit tests that call it, in `extract.rs` and `writeback.rs`.
+# The verify step compiles the library and the binary and not the tests, so it
+# reports success, and `cargo test` on the extracted crate then fails with two
+# unresolved-crate errors. Nobody who merely depends on the crate meets this,
+# since dev-dependencies are not built downstream, which is how it would sit
+# undetected.
+#
+# Measured 2026-09-01: `cargo publish --dry-run` exits zero with verify enabled,
+# and `cargo test --no-run` on the crate it packaged exits 101. The sentence
+# about the verify step was written on 2026-08-31 from what verify does rather
+# than from a run, because that day's dry run passed `--no-verify`. It held, and
+# the two dates are here because afterwards there is no telling reasoning and
+# evidence apart.
 publish = false
 # `slpc`'s floor, which is `zip`'s floor, which is a number nobody here chose.
 # It moves when that one does.
