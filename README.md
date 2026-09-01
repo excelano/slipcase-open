@@ -29,6 +29,7 @@ process died, so it cannot tell a complete save from a half-written one.
     slipcase-open close 6a94-0          # final repack, then clean up
     slipcase-open recover 6a94-0 --write-back
     slipcase-open recover 6a94-0 --discard
+    slipcase-open policy                # which files settings come from here
 
 The first `open` becomes the resident instance; every later invocation hands its
 container to that one and exits. On a desktop with a notification service, the
@@ -43,6 +44,11 @@ then user configuration, then the built-in default. On Linux that means a
 root-owned `/etc/slipcase/open.toml` taking precedence over
 `$XDG_CONFIG_HOME/slipcase-open/policy.toml`. The shipped policy file documents
 every key and sets none of them.
+
+`slipcase-open policy` prints both paths as this machine resolves them, what
+they add up to, and where the sessions are kept. Every one of those paths comes
+out of the environment, so where a file lives and where it lives by default are
+two questions and only the running program answers the first.
 
 The same file sets how much the tool says. `notify = "important"` is the
 default and keeps warnings, failures, questions, and the answer to anything you

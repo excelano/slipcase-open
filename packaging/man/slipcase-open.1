@@ -13,6 +13,8 @@ slipcase\-open \- open the payload of a slipcase container in its own applicatio
 .B slipcase\-open recover
 .I SESSION
 .RB { \-\-write\-back | \-\-discard }
+.br
+.B slipcase\-open policy
 .SH DESCRIPTION
 Opens the payload of a
 .B .slpc
@@ -56,23 +58,52 @@ to put the payload into its container, or
 .B \-\-discard
 to throw it away. Naming a session without either reports its state and does
 nothing.
+.TP
+.B policy
+Report where settings are read on this machine, what they resolve to, and where
+the tool keeps its own state. The paths below come out of the environment, so
+this is what answers which file to edit; the list here is what the defaults are.
+Exits non\-zero where a layer exists and cannot be read, after naming it.
 .SH FILES
 .TP
 .I /etc/slipcase/open.toml
 Machine policy. Root\-owned, takes precedence over the user's own configuration,
 and installed documenting every key and setting none of them.
 .TP
+.I $XDG_CONFIG_HOME/slipcase\-open/policy.toml
+The user's own configuration, at
 .I ~/.config/slipcase\-open/policy.toml
-The user's own configuration. Not created by the package.
+where the variable is unset. Not created by the package.
 .TP
+.I $XDG_STATE_HOME/slipcase\-open/sessions
+Where a session's payload lives while it is open, at
 .I ~/.local/state/slipcase\-open/sessions
-Where a session's payload lives while it is open. Deliberately not the temporary
-directory, which a reboot or a cleaner may empty underneath an edit that has not
-been written back.
+where the variable is unset. Deliberately not the temporary directory, which a
+reboot or a cleaner may empty underneath an edit that has not been written back.
+.TP
+.I $XDG_RUNTIME_DIR/slipcase\-open/front\-door
+The socket every later invocation reaches the resident instance through. Private
+to its owner, and gone at logout. Falls back beside the state directory on a
+system that sets no runtime directory.
+.TP
+.I /usr/share/applications/slipcase\-open.desktop
+The desktop entry that puts this tool in the Open With list. The media type it
+names is declared by
+.BR slipcase\-common ,
+not by this package, and without that package installed nothing associates a
+container with this entry.
+.PP
+Run
+.B slipcase\-open policy
+for these paths as this machine resolves them rather than as they are written
+here.
 .SH CONFIGURATION
-Both files are TOML and take the same keys. In order of authority: machine
-policy, then user policy, then the user's own configuration, then the built\-in
-default.
+The two policy files are TOML and take the same keys. In order of authority:
+machine policy, then user policy, then the user's own configuration, then the
+built\-in default. There is no per\-user policy file on this platform, because
+nothing here would administer one; that layer is Windows and macOS vocabulary.
+Every key is optional, and one that is absent means the layer has no opinion
+about it rather than that it forbids everything.
 .TP
 .B allowed
 The payload extensions that may be opened, compared with ASCII case folded.

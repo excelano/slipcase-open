@@ -105,6 +105,35 @@ jobs:
           dpkg-deb -f "$deb" Depends | grep -q slipcase-common ||
               { echo "the package does not depend on slipcase-common" >&2; exit 1; }
 
+      # The one layer no test can reach. `/etc/slipcase/open.toml` is
+      # deliberately not redirectable — a machine policy an environment
+      # variable could move is not one — so the suite has no way to put a file
+      # there, and the machine arm of `policy` is unexercised by everything
+      # above. Here there is a machine to write to.
+      #
+      # What it checks is the unit test `the_policy_file_the_package_ships_says
+      # _nothing` makes of the shipped file, asked through the real resolution
+      # instead of a `Files` pointed at the repository copy: an untouched
+      # install must not read as administered. A stray uncommented line in that
+      # file is a policy nobody wrote, enforced on every machine that installs
+      # the package, and announced to each of them as their settings being
+      # administered.
+      - name: The shipped policy file reads as documentation
+        run: |
+          sudo install -D -m 0644 packaging/linux/open.toml /etc/slipcase/open.toml
+          said=$(cargo run --release --quiet -- policy)
+          printf '%s\n' "$said"
+          printf '%s\n' "$said" | grep -q '/etc/slipcase/open.toml (there, and sets nothing)' ||
+              { echo "the shipped file is not being read, or is setting something" >&2; exit 1; }
+          # `if` rather than `grep ... && { exit 1; }`: under `set -e` a whole
+          # AND-list that fails is a failed command, so the good case — no
+          # match — would end the step with the inverted verdict.
+          if printf '%s\n' "$said" | grep -qi 'administered'; then
+              echo "an untouched install reads as administered" >&2
+              exit 1
+          fi
+          sudo rm -rf /etc/slipcase
+
       - name: What lintian says
         run: |
           sudo apt-get update -qq

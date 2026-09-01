@@ -55,6 +55,25 @@ impl Files {
         self
     }
 
+    /// Where each layer is looked for, highest authority first.
+    ///
+    /// For an interface that reports the file it is actually reading rather
+    /// than the one the documentation names. Every path here comes out of the
+    /// environment — `XDG_CONFIG_HOME` on this platform, and the equivalents
+    /// elsewhere — so where a person's settings live and where they live *by
+    /// default* are two questions, and only the running program can answer the
+    /// first.
+    ///
+    /// A layer being listed says nothing about the file being there. Ask
+    /// [`Source::layer`] for that, which reads it.
+    #[must_use]
+    pub fn locations(&self) -> impl DoubleEndedIterator<Item = (Origin, &Path)> {
+        // Ascending by authority in the map, because that is `Origin`'s order
+        // and the resolution wants it that way; reversed here, because a person
+        // reading a list of layers wants the one that wins at the top.
+        self.paths.iter().rev().map(|(o, p)| (*o, p.as_path()))
+    }
+
     /// The layers this platform keeps in files, at the places concept 10 names.
     ///
     /// Linux only, and deliberately: a root-owned `/etc/slipcase` taking

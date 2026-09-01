@@ -9,6 +9,11 @@
 //! *serve the front door*. Every unit test in the crate can watch `is_idle`
 //! answer correctly and none of them can watch `main` act on it.
 //!
+//! There is a second: what the paths resolve to. `policy` reports the files
+//! this machine reads rather than the ones the documentation names, and every
+//! one of them comes out of the environment a process was started with — so a
+//! test of it is a test of a process or it is a test of nothing.
+//!
 //! **Nothing here touches the machine it runs on.** The state directory, the
 //! front door and the configuration are all pointed at a temporary tree, and
 //! the session bus is pointed at nothing — so concept 9's channel falls back to
@@ -161,4 +166,73 @@ fn asking_what_is_open_with_nobody_running_reads_the_state_directory() {
     let said = String::from_utf8_lossy(&done.stdout);
     assert!(said.contains("report.txt"), "{said}");
     assert!(said.contains("--write-back"), "{said}");
+}
+
+#[test]
+fn the_settings_verb_names_the_files_this_world_would_read() {
+    // What the verb is for. The paths come out of `XDG_CONFIG_HOME` and
+    // `XDG_STATE_HOME`, so the answer is a property of the environment and not
+    // of the build, and this world's spellings are what should come back.
+    //
+    // Nothing is asserted about the resolved lists. `/etc/slipcase/open.toml`
+    // is the one layer no environment variable moves — deliberately, since a
+    // machine policy that could be redirected is not one — so a machine with a
+    // real policy applied would fail an assertion about what is permitted, and
+    // that assertion would be measuring the machine rather than the code.
+    let world = Alone::new();
+    let done = world.run(&["policy"]).output().unwrap();
+    let said = String::from_utf8_lossy(&done.stdout);
+    assert!(done.status.success(), "{said}");
+
+    assert!(said.contains("/etc/slipcase/open.toml"), "{said}");
+    assert!(
+        said.contains(
+            world
+                .path()
+                .join("config/slipcase-open/policy.toml")
+                .to_str()
+                .unwrap()
+        ),
+        "{said}"
+    );
+    assert!(said.contains(world.sessions().to_str().unwrap()), "{said}");
+    assert!(
+        said.contains(
+            world
+                .path()
+                .join("run/slipcase-open/front-door")
+                .to_str()
+                .unwrap()
+        ),
+        "{said}"
+    );
+    // The user's own file is not there, and saying so is the point: somebody
+    // asking where their settings live is usually asking where to put them.
+    assert!(said.contains("not there"), "{said}");
+}
+
+#[test]
+fn a_settings_file_that_will_not_parse_is_named_before_it_is_refused() {
+    // The reason the locations are printed before anything is resolved. A
+    // person runs this verb *because* something is wrong, and a resolution that
+    // refuses to guess past a broken layer would otherwise print nothing at all
+    // — leaving them with a complaint about a file and no list of the files
+    // there are.
+    let world = Alone::new();
+    let config = world.path().join("config/slipcase-open");
+    std::fs::create_dir_all(&config).unwrap();
+    std::fs::write(config.join("policy.toml"), "denied = [\"exe\"\n").unwrap();
+
+    let done = world.run(&["policy"]).output().unwrap();
+    let printed = String::from_utf8_lossy(&done.stdout);
+    let complained = String::from_utf8_lossy(&done.stderr);
+
+    assert!(!done.status.success(), "{printed}{complained}");
+    assert!(
+        printed.contains(config.join("policy.toml").to_str().unwrap()),
+        "the broken file was not named in the listing: {printed}"
+    );
+    assert!(printed.contains("cannot be read"), "{printed}");
+    // And the refusal says what is wrong with it, which the listing does not.
+    assert!(complained.contains("unclosed array"), "{complained}");
 }

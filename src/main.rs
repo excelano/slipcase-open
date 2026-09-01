@@ -36,8 +36,28 @@ use slipcase_open::{recover, session};
 
 /// Open the payload of a slipcase container in its own application, and write
 /// edits back into the container.
+///
+/// Two lines rather than the table, and under `--help` rather than `-h`.
+/// Concept 9 keeps the command line the floor beneath everything else, and the
+/// thing read most often is the list of verbs: every line spent on paths here
+/// is a line between somebody and the verb they came for. `policy` is where the
+/// paths belong, because it prints the ones this machine resolves rather than
+/// the ones this build documents.
+///
+/// Wrapped by hand. `clap` reflows help text only with its `wrap_help`
+/// feature, which pulls in a terminal-size crate and is not enabled here, so an
+/// unbroken line would run off the side of the screen rather than off the side
+/// of nothing.
 #[derive(Parser)]
-#[command(version, about, long_about = None)]
+#[command(
+    version,
+    about,
+    long_about = None,
+    after_long_help = "Settings are read from /etc/slipcase/open.toml and from\n\
+$XDG_CONFIG_HOME/slipcase-open/policy.toml, neither of which has to exist.\n\
+Run `slipcase-open policy` for the paths on this machine, or see\n\
+slipcase-open(1)."
+)]
 struct Cli {
     #[command(subcommand)]
     verb: Verb,
@@ -53,6 +73,8 @@ enum Verb {
     Close(Close),
     /// Act on a session left behind by one that did not close.
     Recover(Recover),
+    /// Where settings are read from, and what they add up to.
+    Policy,
 }
 
 #[derive(Args)]
@@ -108,6 +130,7 @@ fn main() -> ExitCode {
             Verb::Sessions => sessions(&root, &door),
             Verb::Close(a) => close(&door, &a),
             Verb::Recover(a) => recover_one(&root, &door, &a),
+            Verb::Policy => settings(&root, &door),
         }
     }();
     match outcome {
@@ -356,6 +379,180 @@ fn report_policy(outside: &Outside<'_>) {
         outside.report(&Report::ordinary(format!(
             "Ignored: `{entry}` in a policy list cannot match any payload."
         )));
+    }
+}
+
+/// Concept 10's layers, named rather than described.
+///
+/// **The paths are resolved and not documented.** Every one of them comes out
+/// of the environment — `XDG_CONFIG_HOME` and `XDG_STATE_HOME` here,
+/// `%LOCALAPPDATA%` and a registry subtree elsewhere — so the file somebody
+/// should edit and the file this build's documentation names are two
+/// questions, and only the running program can answer the first. `git config
+/// --show-origin` and `npm config ls -l` exist for the same reason.
+///
+/// **Read here rather than asked of the instance.** There is nothing for the
+/// front door to add: concept 10 forbids holding what may be opened, so a
+/// running instance re-reads these files on every launch as well. The one
+/// value it does keep is how loud to be, and that is what it read when it
+/// started rather than what is in the file now — which is a reason to print
+/// the file's answer here rather than the instance's.
+///
+/// **The locations are printed before anything is resolved.** A file with a
+/// typo in it still has to be *named* by the verb somebody ran to find out
+/// where their settings are, and a resolution that refuses to guess past a
+/// broken layer would otherwise print nothing at all. The refusal follows the
+/// listing and still fails the run.
+fn settings(root: &Path, door: &Path) -> Fallible {
+    let source = policy::files::Files::for_this_platform();
+    let resolved = policy::resolve(&source);
+
+    let mut layers = source.locations().peekable();
+    if layers.peek().is_none() {
+        // Every platform but Linux, until PLAN.md Phases 4 and 5. Said out
+        // loud, because a blank heading reads as a program that could not find
+        // its own configuration.
+        println!("No settings files on this platform yet. The built-in set is what decides.");
+    } else {
+        println!("Where settings are read, in order of authority:");
+        println!();
+        for (origin, path) in layers {
+            println!(
+                "  {:<14}  {} ({})",
+                origin,
+                slpc::display_path(path),
+                layer_state(&source, origin, resolved.as_ref().ok())
+            );
+        }
+        println!();
+    }
+
+    // Named by the error itself, which carries the path. Returned rather than
+    // reported, because a policy that cannot be established is not a policy
+    // that permits and the exit code has to say so.
+    let effective = resolved?;
+
+    println!("What they add up to:");
+    println!();
+    let allowed: Vec<&str> = effective.allowed().collect();
+    let denied: Vec<&str> = effective.denied().collect();
+    labelled("allowed", &allowed);
+    labelled("denied", &denied);
+    println!(
+        "  {:<14}  {}",
+        "notify",
+        // The spelling the file itself uses, so that what this prints can be
+        // typed back into it.
+        match effective.notify {
+            policy::Notify::Everything => "everything",
+            policy::Notify::Important => "important",
+        }
+    );
+    println!(
+        "  {:<14}  {}",
+        "write-back",
+        if effective.confirm_each_write_back {
+            "confirmed each time"
+        } else {
+            "as the payload is saved"
+        }
+    );
+    println!();
+
+    // The same sentences `report_policy` says on the way into an open, because
+    // somebody who saw one there and came here to find out more should meet
+    // the claim they arrived with rather than a paraphrase of it.
+    if effective.managed {
+        println!("Settings on this machine are administered.");
+        if effective.configuration_suppressed {
+            println!("Your own configuration is not being consulted.");
+        }
+        println!();
+    }
+    for entry in &effective.uncomparable_entries {
+        println!("Ignored: `{entry}` in a policy list cannot match any payload.");
+    }
+    if !effective.uncomparable_entries.is_empty() {
+        println!();
+    }
+
+    // Not policy, and here anyway. Somebody looking for where this tool keeps
+    // its files has one question and not two, and the answer to the half that
+    // is not configuration is a directory nothing else prints.
+    println!("Where the tool keeps its own state:");
+    println!();
+    println!("  {:<14}  {}", "sessions", slpc::display_path(root));
+    println!("  {:<14}  {}", "front door", slpc::display_path(door));
+    Ok(())
+}
+
+/// What reading this layer right now turns out to say.
+///
+/// A read rather than a look at the filesystem: a file that is there and holds
+/// no key is a layer that exists and has no opinion, and telling somebody it is
+/// *present* without telling them it sets nothing is how the shipped
+/// `/etc/slipcase/open.toml` gets mistaken for a policy nobody wrote.
+fn layer_state(
+    source: &policy::files::Files,
+    origin: policy::Origin,
+    effective: Option<&policy::Effective>,
+) -> String {
+    // Asked before the file is read, because a suppressed layer is not
+    // consulted at all and saying what is in it would describe a file that
+    // played no part in anything.
+    if origin == policy::Origin::Configuration
+        && effective.is_some_and(|e| e.configuration_suppressed)
+    {
+        return "not consulted; policy has suppressed it".to_string();
+    }
+    match policy::Source::layer(source, origin) {
+        Ok(None) => "not there".to_string(),
+        Ok(Some(layer)) if layer.says_nothing() => "there, and sets nothing".to_string(),
+        Ok(Some(_)) => "in force".to_string(),
+        // No detail, because the resolution below refuses with it and names the
+        // same file. Two accounts of one typo is noise.
+        Err(_) => "cannot be read".to_string(),
+    }
+}
+
+/// A label and a list, wrapped under itself rather than off the side.
+///
+/// The permitted set is thirty entries before anybody configures anything,
+/// which is one line nobody reads and three that anybody can.
+fn labelled(label: &str, items: &[&str]) {
+    const INDENT: usize = 18;
+    const WIDTH: usize = 78;
+
+    if items.is_empty() {
+        println!("  {label:<14}  nothing");
+        return;
+    }
+    let mut line = String::new();
+    let mut first = true;
+    for item in items {
+        let piece = if line.is_empty() {
+            (*item).to_string()
+        } else {
+            format!(", {item}")
+        };
+        if !line.is_empty() && INDENT + line.len() + piece.len() > WIDTH {
+            println!("{}{line},", head(label, first));
+            first = false;
+            line = (*item).to_string();
+        } else {
+            line.push_str(&piece);
+        }
+    }
+    println!("{}{line}", head(label, first));
+}
+
+/// The label on the first line of a wrapped list, and the space it occupied on
+/// every line after it.
+fn head(label: &str, first: bool) -> String {
+    if first {
+        format!("  {label:<14}  ")
+    } else {
+        " ".repeat(18)
     }
 }
 

@@ -94,6 +94,22 @@ impl Origin {
     }
 }
 
+/// The name a person knows a layer by, which is the vocabulary concept 10 uses
+/// and the vocabulary the shipped policy file and the manual page use with it.
+impl fmt::Display for Origin {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // `pad` rather than `write_str`, so that a caller lining these up in a
+        // column gets the width it asked for. `write_str` ignores it silently,
+        // which is a formatting bug that only shows up in the output.
+        f.pad(match self {
+            Self::BuiltIn => "built-in",
+            Self::Configuration => "configuration",
+            Self::UserPolicy => "user policy",
+            Self::MachinePolicy => "machine policy",
+        })
+    }
+}
+
 /// How much the tool says without being asked.
 ///
 /// A threshold on [`crate::present::Weight`] rather than a list of switches, so
