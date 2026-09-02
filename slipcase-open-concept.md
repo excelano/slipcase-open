@@ -9,7 +9,7 @@ lists what was deliberately left to implementation.*
 
 ## 1. What it is
 
-A minimal companion to the slipcase CLI and viewer: double-click a `.slpc`, the
+A minimal companion to the Slipcase CLI and viewer: double-click a `.slpc`, the
 payload opens in whatever application normally handles it, and edits made there
 are written back into the container.
 
@@ -723,7 +723,7 @@ Where Linux is genuinely thinner is the standing session list, and §9 answers
 that with the command line rather than by pretending a tray is there.
 
 **Why not Windows-only:** information management shops are mixed environments,
-and tooling that only works on Windows makes slipcase read as a
+and tooling that only works on Windows makes Slipcase read as a
 Microsoft-ecosystem format. That undercuts the neutral-primitive positioning.
 Graceful degradation preserves it.
 
@@ -788,7 +788,7 @@ fuzzing harness behind it, which is the drift this project is organised against.
 The cost is a minor bump and a public accessor supported from then on, over a
 field `zip` hands back for free.
 
-Document it as the ZIP field it is rather than a slipcase one, and disclaim
+Document it as the ZIP field it is rather than a Slipcase one, and disclaim
 fixity in the doc comment. A format library exposing a checksum invites the
 reading SPEC §5 declined to license, and §6.3 is careful about the same thing
 from the other side.

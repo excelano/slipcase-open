@@ -50,7 +50,7 @@ use slipcase_open::present::{self, Channel, Report};
 use slipcase_open::resident::{self, Resident};
 use slipcase_open::{recover, session};
 
-/// Open the payload of a slipcase container in its own application, and write
+/// Open the payload of a Slipcase container in its own application, and write
 /// edits back into the container.
 ///
 /// Two lines rather than the table, and under `--help` rather than `-h`.

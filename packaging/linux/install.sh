@@ -3,7 +3,7 @@
 # and the machine policy file. Optionally the binary alongside them.
 #
 # The media type is not here. `slipcase-common` declares it once for every
-# slipcase product, because two packages cannot ship one path; install that
+# Slipcase product, because two packages cannot ship one path; install that
 # first, or the entry below has no type to be associated with.
 #
 # For a person installing by hand and for testing the association without
@@ -117,7 +117,7 @@ if ! grep -qsx 'application/x.slipcase+zip' \
         /usr/share/mime/types
 then
     echo
-    echo "The slipcase media type is not declared on this machine."
+    echo "The Slipcase media type is not declared on this machine."
     echo "Install slipcase-common, or run its install.sh, or nothing will"
     echo "associate a .slpc with this entry."
 fi

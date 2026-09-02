@@ -62,7 +62,7 @@
     <DisplayName>Slipcase Open</DisplayName>
     <PublisherDisplayName>@PUBLISHER_DISPLAY_NAME@</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
-    <Description>Open the payload of a slipcase container in whatever application handles that kind of file, and write edits back into the container.</Description>
+    <Description>Open the payload of a Slipcase container in whatever application handles that kind of file, and write edits back into the container.</Description>
   </Properties>
 
   <Dependencies>
@@ -87,7 +87,7 @@
 
       <uap:VisualElements
         DisplayName="Slipcase Open"
-        Description="Open a slipcase container's payload in its own application and write edits back."
+        Description="Open a Slipcase container's payload in its own application and write edits back."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">

@@ -23,7 +23,7 @@ while [ $# -gt 0 ]; do
 done
 
 # The media type is `slipcase-common`'s and is left alone: removing it here
-# would take the file type away from every other slipcase product on the
+# would take the file type away from every other Slipcase product on the
 # machine.
 rm -f "${prefix}/share/applications/slipcase-open.desktop" \
       "${prefix}/bin/slipcase-open"

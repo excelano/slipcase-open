@@ -2,7 +2,7 @@
 
 Double-click a `.slpc`, and the payload opens in whatever application normally
 handles it. Edit it there, save, and the edit is written back into the
-container. A `.slpc` is a slipcase container: a ZIP archive holding a payload
+container. A `.slpc` is a Slipcase container: a ZIP archive holding a payload
 together with a TOML document describing it, specified at
 <https://slipcaseformat.org>.
 

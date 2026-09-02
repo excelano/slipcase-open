@@ -1,6 +1,6 @@
 [package]
 name = "slipcase-open"
-description = "Open the payload of a slipcase container in its own application, and write edits back into the container"
+description = "Open the payload of a Slipcase container in its own application, and write edits back into the container"
 version = "0.1.3"
 edition = "2021"
 authors = ["David M. Anderson"]

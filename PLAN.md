@@ -51,7 +51,7 @@ It is one field on the private `Entry` struct, populated in `entries_of` from
 the same pass that already reads the name, the size and the kind, and one
 accessor mirroring `payload_size` — the same `Unsupported::Version` refusal, the
 same shared borrow. The doc comment says it is the ZIP field rather than a
-slipcase one and disclaims fixity, because SPEC §5 defines no fixity key and a
+Slipcase one and disclaims fixity, because SPEC §5 defines no fixity key and a
 format library exposing a checksum invites the reading it declined to license.
 
 **Committed, not released.** The changelog entry sits under `[Unreleased]` and
