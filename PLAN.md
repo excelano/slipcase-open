@@ -266,6 +266,35 @@ than before them, because without those a double-click would then say nothing at
 all. The narration in that console is the terminal channel standing in for a
 toast that does not exist yet.
 
+**Open, and not explained: session directories accumulate with their payload
+gone.** Found on 2026-09-02 on a machine that had been opening one container
+since the previous afternoon — seven sessions listed, six reading *nothing was
+extracted*, each with a `session.toml` from the run that made it and an empty
+payload directory. The tray is what made it visible; `sessions` had been saying
+it all along.
+
+What has been measured, and it is less than it looked:
+
+- `recover --discard` refuses with `os error 32` while something holds the
+  payload without sharing delete. Reproduced. But that path leaves the payload
+  *there*, which is not the state on disk.
+- A file handle opened the way `std` opens one shares delete, and
+  `remove_dir_all` gets through it. Measured, so an editor holding the payload
+  is not it.
+- A directory handle held the way a `notify` watcher holds one also shares
+  delete, and `remove_dir_all` gets through that too. Measured, so the watcher
+  is not it either.
+
+Two explanations were written, given a retry apiece, and both failed their own
+tests — the first passed with the retry disabled, which is the test saying it
+never reproduced anything. Both are reverted. **The cause is open**, and the
+next step is a run that reproduces the accumulation rather than another
+mechanism that sounds right.
+
+Nothing is lost while it stands: a session left behind is what concept 6.3
+calls recoverable, and one with no payload has nothing in it to lose. What it
+costs is a list that grows and a tray menu that shows the growth.
+
 **Two things are proven end to end on Windows and one is not.** A marked
 container opens, the payload is extracted carrying `ZoneId=3` and its `HostUrl`,
 the registered application is launched, an edit to the payload is written back,

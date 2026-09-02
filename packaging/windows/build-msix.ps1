@@ -100,6 +100,10 @@ New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 Copy-Item -LiteralPath $binary -Destination (Join-Path $stage 'slipcase-open.exe')
 Copy-Item -Recurse -LiteralPath (Join-Path $here 'assets') -Destination (Join-Path $stage 'Assets')
+# Beside the binary rather than under Assets: `present::tray` loads it by path
+# at run time, because compiling it in as a resource would need `rc.exe` and
+# this project has no build step to put one in.
+Copy-Item -LiteralPath (Join-Path $here 'slipcase-open.ico') -Destination (Join-Path $stage 'slipcase-open.ico')
 
 $manifest = Get-Content -LiteralPath (Join-Path $here 'AppxManifest.xml.in') -Raw
 $manifest = $manifest.Replace('@IDENTITY_NAME@', $identity.Name)

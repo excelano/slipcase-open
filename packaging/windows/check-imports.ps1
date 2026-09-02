@@ -60,10 +60,11 @@ function Refuse([string] $why) {
 #   bcryptprimitives  hashing inside the standard library
 #   combase           the COM and WinRT base, reached through the toast
 #   oleaut32          the BSTR and variant machinery WinRT calls carry
+#   user32            the tray's hidden window, its message pump and its menu
 #
-# combase and oleaut32 arrived with `present::toast` on 2026-09-01, and this
-# check refused the build until they were looked at — which is the whole of what
-# it is for. Both were confirmed present in C:\Windows\System32 on this machine
+# combase and oleaut32 arrived with `present::toast` on 2026-09-01 and user32
+# with `present::tray` on 2026-09-02, and this check refused each build until
+# they were looked at — which is the whole of what it is for. Both were confirmed present in C:\Windows\System32 on this machine
 # (10.0.19041.3636, Microsoft Corporation) and both are in the sibling's own
 # confirmed list, which was checked against a stock Windows 10 and 11.
 #
@@ -72,7 +73,7 @@ function Refuse([string] $why) {
 # that was missing when VCRUNTIME140.dll arrived.
 $InBox = @(
     'advapi32.dll', 'bcryptprimitives.dll', 'combase.dll', 'kernel32.dll',
-    'ntdll.dll', 'ole32.dll', 'oleaut32.dll', 'shell32.dll'
+    'ntdll.dll', 'ole32.dll', 'oleaut32.dll', 'shell32.dll', 'user32.dll'
 )
 
 # API set contracts are resolved by the loader from the schema inside Windows

@@ -67,6 +67,16 @@ impl Launcher for Host {
     }
 }
 
+/// Give up this process's claim on the foreground before handing a request to
+/// the instance that will act on it.
+///
+/// The seam is here rather than in `shell` because `main` is the caller and
+/// `shell` is this module's own. What it is for is in `shell`.
+#[cfg(target_os = "windows")]
+pub fn hand_the_foreground_on() {
+    shell::hand_the_foreground_on();
+}
+
 #[cfg(target_os = "windows")]
 mod shell {
     //! Handing a payload to the shell, with Mark of the Web still consulted.
@@ -137,7 +147,9 @@ mod shell {
     use windows::core::PCWSTR;
     use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
     use windows::Win32::UI::Shell::{ShellExecuteExW, SEE_MASK_NOASYNC, SHELLEXECUTEINFOW};
-    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        AllowSetForegroundWindow, ASFW_ANY, SW_SHOWNORMAL,
+    };
 
     /// What is asked of `ShellExecuteEx`, and more to the point what is not.
     ///
@@ -146,6 +158,37 @@ mod shell {
     /// `SEE_MASK_NOZONECHECKS` nor `SEE_MASK_FLAG_NO_UI` is here, and the module
     /// documentation says why that absence is the whole trust-zone story.
     pub(super) const MASK: u32 = SEE_MASK_NOASYNC;
+
+    /// Give up this process's claim on the foreground, so that whoever acts
+    /// next may take it.
+    ///
+    /// **Which process is holding the right is not the one doing the launching,
+    /// and that is the whole of why this exists.** Concept 8 makes every
+    /// invocation a client of a resident instance, so a double-click starts a
+    /// process that hands its request over and exits. The shell activated
+    /// *that* process, so it is the one Windows will let change the foreground
+    /// — and the instance, which is what actually calls `ShellExecuteEx`, has
+    /// been sitting in the background since the first container was opened and
+    /// may not.
+    ///
+    /// Measured on 2026-09-02, and it is exactly this shape: the first
+    /// double-click put the payload in front, because that invocation *was* the
+    /// instance; every one after it opened the payload behind the window the
+    /// person was looking at, because the instance by then was somebody else's
+    /// old process.
+    ///
+    /// `ASFW_ANY` rather than naming the instance: the client would have to ask
+    /// the pipe who is serving it, and the answer would still be wrong half the
+    /// time — concept 6 says a payload frequently goes to an application that
+    /// is already running, so the process which ends up in front is neither the
+    /// client nor the instance.
+    #[allow(unsafe_code)]
+    pub(super) fn hand_the_foreground_on() {
+        // SAFETY: gives away a right this process holds, takes no pointer, and
+        // returns a bool that means nothing here — a client which never had the
+        // right has none to lose.
+        let _ = unsafe { AllowSetForegroundWindow(ASFW_ANY) };
+    }
 
     /// Hand `payload` to whatever the shell says opens it, and stop caring.
     ///
@@ -174,6 +217,24 @@ mod shell {
     #[allow(unsafe_code)]
     fn execute(path: &[u16]) -> io::Result<()> {
         let _apartment = Apartment::enter();
+
+        // Hand our right to the foreground to whatever is about to be
+        // started. Windows refuses a foreground change from a process that does
+        // not have it, and the refusal is silent: the document opens *behind*
+        // whatever the person was looking at. Measured on 2026-09-02 — a
+        // container double-clicked in Explorer opened its payload behind the
+        // Explorer window — and this is the documented way to pass the right
+        // on, since this process was itself activated by that double-click.
+        //
+        // `ASFW_ANY` rather than a process id, because there is none to name:
+        // concept 6 says half of real applications hand the file to an instance
+        // that is already running, so the process that ends up with the
+        // foreground is frequently not the one this call starts.
+        //
+        // SAFETY: a permission handed to the shell for the length of this
+        // call, taking no pointer and returning a bool this code ignores by
+        // design — a refusal leaves the window where it would have been.
+        let _ = unsafe { AllowSetForegroundWindow(ASFW_ANY) };
 
         let mut how = SHELLEXECUTEINFOW {
             cbSize: u32::try_from(std::mem::size_of::<SHELLEXECUTEINFOW>()).unwrap_or(0),

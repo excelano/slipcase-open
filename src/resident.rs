@@ -257,7 +257,7 @@ impl Resident {
         Ok(false)
     }
 
-    fn list(&self) -> Response {
+    pub(crate) fn list(&self) -> Response {
         let mut lines: Vec<String> = self
             .sessions
             .iter()
@@ -675,7 +675,9 @@ pub fn run(
     listener: crate::endpoint::Listener,
     resident: &mut Resident,
     outside: &Outside<'_>,
+    standing: &dyn crate::present::Standing,
 ) -> io::Result<()> {
+    let mut shown: Vec<String> = Vec::new();
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         // A caller that went away between connecting and being read is not an
@@ -706,10 +708,30 @@ pub fn run(
 
         resident.turn(outside);
 
+        // Concept 12's standing list, told what to say and asked what was
+        // said back. Only when it changed: this is every 250 milliseconds, and
+        // the list is the same on almost all of them.
+        if let Response::Ok(lines) = resident.list() {
+            if lines != shown {
+                standing.show(&lines);
+                shown = lines;
+            }
+        }
+        if standing.taken().contains(&crate::present::Chosen::Quit) {
+            // The same ending as interrupting the command line, and the menu
+            // item says so: every session stays where it is and stays
+            // recoverable.
+            break;
+        }
+
         // Concept 8's exit rule: nothing open, nothing lingering, nothing
         // waiting on somebody. Staying resident does nothing for the crash
         // case, where this process is dead by definition.
-        if resident.is_idle() {
+        //
+        // A standing list is the fourth reason and is not a session: somebody
+        // asked to be able to see what is open, and vanishing is not an answer
+        // to that. `PLAN.md` carries the amendment.
+        if resident.is_idle() && !standing.holding() {
             break;
         }
     }

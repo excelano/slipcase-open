@@ -31,6 +31,57 @@ pub mod freedesktop;
 #[cfg(windows)]
 pub mod toast;
 
+#[cfg(windows)]
+pub mod tray;
+
+/// What somebody chose from the standing list.
+///
+/// One variant so far. The list itself is the point of concept 12's tray — it
+/// answers *what is open* without a command being typed — and acting on a
+/// single session from it is worth adding once there is a session surface to
+/// act through.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Chosen {
+    /// Leave, keeping every session recoverable, which is what interrupting
+    /// the command line already does.
+    Quit,
+}
+
+/// The standing list of what is open.
+///
+/// Concept 12 gives this a tray icon on Windows, a menu bar item on macOS and
+/// the command line on Linux — which is why doing nothing is a complete
+/// implementation and [`Nowhere`] is one. Concept 9 says the tray joins later
+/// without the engine noticing, and not noticing is what this trait is for: the
+/// loop hands it lines it was going to format anyway and asks what came back.
+pub trait Standing {
+    /// The sessions as `sessions` would print them, whenever they change.
+    fn show(&self, sessions: &[String]);
+
+    /// What has been chosen since this was last asked. Does not block.
+    fn taken(&self) -> Vec<Chosen>;
+
+    /// Whether this surface is itself a reason for the instance to stay.
+    ///
+    /// Concept 8 keeps the process alive for a session, a lingering one, or an
+    /// unanswered question, and stops it when none remain. A standing list is a
+    /// fourth reason and a different kind: somebody asked to be able to see
+    /// what is open, and answering *nothing* and vanishing is not an answer.
+    fn holding(&self) -> bool {
+        false
+    }
+}
+
+/// No standing list, which is every platform without one and every test.
+pub struct Nowhere;
+
+impl Standing for Nowhere {
+    fn show(&self, _sessions: &[String]) {}
+    fn taken(&self) -> Vec<Chosen> {
+        Vec::new()
+    }
+}
+
 /// How much of the person's attention something is worth.
 ///
 /// **The axis is whether the person asked for it, not how loud it is.** That is

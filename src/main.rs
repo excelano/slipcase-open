@@ -154,22 +154,31 @@ fn main() -> ExitCode {
     // A verb, or a bare path meaning `open`, or neither — and neither is what
     // clap used to refuse for us, so it is refused here in the same shape.
     let verb = match (cli.verb, cli.container) {
-        (Some(verb), _) => verb,
-        (None, Some(container)) => Verb::Open(Open { container }),
+        (Some(verb), _) => Some(verb),
+        (None, Some(container)) => Some(Verb::Open(Open { container })),
+        // Neither a verb nor a container. On Windows that is the Start tile
+        // being clicked, which concept 12 answers with the standing list; a
+        // packaged application whose tile does nothing is the first thing a
+        // person sees of it. Everywhere else it is a command missing its verb.
         (None, None) => {
-            let _ = Cli::command().print_help();
-            return ExitCode::from(2);
+            if cfg!(windows) {
+                None
+            } else {
+                let _ = Cli::command().print_help();
+                return ExitCode::from(2);
+            }
         }
     };
     let outcome = || -> Fallible {
         let root = session::default_root()?;
         let door = endpoint::path()?;
         match verb {
-            Verb::Open(a) => open(&root, &door, &a),
-            Verb::Sessions => sessions(&root, &door),
-            Verb::Close(a) => close(&door, &a),
-            Verb::Recover(a) => recover_one(&root, &door, &a),
-            Verb::Policy => settings(&root, &door),
+            Some(Verb::Open(a)) => open(&root, &door, &a),
+            Some(Verb::Sessions) => sessions(&root, &door),
+            Some(Verb::Close(a)) => close(&door, &a),
+            Some(Verb::Recover(a)) => recover_one(&root, &door, &a),
+            Some(Verb::Policy) => settings(&root, &door),
+            None => stand_by(&root, &door),
         }
     }();
     match outcome {
@@ -188,6 +197,12 @@ fn main() -> ExitCode {
 /// `Ok(None)` means nobody is listening, which is not a failure: it is the
 /// common case for the first invocation.
 fn hand_over(door: &Path, request: &Request) -> Result<Option<Response>, ipc::Error> {
+    // Before the request goes anywhere. This process is the one the shell just
+    // activated, so it is the one holding the right to put a window in front,
+    // and the instance about to do the launching is not. `platform::shell` says
+    // what that costs when it is left here.
+    #[cfg(windows)]
+    slipcase_open::platform::hand_the_foreground_on();
     match endpoint::connect(door) {
         Err(_) => Ok(None),
         Ok(mut stream) => ipc::ask(&mut stream, request).map(Some),
@@ -299,7 +314,10 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
         eprintln!("  slipcase-open close <session>");
     }
 
-    resident::run(listener, &mut instance, &outside)?;
+    // Not holding: this instance has work, and concept 8 ends it when the work
+    // does. Only a tray somebody summoned outlives its sessions.
+    let standing = standing(false);
+    resident::run(listener, &mut instance, &outside, standing.as_ref())?;
     instance.stand_down(&outside);
     Ok(())
 }
@@ -538,6 +556,68 @@ fn settings(root: &Path, door: &Path) -> Fallible {
         println!("  {:<14}  {why}", "");
     }
     Ok(())
+}
+
+/// Concept 12's standing session list, where the platform has somewhere to put
+/// one.
+///
+/// The same shape as [`channel`]: try the platform's, and fall back to the one
+/// that does nothing. A session with no shell has no tray, and that is ordinary.
+fn standing(holds: bool) -> Box<dyn present::Standing> {
+    #[cfg(windows)]
+    if let Ok(tray) = present::tray::Tray::show_up(holds) {
+        return Box::new(tray);
+    }
+    #[cfg(not(windows))]
+    let _ = holds;
+    Box::new(present::Nowhere)
+}
+
+/// Stand by with the standing list and nothing open.
+///
+/// **The Start tile, and the one invocation that holds itself open.** Concept 8
+/// keeps an instance alive for a session, a lingering one, or an unanswered
+/// question, and this is a fourth reason of a different kind: somebody asked to
+/// see what is open, and an icon that appears and vanishes is not an answer. It
+/// is deliberately the *only* way to get one — a double-click still ends when
+/// its work does, or every container opened in a morning would leave an icon
+/// behind it.
+///
+/// Where an instance is already running there is already a tray, so this hands
+/// over and says nothing rather than raising a second one.
+///
+/// # Errors
+///
+/// Where the front door cannot be bound or served.
+fn stand_by(root: &Path, door: &Path) -> Fallible {
+    #[cfg(windows)]
+    {
+        if hand_over(door, &Request::Ping)?.is_some() {
+            return Ok(());
+        }
+        let Ok(listener) = endpoint::bind(door) else {
+            // Somebody bound it between the two calls, which means there is an
+            // instance and therefore a tray. Nothing to say.
+            return Ok(());
+        };
+        let channel = channel();
+        let source = policy::files::Files::for_this_platform();
+        let volume = policy::resolve(&source)
+            .map(|e| e.notify)
+            .unwrap_or_default();
+        let outside = Outside::new(&source, &Host, channel.as_ref()).saying(volume);
+        let _ = resident::sweep(root, &[]);
+        let mut instance = Resident::new(root);
+        let standing = standing(true);
+        resident::run(listener, &mut instance, &outside, standing.as_ref())?;
+        instance.stand_down(&outside);
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (root, door);
+        Err("no standing list on this platform".into())
+    }
 }
 
 /// Join the console of whoever started this, where there is one.
