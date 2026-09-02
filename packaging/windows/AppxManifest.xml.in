@@ -48,8 +48,9 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap2="http://schemas.microsoft.com/appx/manifest/uap/windows10/2"
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap2 uap3 rescap">
+  IgnorableNamespaces="uap uap2 uap3 desktop rescap">
 
   <Identity
     Name="@IDENTITY_NAME@"
@@ -110,6 +111,22 @@
             </uap2:SupportedVerbs>
           </uap3:FileTypeAssociation>
         </uap:Extension>
+        <!-- Concept 9 keeps the command line a shipped interface rather than
+             a test harness, and a package without this has none: the binary
+             under WindowsApps is ACL'd against being run directly, so every
+             verb the command line offers would be unreachable from the
+             installed product. (A double hyphen cannot appear in an XML
+             comment, which is what makeappx refused this file for first.) The alias puts it on the path with the package
+             identity it needs, which is also what lets `policy` answer whether
+             the toast is available. -->
+        <uap3:Extension
+          Category="windows.appExecutionAlias"
+          Executable="slipcase-open.exe"
+          EntryPoint="Windows.FullTrustApplication">
+          <uap3:AppExecutionAlias>
+            <desktop:ExecutionAlias Alias="slipcase-open.exe" />
+          </uap3:AppExecutionAlias>
+        </uap3:Extension>
       </Extensions>
     </Application>
   </Applications>

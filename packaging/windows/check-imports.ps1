@@ -58,13 +58,21 @@ function Refuse([string] $why) {
 #   shell32           ShellExecuteExW itself
 #   kernel32, ntdll   the pipe, the file information call, the rest of std
 #   bcryptprimitives  hashing inside the standard library
+#   combase           the COM and WinRT base, reached through the toast
+#   oleaut32          the BSTR and variant machinery WinRT calls carry
+#
+# combase and oleaut32 arrived with `present::toast` on 2026-09-01, and this
+# check refused the build until they were looked at — which is the whole of what
+# it is for. Both were confirmed present in C:\Windows\System32 on this machine
+# (10.0.19041.3636, Microsoft Corporation) and both are in the sibling's own
+# confirmed list, which was checked against a stock Windows 10 and 11.
 #
 # The list is deliberately explicit: a dependency this project has never seen
 # before should stop a build and be looked at by a person, which is the step
 # that was missing when VCRUNTIME140.dll arrived.
 $InBox = @(
-    'advapi32.dll', 'bcryptprimitives.dll', 'kernel32.dll',
-    'ntdll.dll', 'ole32.dll', 'shell32.dll'
+    'advapi32.dll', 'bcryptprimitives.dll', 'combase.dll', 'kernel32.dll',
+    'ntdll.dll', 'ole32.dll', 'oleaut32.dll', 'shell32.dll'
 )
 
 # API set contracts are resolved by the loader from the schema inside Windows
@@ -102,13 +110,24 @@ Write-Host "  subsystem : $subsystemName"
 if ($machine -ne 0x8664) {
     Refuse "the manifest declares x64 and this is $machineName"
 }
+if ($subsystem -eq 3) {
+    Refuse 'a console subsystem: a double-click would get a console window, and worse, would read as a terminal and silence the notification channel'
+}
 
-# The subsystem is reported and not refused, which is where this differs from
-# the sibling's copy. That one is a windowed application and a console
-# subsystem would be a mistake; this one is a command line by design — concept
-# 9 keeps it as the floor beneath the notifications — and what a console
-# subsystem costs a packaged double-click is a measurement nobody has taken
-# yet. When it has been taken, this is where the answer goes.
+# Refused, and the measurement that settled it is worth stating because the
+# obvious reading of this product says the opposite. Concept 9 keeps the command
+# line as the floor beneath the notifications, so a console subsystem looks like
+# the honest choice for it. It is not, and the cost is behaviour rather than
+# appearance: a console subsystem binary always has a terminal, so `main`'s
+# `is_terminal` test answered yes to a double-click, the voice was the client's,
+# and the instance never spoke through the channel at all. Measured on
+# 2026-09-01 against the packaged build — the narration arrived in a console
+# window that stayed for the life of the session and no toast was ever raised.
+#
+# `main` is the windows subsystem now and attaches to the parent's console when
+# there is one, so the command line is unharmed. A build that goes back to a
+# console subsystem would take the toast away again silently, which is what this
+# refusal is here to prevent.
 
 $dataDir = $pe + 24 + $(if ($magic -eq 0x20b) { 112 } else { 96 })
 $importRva = U32 ($dataDir + 8)

@@ -28,6 +28,9 @@ pub mod terminal;
 #[cfg(target_os = "linux")]
 pub mod freedesktop;
 
+#[cfg(windows)]
+pub mod toast;
+
 /// How much of the person's attention something is worth.
 ///
 /// **The axis is whether the person asked for it, not how loud it is.** That is

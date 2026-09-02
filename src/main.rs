@@ -21,6 +21,19 @@
 
 // The level `Cargo.toml` explains: `forbid` everywhere Windows is not.
 #![cfg_attr(not(windows), forbid(unsafe_code))]
+// No console of its own, and this is behaviour rather than appearance.
+//
+// A console subsystem binary always has a terminal, so `is_terminal` below was
+// answering yes to a double-click and the voice was the client's — which is the
+// branch where the instance says nothing through concept 9's channel, because a
+// person is taken to be reading the lines it hands back. Measured on 2026-09-01
+// against the packaged build: the narration appeared in a console window that
+// stayed open for the life of the session, and no toast was ever raised.
+//
+// So the subsystem is what makes the channel fire on a double-click, and the
+// console window it also removes is the smaller half of it. `attach_console`
+// gives the terminal back to an invocation that came from one.
+#![cfg_attr(windows, windows_subsystem = "windows")]
 
 use std::io::IsTerminal as _;
 use std::path::{Path, PathBuf};
@@ -135,6 +148,8 @@ impl std::fmt::Display for AlreadySaid {
 impl std::error::Error for AlreadySaid {}
 
 fn main() -> ExitCode {
+    #[cfg(windows)]
+    attach_console();
     let cli = Cli::parse();
     // A verb, or a bare path meaning `open`, or neither — and neither is what
     // clap used to refuse for us, so it is refused here in the same shape.
@@ -299,6 +314,10 @@ fn channel() -> Box<dyn Channel> {
     #[cfg(target_os = "linux")]
     if let Ok(desktop) = present::freedesktop::Desktop::connect() {
         return Box::new(desktop);
+    }
+    #[cfg(windows)]
+    if let Ok(toast) = present::toast::Toast::connect() {
+        return Box::new(toast);
     }
     Box::new(present::terminal::Terminal)
 }
@@ -507,7 +526,72 @@ fn settings(root: &Path, door: &Path) -> Fallible {
     println!();
     println!("  {:<14}  {}", "sessions", slpc::display_path(root));
     println!("  {:<14}  {}", "front door", slpc::display_path(door));
+    let (speaks, refused) = how_it_speaks();
+    println!("  {:<14}  {speaks}", "notifications");
+    if let Some(why) = refused {
+        // Named here and nowhere else. Concept 9's fallback is silent on
+        // purpose — announcing it on every run would be the first thing this
+        // tool said in an SSH session — but *where settings are read from* is
+        // exactly the verb somebody reaches for when they are asking why
+        // nothing appeared, and a silence with no account of itself is the
+        // thing that cannot be debugged.
+        println!("  {:<14}  {why}", "");
+    }
     Ok(())
+}
+
+/// Join the console of whoever started this, where there is one.
+///
+/// The windows subsystem means no console is made for this process, which is
+/// what a double-click should get. An invocation from a terminal wants the
+/// opposite, and `ATTACH_PARENT_PROCESS` is the difference between the two
+/// without either having to be declared: a shell has a console to join and
+/// Explorer does not.
+///
+/// Handles this process was given are left alone. A redirect — `slipcase-open
+/// sessions > list.txt` — arrives as inherited handles, and joining a console
+/// over the top of them would send the output somewhere the caller did not ask
+/// for.
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn attach_console() {
+    use windows::Win32::System::Console::{
+        AttachConsole, GetStdHandle, ATTACH_PARENT_PROCESS, STD_OUTPUT_HANDLE,
+    };
+
+    // SAFETY: both are plain queries against this process's own handle table.
+    unsafe {
+        if GetStdHandle(STD_OUTPUT_HANDLE).is_ok_and(|h| !h.is_invalid()) {
+            return;
+        }
+        let _ = AttachConsole(ATTACH_PARENT_PROCESS);
+    }
+}
+
+/// How this machine will be spoken to, and what refused a richer channel.
+///
+/// Asked by opening the channel and closing it again, which is the only honest
+/// way to answer: the platform's own refusal is the answer, and anything else
+/// would be this code guessing at what it would find.
+fn how_it_speaks() -> (String, Option<String>) {
+    #[cfg(target_os = "linux")]
+    {
+        match present::freedesktop::Desktop::connect() {
+            Ok(_) => ("desktop notifications".to_owned(), None),
+            Err(why) => ("the terminal".to_owned(), Some(why.to_string())),
+        }
+    }
+    #[cfg(windows)]
+    {
+        match present::toast::Toast::connect() {
+            Ok(_) => ("toast notifications".to_owned(), None),
+            Err(why) => ("the terminal".to_owned(), Some(why.to_string())),
+        }
+    }
+    #[cfg(not(any(target_os = "linux", windows)))]
+    {
+        ("the terminal".to_owned(), None)
+    }
 }
 
 /// What reading this layer right now turns out to say.
