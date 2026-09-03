@@ -358,11 +358,22 @@ fn sessions(root: &Path, door: &Path) -> Fallible {
             state
         );
         println!("    from {}", slpc::display_path(&s.record().container));
-        if state.needs_a_person() {
-            println!(
+        // Anything that is not quiet, which is a wider set than the ones
+        // needing a decision. Concept 6.3 as amended writes an edit back when
+        // its container is next opened, and this is concept 9's floor: what it
+        // owes somebody reading it is the verb that does the same thing now,
+        // whether or not the tool would eventually get there by itself.
+        match state.course() {
+            recover::Course::Sweep => {}
+            recover::Course::WriteBack => println!(
+                "    goes back when its container is next opened, or: \
+                 slipcase-open recover {} --write-back",
+                id_of(s)
+            ),
+            recover::Course::Ask => println!(
                 "    slipcase-open recover {} --write-back|--discard",
                 id_of(s)
-            );
+            ),
         }
     }
     Ok(())

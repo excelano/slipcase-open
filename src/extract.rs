@@ -105,7 +105,7 @@ impl std::error::Error for Error {}
 /// [`Error::Unmarked`] one means it must not be left behind either.
 pub fn extract<R: Read + Seek>(
     container: &mut Container<R>,
-    session: &Session,
+    session: &mut Session,
 ) -> Result<Mark, Error> {
     // Asked before anything is written, so an encrypted payload or one stored
     // by a method this build cannot decode is a sentence rather than a
@@ -120,9 +120,23 @@ pub fn extract<R: Read + Seek>(
     // so anything already under the name is something else's, and SPEC 3
     // forbids replacing a file the caller did not ask to replace.
     let mut dest = Destination::new(&out, false).map_err(Error::Write)?;
-    let mut payload = container.payload().map_err(Error::Unreadable)?;
-    std::io::copy(&mut payload, dest.writer()).map_err(|e| Error::Write(e.into()))?;
+    {
+        let mut payload = container.payload().map_err(Error::Unreadable)?;
+        std::io::copy(&mut payload, dest.writer()).map_err(|e| Error::Write(e.into()))?;
+    }
     dest.commit().map_err(Error::Write)?;
+
+    // The first of the two moments the session and its container are known to
+    // agree, and this is where it is established, so this is where it is
+    // written down. Recovery needs it to tell an edit that never landed from a
+    // container that moved underneath a dead session.
+    //
+    // Best effort: a session that could not note it asks on recovery instead of
+    // acting, which is the cautious direction and no reason to fail an
+    // extraction that succeeded.
+    if let Ok(crc) = container.payload_crc() {
+        let _ = session.note_agreement(crc);
+    }
 
     match slpc::provenance::carry(&session.record().container, &out) {
         Ok(mark) => Ok(mark),
@@ -169,8 +183,8 @@ mod tests {
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"%PDF-1.7 not really\n");
 
-        let s = session::create(&root, &c, "report.pdf").unwrap();
-        extract(&mut open(&c), &s).unwrap();
+        let mut s = session::create(&root, &c, "report.pdf").unwrap();
+        extract(&mut open(&c), &mut s).unwrap();
 
         assert_eq!(s.payload_path().file_name().unwrap(), "report.pdf");
         assert_eq!(
@@ -187,8 +201,8 @@ mod tests {
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "empty.txt", b"");
 
-        let s = session::create(&root, &c, "empty.txt").unwrap();
-        extract(&mut open(&c), &s).unwrap();
+        let mut s = session::create(&root, &c, "empty.txt").unwrap();
+        extract(&mut open(&c), &mut s).unwrap();
         assert_eq!(fs::read(s.payload_path()).unwrap(), b"");
     }
 
@@ -202,8 +216,8 @@ mod tests {
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"x");
 
-        let s = session::create(&root, &c, "report.pdf").unwrap();
-        extract(&mut open(&c), &s).unwrap();
+        let mut s = session::create(&root, &c, "report.pdf").unwrap();
+        extract(&mut open(&c), &mut s).unwrap();
 
         let mut found: Vec<_> = fs::read_dir(s.payload_dir())
             .unwrap()
@@ -222,11 +236,14 @@ mod tests {
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
 
-        let s = session::create(&root, &c, "report.pdf").unwrap();
-        extract(&mut open(&c), &s).unwrap();
+        let mut s = session::create(&root, &c, "report.pdf").unwrap();
+        extract(&mut open(&c), &mut s).unwrap();
         fs::write(s.payload_path(), b"edited by somebody").unwrap();
 
-        assert!(matches!(extract(&mut open(&c), &s), Err(Error::Write(_))));
+        assert!(matches!(
+            extract(&mut open(&c), &mut s),
+            Err(Error::Write(_))
+        ));
         assert_eq!(fs::read(s.payload_path()).unwrap(), b"edited by somebody");
     }
 
@@ -252,8 +269,8 @@ mod tests {
             "this filesystem would not hold the mark, so the carry is untested here"
         );
 
-        let s = session::create(&root, &c, "report.pdf").unwrap();
-        let mark = extract(&mut open(&c), &s).unwrap();
+        let mut s = session::create(&root, &c, "report.pdf").unwrap();
+        let mark = extract(&mut open(&c), &mut s).unwrap();
         assert_ne!(mark, slpc::provenance::Mark::Silent);
         assert!(slpc::provenance::arrived_from_elsewhere(&s.payload_path()));
     }
@@ -264,8 +281,8 @@ mod tests {
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"%PDF");
 
-        let s = session::create(&root, &c, "report.pdf").unwrap();
-        let mark = extract(&mut open(&c), &s).unwrap();
+        let mut s = session::create(&root, &c, "report.pdf").unwrap();
+        let mark = extract(&mut open(&c), &mut s).unwrap();
         assert_eq!(mark, slpc::provenance::Mark::Silent);
     }
 
@@ -279,9 +296,9 @@ mod tests {
         let c = tmp.path().join("locked.slpc");
         fs::write(&c, encrypted_container()).unwrap();
 
-        let s = session::create(&root, &c, "secret.pdf").unwrap();
+        let mut s = session::create(&root, &c, "secret.pdf").unwrap();
         assert!(matches!(
-            extract(&mut open(&c), &s),
+            extract(&mut open(&c), &mut s),
             Err(Error::Unreadable(_))
         ));
         assert!(!s.payload_path().exists());

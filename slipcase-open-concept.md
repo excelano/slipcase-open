@@ -270,9 +270,10 @@ otherwise.
 delete the directory.** The close is honoured: the final repack runs as it
 would otherwise. But where siblings say the application is still working in
 there (§6.1), the directory is handed to the recovery mechanism rather than
-removed, and the next launch picks it up through §6.3 and asks. The editor's
-next save then lands somewhere the tool will still look, at the cost of a
-session directory living until the next launch instead of until the close.
+removed, and the next launch picks it up through §6.3 — which, as amended,
+writes it back where the container has not moved and asks where it has. The
+editor's next save then lands somewhere the tool will still look, at the cost of
+a session directory living until the next launch instead of until the close.
 
 Warn at close and offer to proceed anyway, but do not make the warning the only
 protection. A user who chooses to go ahead should still not lose the save.
@@ -282,29 +283,68 @@ repack is atomic (§7) and unremarkable, and a prompt on every save is friction
 for the common case. Per-write confirmation is a setting for the archival
 audience, off by default.
 
-### 6.3 Recovery never writes back on its own
+### 6.3 Recovery puts back an edit whose container has not moved
 
 A session that survives a crash is recoverable because the payload and the
-session record are still on disk. Recovery must not act on them. The tool was
-not watching when the process died, so it cannot distinguish a complete save
-from a half-written one, and putting a truncated save over the container is the
-worst outcome this tool is capable of producing.
+session record are still on disk. The ZIP central directory already stores a
+CRC-32 for the payload member, so recovery computes the CRC of the extracted
+payload and compares. Equal means nothing was lost: clean up and say nothing.
 
-It can narrow what has to be asked without keeping a record of its own. The ZIP
-central directory already stores a CRC-32 for the payload member, so recovery
-computes the CRC of the extracted payload and compares. Equal means nothing was
-lost: clean up and say nothing. Different means an edit never landed, and since
-a complete one and a truncated one look alike, it becomes a recovery item naming
-the container, the payload, and the payload's modification time, offering
-write-back, discard, and reveal-the-folder. Nothing happens until the user
-chooses, and the session directory survives until they do.
+Different means an edit never landed, and what to do about it depends on
+something the comparison cannot see: which side moved. If the container is still
+holding what this session last agreed with it about, the difference is the
+person's own edit and nobody else's, and it is written back. If the container
+has changed too, both sides hold work the other does not and only the person can
+choose; that is the recovery item, naming the container, the payload and the
+payload's modification time, offering write-back, discard and
+reveal-the-folder. Nothing happens until they choose, and the session directory
+survives until they do.
 
-**Comparing against the container beats recording a digest.** A recorded value
-is a second copy of a fact and can drift from it, and the moment it gets
-consulted is after a crash, which is when a session record is least
+**Amended while building it, 2026-09-03.** This section said recovery must never
+write back on its own: the tool was not watching when the process died, so it
+cannot tell a complete save from a half-written one, and putting a truncated
+save over the container is the worst outcome this tool can produce.
+
+That risk is real and is not gone. What was wrong was the comparison it was
+being weighed against. The alternative is not safety, it is a question — and a
+question that goes unanswered loses the same edit more quietly, which is what
+made §9's five-minute withdrawal a dead end. The person pressed Save. Being
+asked afterwards to choose between *write back*, *discard* and *reveal the
+folder* is this tool's own failure handed back to them in vocabulary they never
+asked to learn, and it is the single most common way anyone meets this design.
+
+Two things keep the risk small, and they are why the trade is worth making
+rather than merely convenient. Most applications save by writing a sibling and
+renaming over the payload — the behaviour §6.1 already relies on to know the
+application is working — so the file is the old bytes or the complete new ones
+and not a prefix of either. And what is written back is *reported*, not done
+silently: the report is not droppable by the notification setting, because
+somebody seeing an outcome that looks wrong while the container is still in
+front of them is the only defence left against the case this accepts.
+
+The three outcomes — sweep it, write it back, ask — are decided by one
+exhaustive function over the recovery states rather than by two predicates. What
+they choose between is deleting somebody's directory, writing into somebody's
+container and interrupting them, and a state added later must not fall into one
+of those by whichever way a negation happened to go.
+
+**Comparing against the container beats recording a digest of the payload.** A
+recorded value is a second copy of a fact and can drift from it, and the moment
+it gets consulted is after a crash, which is when a session record is least
 trustworthy. The container's own stored CRC needs nothing maintaining it:
 repacking recomputes it, so the comparison stays correct across every write-back
 in a session as a side effect of the write-backs themselves.
+
+**The one value the session does record is not that, and the difference
+matters.** *Has the payload changed* is answerable from the container, and is
+answered there. *Which side changed* is not answerable from either side, because
+both are only observable now and the question is about then; it needs a note of
+a past moment. So the session records what the container held at the two moments
+the two were made to agree — the extraction, and each write-back — and nothing
+else. There is nothing for it to drift from: if it is stale, the answer it gives,
+that the container is not where we left it, is the true one. A session that never
+recorded it, which is one written by an earlier build, is read as *not known to
+agree* and asks.
 
 `slpc` does not expose it today — `payload_size()` and `payload_mode()` are
 there and the CRC is not — and adding the accessor reads a field the container
@@ -802,8 +842,8 @@ those two features sit.
 **One addition to `slpc` is needed**: an accessor for the payload member's
 CRC-32, which the ZIP central directory already stores and the `zip` crate
 already surfaces on read. It is a field of the container, so reading it out is
-the format library's job, it costs no dependency, and it lets recovery stop
-keeping a record of its own (§6.3).
+the format library's job, it costs no dependency, and it is what recovery
+compares against rather than keeping a payload digest of its own (§6.3).
 
 The alternative was the engine reading the central directory itself, and it is
 worse than a version bump on any reading. It duplicates the parsing `slpc`

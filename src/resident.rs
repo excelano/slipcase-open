@@ -163,6 +163,49 @@ impl Resident {
         self.holds_for = None;
     }
 
+    /// Put back an edit that never reached its container.
+    ///
+    /// **Concept 6.3 as amended: this one is not a question.** `recover` only
+    /// answers [`recover::Course::WriteBack`] where it knows the difference is
+    /// this session's own edit and the container is still holding what the two
+    /// last agreed on, so there is nothing for a person to decide and nobody
+    /// else's work to lose. Asking anyway is this tool's failure handed back to
+    /// them in vocabulary they never asked to learn.
+    ///
+    /// **Said, not silent.** The risk that survives the amendment is a save
+    /// that was half-written when the process died, and the only defence left
+    /// against it is somebody seeing what happened while the container is still
+    /// in front of them. So the report is `ordinary` rather than `routine`: no
+    /// setting drops it.
+    fn put_it_back(&mut self, mut session: Session, outside: &Outside<'_>) {
+        let name = slpc::display_name(&session.record().payload).into_owned();
+        let into = slpc::display_path(&session.record().container);
+        match crate::writeback::write_back(&mut session) {
+            Ok(()) => {
+                outside.report(
+                    &Report::ordinary(format!("{name} was recovered and written back."))
+                        .and(format!("Into {into}."))
+                        .and("It had been edited after the session holding it stopped."),
+                );
+                let _ = session.remove();
+            }
+            Err(e) => {
+                // The session stays, which is what makes a second attempt
+                // possible, and the icon carries it: an edit that is nowhere
+                // but a session directory is exactly what orange is for.
+                outside.report(
+                    &Report::interrupt(format!("{name} could not be written back."))
+                        .and(e.to_string()),
+                );
+                self.note(
+                    crate::present::Mood::AtRisk,
+                    format!("recover:{}", id_of(&session)),
+                    format!("{name} - an edit is not in its container"),
+                );
+            }
+        }
+    }
+
     /// Take on a trouble, for the icon to carry and the menu to explain.
     ///
     /// The same one twice is one trouble. A container that will not open is a
@@ -353,8 +396,18 @@ impl Resident {
                 continue;
             }
             let state = recover::state(&left);
-            if !state.needs_a_person() {
-                continue;
+            match state.course() {
+                // Nothing was lost; the sweep will take it.
+                recover::Course::Sweep => continue,
+                // The person's own edit, and the container has not moved. Put
+                // it back and let the open carry on — being stopped to answer a
+                // question about work they already saved is the thing this
+                // replaces.
+                recover::Course::WriteBack => {
+                    self.put_it_back(left, outside);
+                    continue;
+                }
+                recover::Course::Ask => {}
             }
             let about = id_of(&left);
             // Already asked, and still waiting. Asking again would put a second
@@ -618,9 +671,21 @@ impl Resident {
             // lost, so clean up and say nothing. This is that case arriving
             // while the process is still alive to see it, which is what concept
             // 8 keeps it alive for.
-            if !state.needs_a_person() {
-                let _ = session.remove();
-                continue;
+            //
+            // And the amended case beside it: a save that landed after the
+            // close is the most ordinary reason to be here at all — somebody
+            // pressed Save on the way out — so it goes back rather than being
+            // put to them as a choice.
+            match state.course() {
+                recover::Course::Sweep => {
+                    let _ = session.remove();
+                    continue;
+                }
+                recover::Course::WriteBack => {
+                    self.put_it_back(session, outside);
+                    continue;
+                }
+                recover::Course::Ask => {}
             }
             outside.channel.ask(&Question {
                 about: about.clone(),
@@ -780,7 +845,9 @@ impl Resident {
         }
         for lingering in std::mem::take(&mut self.lingering) {
             let session = lingering.into_session();
-            if recover::state(&session).needs_a_person() {
+            if recover::state(&session).is_quiet() {
+                let _ = session.remove();
+            } else {
                 outside.report(
                     &Report::ordinary(format!(
                         "{} was closed while its application was still working.",
@@ -788,8 +855,6 @@ impl Resident {
                     ))
                     .and("It is left for recovery: run `slipcase-open sessions`."),
                 );
-            } else {
-                let _ = session.remove();
             }
         }
         for pending in &std::mem::take(&mut self.pending) {
@@ -853,7 +918,9 @@ pub fn sweep(root: &Path, live: &[PathBuf]) -> io::Result<usize> {
         if live.iter().any(|d| d == s.dir()) {
             continue;
         }
-        if recover::state(&s).needs_a_person() {
+        // `is_quiet` and not `!needs_a_person`: an edit that never landed now
+        // takes neither course, and the negation would have swept it.
+        if !recover::state(&s).is_quiet() {
             continue;
         }
         if s.remove().is_ok() {
@@ -1063,10 +1130,30 @@ mod tests {
     }
 
     /// A session left behind by a process that died with an edit in it.
+    ///
+    /// Its container has not moved, so concept 6.3 as amended puts the edit
+    /// back without asking. Use [`a_diverged_session`] for the tests that are
+    /// about the question.
     fn a_crashed_session(root: &Path, c: &Path, name: &str, edit: &[u8]) -> session::Session {
-        let left = session::create(root, c, name).unwrap();
-        extract::extract(&mut slpc::Container::open(c).unwrap(), &left).unwrap();
+        let mut left = session::create(root, c, name).unwrap();
+        extract::extract(&mut slpc::Container::open(c).unwrap(), &mut left).unwrap();
         fs::write(left.payload_path(), edit).unwrap();
+        left
+    }
+
+    /// What `a_diverged_session` leaves in the container, for the tests that
+    /// have to say what the container holds afterwards.
+    const SOMEBODY_ELSE: &[u8] = b"what somebody else put there in the meantime";
+
+    /// The same, and then somebody else repacks the container while the session
+    /// is not running.
+    ///
+    /// **The only shape that still raises concept 6.3's question**, because it
+    /// is the only one where both sides hold work the other does not and no
+    /// answer is obviously right.
+    fn a_diverged_session(root: &Path, c: &Path, name: &str, edit: &[u8]) -> session::Session {
+        let left = a_crashed_session(root, c, name, edit);
+        container(c.parent().unwrap(), name, SOMEBODY_ELSE);
         left
     }
 
@@ -1164,7 +1251,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let left = a_crashed_session(&root, &c, "report.pdf", b"edited then the process died");
+        let left = a_diverged_session(&root, &c, "report.pdf", b"edited then the process died");
 
         let w = World::new();
         let mut r = Resident::new(&root);
@@ -1198,7 +1285,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        a_crashed_session(&root, &c, "report.pdf", b"edited");
+        a_diverged_session(&root, &c, "report.pdf", b"edited");
 
         let w = World::new();
         let mut r = Resident::new(&root);
@@ -1214,7 +1301,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        a_crashed_session(&root, &c, "report.pdf", b"the edit that never landed");
+        a_diverged_session(&root, &c, "report.pdf", b"the edit that never landed");
 
         let w = World::new();
         let mut r = Resident::new(&root);
@@ -1240,7 +1327,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        a_crashed_session(&root, &c, "report.pdf", b"edited");
+        a_diverged_session(&root, &c, "report.pdf", b"edited");
 
         let w = World::new();
         let mut r = Resident::new(&root);
@@ -1256,11 +1343,11 @@ mod tests {
         // now on disk holds the container's payload rather than the edit.
         let now = session::scan(&root).unwrap();
         assert_eq!(now.len(), 1);
-        assert_eq!(fs::read(now[0].payload_path()).unwrap(), b"first");
+        assert_eq!(fs::read(now[0].payload_path()).unwrap(), SOMEBODY_ELSE);
         let mut held = slpc::Container::open(&c).unwrap();
         let mut bytes = Vec::new();
         std::io::Read::read_to_end(&mut held.payload().unwrap(), &mut bytes).unwrap();
-        assert_eq!(bytes, b"first", "discard must not touch the container");
+        assert_eq!(bytes, SOMEBODY_ELSE, "discard must not touch the container");
         assert_eq!(w.launcher.launched().len(), 1);
     }
 
@@ -1272,7 +1359,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let left = a_crashed_session(&root, &c, "report.pdf", b"edited");
+        let left = a_diverged_session(&root, &c, "report.pdf", b"edited");
 
         let w = World::new();
         let mut r = Resident::new(&root);
@@ -1311,7 +1398,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let left = a_crashed_session(&root, &c, "report.pdf", b"edited");
+        let left = a_diverged_session(&root, &c, "report.pdf", b"edited");
 
         let w = World::new();
         let mut r = Resident::new(&root).waiting(Duration::ZERO, Duration::ZERO);
@@ -1345,7 +1432,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let left = a_crashed_session(&root, &c, "report.pdf", b"edited");
+        let left = a_diverged_session(&root, &c, "report.pdf", b"edited");
 
         let w = World::new();
         let mut r = Resident::new(&root).waiting(Duration::ZERO, Duration::ZERO);
@@ -1374,14 +1461,119 @@ mod tests {
     }
 
     #[test]
+    fn a_leftover_edit_goes_back_and_the_open_carries_on() {
+        // The complaint this whole amendment came from: an edit was saved, the
+        // process that was watching stopped, and reopening the container put a
+        // question in the way instead of the document. The container has not
+        // moved, so the edit is the person's own — it goes back, and the open
+        // proceeds in the same breath rather than waiting on an answer.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        a_crashed_session(&root, &c, "report.pdf", b"the edit that never landed");
+
+        let w = World::new();
+        let mut r = Resident::new(&root);
+        let opened = ok(r.handle(opening(c.clone()), &w.loud()));
+
+        assert!(
+            w.channel.questions().is_empty(),
+            "the person was asked about their own save: {:?}",
+            w.channel.questions()
+        );
+        assert!(
+            opened.iter().any(|l| l.contains("is open")),
+            "the open did not carry on: {opened:?}"
+        );
+        assert_eq!(w.launcher.launched().len(), 1);
+
+        // The edit reached the container, and the session that carried it is
+        // gone rather than left to be listed as needing a decision.
+        let mut held = slpc::Container::open(&c).unwrap();
+        let mut bytes = Vec::new();
+        std::io::Read::read_to_end(&mut held.payload().unwrap(), &mut bytes).unwrap();
+        assert_eq!(bytes, b"the edit that never landed");
+        assert!(w.channel.said().contains("recovered and written back"));
+        // One session on disk: the new one, holding what the container now has.
+        let now = session::scan(&root).unwrap();
+        assert_eq!(now.len(), 1, "{now:?}");
+        assert_eq!(
+            fs::read(now[0].payload_path()).unwrap(),
+            b"the edit that never landed"
+        );
+    }
+
+    #[test]
+    fn a_write_back_that_fails_on_recovery_keeps_the_session_and_colours_the_icon() {
+        // The edit is the one thing that must not be dropped on the floor. A
+        // failed recovery write-back leaves the session where it was, so a
+        // second attempt is possible, and puts the icon in the state that means
+        // *work is not in its container*.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let left = a_crashed_session(&root, &c, "report.pdf", b"an edit worth keeping");
+
+        // The container has to stay *readable*, or `recover` answers
+        // `Unreadable` and asks rather than reaching the write-back at all.
+        // Both of these, because the two platforms refuse in different places:
+        // Windows will not rename over a read-only file, and Unix will not
+        // create the temporary beside it in a directory it cannot write.
+        let held = tmp.path().join("held");
+        fs::create_dir(&held).unwrap();
+        let c = {
+            let moved = held.join("report.pdf.slpc");
+            fs::rename(&c, &moved).unwrap();
+            moved
+        };
+        // The record still names the old path, so put the session back onto
+        // this one by rebuilding it there.
+        fs::remove_dir_all(left.dir()).unwrap();
+        let left = a_crashed_session(&root, &c, "report.pdf", b"an edit worth keeping");
+        readonly(&c, true);
+        readonly(&held, true);
+
+        let w = World::new();
+        let mut r = Resident::new(&root);
+        let _ = r.handle(opening(c.clone()), &w.outside());
+
+        readonly(&held, false);
+        readonly(&c, false);
+
+        assert!(left.dir().exists(), "the edit was thrown away");
+        assert_eq!(
+            fs::read(left.payload_path()).unwrap(),
+            b"an edit worth keeping"
+        );
+        assert_eq!(
+            r.mood(),
+            crate::present::Mood::AtRisk,
+            "an edit that is nowhere but a session directory is what orange is for"
+        );
+    }
+
+    /// Make a path refuse writes, and let it accept them again.
+    fn readonly(at: &Path, yes: bool) {
+        let mut perms = fs::metadata(at).unwrap().permissions();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            perms.set_mode(if yes { 0o500 } else { 0o700 });
+        }
+        #[cfg(not(unix))]
+        perms.set_readonly(yes);
+        fs::set_permissions(at, perms).unwrap();
+    }
+
+    #[test]
     fn a_quiet_leftover_does_not_stand_in_the_way() {
         // Only a recovery item worth asking about blocks. One that matches its
         // container has nothing to lose and should not stop somebody working.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let left = session::create(&root, &c, "report.pdf").unwrap();
-        extract::extract(&mut slpc::Container::open(&c).unwrap(), &left).unwrap();
+        let mut left = session::create(&root, &c, "report.pdf").unwrap();
+        extract::extract(&mut slpc::Container::open(&c).unwrap(), &mut left).unwrap();
         assert!(matches!(recover::state(&left), recover::State::Unchanged));
 
         let w = World::new();
@@ -1435,14 +1627,19 @@ mod tests {
     }
 
     #[test]
-    fn a_lingering_session_saved_after_the_close_becomes_a_question() {
+    fn a_lingering_session_saved_after_the_close_is_written_back_not_asked_about() {
+        // The most ordinary reason to be here at all: somebody pressed Save on
+        // the way out. Concept 6.3 as amended — the container has not moved, so
+        // the save is theirs and it goes home. Putting it to them as *write
+        // back, discard, or reveal the folder* would be this tool's own timing
+        // handed back to them as a decision.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
         let w = World::new();
         let mut r = Resident::new(&root).waiting(Duration::ZERO, Duration::from_secs(300));
 
-        let opened = ok(r.handle(opening(c), &w.outside()));
+        let opened = ok(r.handle(opening(c.clone()), &w.outside()));
         let dir = session::scan(&root).unwrap()[0].payload_dir();
         let sibling = dir.join(".~lock.report.pdf#");
         fs::write(&sibling, b"still working").unwrap();
@@ -1451,19 +1648,28 @@ mod tests {
         // The application's last save, and then it tidies up after itself.
         fs::write(dir.join("report.pdf"), b"the last save").unwrap();
         fs::remove_file(&sibling).unwrap();
-        r.turn(&w.outside());
+        r.turn(&w.loud());
 
-        let asked = w.channel.questions();
-        assert_eq!(asked.len(), 1, "{asked:?}");
-        assert!(asked[0].summary.contains("after you closed"), "{asked:?}");
-        // Nothing was written back on its own. Concept 6.3: this tool was not
-        // watching when the user said they were done, so it cannot tell a
-        // complete save from a half-written one.
-        let mut held =
-            slpc::Container::open(&session::scan(&root).unwrap()[0].record().container).unwrap();
+        assert!(
+            w.channel.questions().is_empty(),
+            "{:?}",
+            w.channel.questions()
+        );
+        // It reached the container, which is the whole point.
+        let mut held = slpc::Container::open(&c).unwrap();
         let mut bytes = Vec::new();
         std::io::Read::read_to_end(&mut held.payload().unwrap(), &mut bytes).unwrap();
-        assert_eq!(bytes, b"first");
+        assert_eq!(bytes, b"the last save");
+        // Said rather than done silently: the risk this accepts is a save that
+        // was half-written, and being able to see what happened is the only
+        // defence left against it.
+        assert!(
+            w.channel.said().contains("recovered and written back"),
+            "{}",
+            w.channel.said()
+        );
+        assert!(session::scan(&root).unwrap().is_empty());
+        assert!(r.is_idle());
     }
 
     #[test]
@@ -1558,8 +1764,8 @@ mod tests {
         let a = container(tmp.path(), "quiet.pdf", b"a");
         let b = container(tmp.path(), "edited.pdf", b"b");
 
-        let quiet = session::create(&root, &a, "quiet.pdf").unwrap();
-        extract::extract(&mut slpc::Container::open(&a).unwrap(), &quiet).unwrap();
+        let mut quiet = session::create(&root, &a, "quiet.pdf").unwrap();
+        extract::extract(&mut slpc::Container::open(&a).unwrap(), &mut quiet).unwrap();
 
         let edited = a_crashed_session(&root, &b, "edited.pdf", b"an edit that never landed");
         let half_made = session::create(&root, &a, "quiet.pdf").unwrap();
@@ -1604,7 +1810,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
-        let left = a_crashed_session(&root, &c, "report.pdf", b"edited");
+        let left = a_diverged_session(&root, &c, "report.pdf", b"edited");
 
         let w = World::new();
         let mut r = Resident::new(&root);
@@ -1783,7 +1989,7 @@ mod tests {
         let w = World::new();
         let c = container(tmp.path(), "report.txt", b"a report\n");
 
-        a_crashed_session(&root, &c, "report.txt", b"an edit nobody wrote back\n");
+        a_diverged_session(&root, &c, "report.txt", b"an edit nobody wrote back\n");
 
         let mut r = Resident::new(&root);
         assert_eq!(r.mood(), crate::present::Mood::Settled);

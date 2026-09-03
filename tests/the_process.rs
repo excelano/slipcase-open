@@ -94,10 +94,20 @@ impl Alone {
 
     /// What a process that died mid-session leaves behind: a session on disk,
     /// an edit that never reached the container, and nobody holding it.
+    ///
+    /// Its container has not moved, so concept 6.3 as amended puts the edit
+    /// back rather than asking about it.
     fn a_crashed_session(&self, container: &Path, name: &str, edit: &[u8]) {
-        let left = session::create(&self.sessions(), container, name).unwrap();
-        extract::extract(&mut slpc::Container::open(container).unwrap(), &left).unwrap();
+        let mut left = session::create(&self.sessions(), container, name).unwrap();
+        extract::extract(&mut slpc::Container::open(container).unwrap(), &mut left).unwrap();
         std::fs::write(left.payload_path(), edit).unwrap();
+    }
+
+    /// The same, and then somebody else repacks the container behind its back,
+    /// which is the only shape that still raises concept 6.3's question.
+    fn a_diverged_session(&self, container: &Path, name: &str, edit: &[u8]) {
+        self.a_crashed_session(container, name, edit);
+        self.container(name, b"what somebody else put there in the meantime");
     }
 }
 
@@ -121,7 +131,7 @@ fn a_refusal_that_raised_a_question_stays_to_be_answered() {
     // process goes — and it would go without withdrawing them.
     let world = Alone::new();
     let c = world.container("report.txt", b"first");
-    world.a_crashed_session(&c, "report.txt", b"an edit that never landed");
+    world.a_diverged_session(&c, "report.txt", b"an edit that never landed");
 
     let mut child = world.run(&["open", c.to_str().unwrap()]).spawn().unwrap();
     let left_early = finished(&mut child, LONG_ENOUGH);
@@ -176,6 +186,39 @@ fn asking_what_is_open_with_nobody_running_reads_the_state_directory() {
     let said = String::from_utf8_lossy(&done.stdout);
     assert!(said.contains("report.txt"), "{said}");
     assert!(said.contains("--write-back"), "{said}");
+}
+
+#[test]
+fn an_edit_left_by_a_crash_goes_back_when_the_container_is_opened() {
+    // Concept 6.3 as amended, through the whole program rather than the engine:
+    // the session below is what a crash leaves, and opening the container it
+    // belongs to used to stop and ask. It now puts the edit back and carries
+    // on, and the container on disk is the assertion.
+    let world = Alone::new();
+    let c = world.container("report.txt", b"first");
+    world.a_crashed_session(&c, "report.txt", b"the edit that never landed");
+
+    let mut child = world.run(&["open", c.to_str().unwrap()]).spawn().unwrap();
+    let returned = finished(&mut child, LONG_ENOUGH);
+    let _ = child.kill();
+    let done = child.wait_with_output().unwrap();
+    let said = String::from_utf8_lossy(&done.stderr);
+
+    assert!(
+        !said.contains("left behind"),
+        "the person was asked about their own save: {said}"
+    );
+    // It stays, because it opened something: concept 8 keeps the instance for
+    // the session it just started, and there is no terminal-driven exit here.
+    assert!(!returned || said.contains("is open"), "{said}");
+
+    let mut held = slpc::Container::open(&c).unwrap();
+    let mut bytes = Vec::new();
+    std::io::Read::read_to_end(&mut held.payload().unwrap(), &mut bytes).unwrap();
+    assert_eq!(
+        bytes, b"the edit that never landed",
+        "the edit did not reach the container"
+    );
 }
 
 // Unix, because every path it names is one: `/etc/slipcase/open.toml`, the XDG

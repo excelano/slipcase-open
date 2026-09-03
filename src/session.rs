@@ -43,10 +43,20 @@ const ATTEMPTS: u32 = 1024;
 
 /// What a session remembers across a crash.
 ///
-/// Deliberately small. Concept 6.3 removed the digest this used to carry: the
-/// container records a CRC-32 for its payload already, so recovery compares
-/// against the container rather than against a second copy of the fact that can
-/// drift from it — and drift is likeliest at the moment this file is consulted.
+/// Deliberately small. Concept 6.3 removed the *payload* digest this used to
+/// carry: the container records a CRC-32 for its payload already, so recovery
+/// compares against the container rather than against a second copy of the fact
+/// that can drift from it — and drift is likeliest at the moment this file is
+/// consulted.
+///
+/// [`Record::agreed`] is not that digest coming back, and the difference is
+/// worth being exact about. The removed one answered *has the payload changed*,
+/// which the container can answer better. This one answers *which side changed*,
+/// which nothing can answer without a record, because both sides are only
+/// visible now and the question is about then. It is a note of a past moment
+/// rather than a cached copy of a present fact, so there is nothing for it to
+/// drift from: if it is stale, the answer it gives — that the container is not
+/// where we left it — is the true one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     /// Where the container was when the session opened, resolved. It may have
@@ -67,6 +77,21 @@ pub struct Record {
     /// How many write-backs this session has performed, which concept 6.2 shows
     /// beside the session.
     pub write_backs: u64,
+    /// The container's payload CRC-32 at the last moment this session and the
+    /// container were known to agree: the extraction, or the most recent
+    /// write-back.
+    ///
+    /// **What it is for is telling which side moved.** A payload that differs
+    /// from its container is either an edit that never landed or a container
+    /// that changed underneath a dead session, and those want opposite
+    /// treatment — the first is the person's own work and goes back, the second
+    /// is a conflict only they can settle. Comparing the two sides now cannot
+    /// separate them, because both are only observable in the present.
+    ///
+    /// `None` for a session written by a build that did not record it, and for
+    /// one whose container could not be read at the time. Recovery treats that
+    /// as *not known to agree*, which is the cautious direction: it asks.
+    pub agreed: Option<u32>,
 }
 
 /// An open or recoverable session on disk.
@@ -113,6 +138,23 @@ impl Session {
     /// Where the record cannot be rewritten.
     pub fn note_write_back(&mut self) -> io::Result<()> {
         self.record.write_backs += 1;
+        write_record(&self.dir, &self.record)
+    }
+
+    /// Write down that the container's payload is this, and that it is what
+    /// this session's payload came from or was last put into.
+    ///
+    /// Called at the two moments the two sides are made to agree: the
+    /// extraction, and the commit of a write-back. Nowhere else — a value
+    /// recorded at any other moment would be recording an agreement that was
+    /// never established, which is the one way [`Record::agreed`] could tell a
+    /// lie rather than simply not know.
+    ///
+    /// # Errors
+    ///
+    /// Where the record cannot be rewritten.
+    pub fn note_agreement(&mut self, crc: u32) -> io::Result<()> {
+        self.record.agreed = Some(crc);
         write_record(&self.dir, &self.record)
     }
 
@@ -220,6 +262,9 @@ pub fn create(root: &Path, container: &Path, payload: &str) -> io::Result<Sessio
             payload: payload.to_string(),
             started,
             write_backs: 0,
+            // Not known yet. `extract` is what sets it, because that is the
+            // moment the two are made to agree.
+            agreed: None,
         },
         dir,
     };
@@ -331,6 +376,9 @@ fn write_record(dir: &Path, record: &Record) -> io::Result<()> {
     doc["payload"] = toml_edit::value(record.payload.as_str());
     doc["started"] = toml_edit::value(i64::try_from(record.started).unwrap_or(i64::MAX));
     doc["write_backs"] = toml_edit::value(i64::try_from(record.write_backs).unwrap_or(i64::MAX));
+    if let Some(agreed) = record.agreed {
+        doc["agreed"] = toml_edit::value(i64::from(agreed));
+    }
     fs::write(dir.join(RECORD), doc.to_string())
 }
 
@@ -362,6 +410,12 @@ fn read_record(dir: &Path) -> io::Result<Record> {
         payload: want["payload"].clone(),
         started: number("started"),
         write_backs: number("write_backs"),
+        // Absent where an older build wrote this, which recovery reads as not
+        // known to agree rather than as agreeing.
+        agreed: doc
+            .get("agreed")
+            .and_then(toml_edit::Item::as_integer)
+            .and_then(|n| u32::try_from(n).ok()),
     })
 }
 

@@ -157,6 +157,20 @@ pub fn write_back(session: &mut Session) -> Result<(), Error> {
     }
     out.commit().map_err(Error::Swap)?;
 
+    // The container now holds what the payload holds, which is the second of
+    // the two moments the two sides are known to agree. Read back off the
+    // container rather than computed from the payload, so the value recorded is
+    // the one recovery will later compare against and cannot be a near miss.
+    //
+    // Best effort: a session that wrote back successfully and could not note it
+    // is a session that will ask on recovery instead of acting, which is the
+    // cautious direction and not worth failing a completed write-back over.
+    if let Ok(repacked) = slpc::Container::open(&container) {
+        if let Ok(crc) = repacked.payload_crc() {
+            let _ = session.note_agreement(crc);
+        }
+    }
+
     session.note_write_back().map_err(Error::Payload)
 }
 
@@ -179,8 +193,8 @@ mod tests {
 
     /// A session with the payload already extracted into it.
     fn opened(root: &Path, container: &Path, name: &str) -> session::Session {
-        let s = session::create(root, container, name).unwrap();
-        extract::extract(&mut slpc::Container::open(container).unwrap(), &s).unwrap();
+        let mut s = session::create(root, container, name).unwrap();
+        extract::extract(&mut slpc::Container::open(container).unwrap(), &mut s).unwrap();
         s
     }
 

@@ -207,12 +207,12 @@ pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result
     }
 
     // Step 4.
-    let session =
+    let mut session =
         session::create(root, container_path, container.payload_name()).map_err(Error::Session)?;
 
     // Steps 5 and 6. A failure here takes the session directory with it rather
     // than leaving a half-made one for recovery to ask about.
-    let mark = match extract::extract(&mut container, &session) {
+    let mark = match extract::extract(&mut container, &mut session) {
         Ok(m) => m,
         Err(e) => {
             let payload = session.payload_path();
