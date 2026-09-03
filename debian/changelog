@@ -1,3 +1,23 @@
+slipcase-open (0.1.4-1) unstable; urgency=low
+
+  * A payload whose bytes are an executable image or a script, under a name
+    claiming neither, is no longer opened. The check is the one the design has
+    always described; what has changed is that it refuses rather than reporting
+    and standing aside. It admits nothing — the allowed set still decides what
+    may be opened — so a container refused here can be renamed and opened as
+    what it actually is. The refusal happens before anything is extracted, so
+    the payload never reaches the disk.
+  * The refusal is said in whatever way the platform has that cannot be missed,
+    which on a desktop with only notifications is a notification.
+  * Windows: the tray icon takes a colour from what is happening — a payload
+    that is a program, a save that did not reach its container, something
+    waiting on a decision, or a save on its way home — and its menu says what,
+    naming the file. The icon now stays until it is asked to leave.
+  * No change to the Debian package's behaviour beyond the refusal and how it is
+    announced.
+
+ -- David M. Anderson <david.anderson@excelano.com>  Thu, 03 Sep 2026 12:00:00 -0500
+
 slipcase-open (0.1.3-1) unstable; urgency=low
 
   * A `policy` verb. It reports which settings files this machine reads, what

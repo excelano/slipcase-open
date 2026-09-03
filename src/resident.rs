@@ -268,7 +268,12 @@ impl Resident {
                         format!("content:{}", container.display()),
                         format!("{named} - is {}, not a document", what.describes()),
                     );
-                    return refuse(voice, outside, e.to_string());
+                    // `refuse` deliberately skipped: it would say "Not opened"
+                    // through the same channel that has just been insisted at,
+                    // which on Windows is a box and two toasts for one event.
+                    // What was insisted on is the better sentence of the two,
+                    // and the command line still gets this one back.
+                    return Response::Err(e.to_string());
                 }
                 // Everything else: nothing was extracted and nothing is at
                 // risk, so this is a look rather than a warning — but it is
