@@ -44,7 +44,8 @@ const TICK: Duration = Duration::from_millis(250);
 /// gap between the last write and the last unlink.
 const SETTLED: Duration = Duration::from_secs(2);
 
-/// How long the instance stays alive holding a question nobody has answered.
+/// How long the instance stays alive holding a question nobody has answered,
+/// where there is nothing standing to keep showing it.
 ///
 /// **A judgement, and worth naming as one.** Concept 8 says to bound the linger
 /// and does not say where, because there is no measurement that settles it:
@@ -55,6 +56,12 @@ const SETTLED: Duration = Duration::from_secs(2);
 /// When it expires the question is taken back rather than left standing, and
 /// what replaces it says how to reach the same decision from the command line —
 /// a button that does nothing is worse than no button.
+///
+/// **It only applies where the question has nowhere to live**, which is what
+/// [`Resident::let_questions_stand`] turns off. The whole of the reasoning above
+/// is about a process staying alive *for* the question; where an icon is
+/// already keeping it, the trade is not being made and the limit only throws
+/// the question away.
 const HELD: Duration = Duration::from_secs(300);
 
 /// How long the icon shows that a save is going back into its container.
@@ -91,7 +98,9 @@ pub struct Resident {
     /// changes them: a five-minute hold is not a setting concept 10 asks for,
     /// and making it one would put a second answer to *how long* in a file.
     settles_after: Duration,
-    holds_for: Duration,
+    /// How long an unanswered question is held before being taken back, or
+    /// `None` where something is standing that can keep showing it.
+    holds_for: Option<Duration>,
     /// What the standing list is coloured for, until somebody puts it down.
     ///
     /// **Held here rather than only spoken**, because a notification is a
@@ -115,7 +124,7 @@ impl Resident {
             lingering: Vec::new(),
             pending: Vec::new(),
             settles_after: SETTLED,
-            holds_for: HELD,
+            holds_for: Some(HELD),
             troubles: Vec::new(),
             wrote_back: None,
         }
@@ -127,7 +136,7 @@ impl Resident {
     #[cfg(test)]
     fn waiting(mut self, settles_after: Duration, holds_for: Duration) -> Self {
         self.settles_after = settles_after;
-        self.holds_for = holds_for;
+        self.holds_for = Some(holds_for);
         self
     }
 
@@ -135,6 +144,23 @@ impl Resident {
     #[must_use]
     pub fn is_idle(&self) -> bool {
         self.sessions.is_empty() && self.lingering.is_empty() && self.pending.is_empty()
+    }
+
+    /// Let questions stand for as long as the instance does.
+    ///
+    /// **For an instance with a standing surface, which is what [`HELD`] was
+    /// standing in for.** That limit exists because a question is the only
+    /// thing keeping the process alive and a process nobody is talking to must
+    /// not sit there for the afternoon. Where an icon is up, the process is
+    /// already staying for its own reasons, so the limit buys nothing and costs
+    /// the question: taking it back and naming two command lines in its place
+    /// is the dead end that made the tray look necessary in the first place.
+    ///
+    /// Not a setting. It follows from whether there is somewhere for the
+    /// question to keep being visible, which is a fact about the platform and
+    /// the invocation rather than a preference.
+    pub fn let_questions_stand(&mut self) {
+        self.holds_for = None;
     }
 
     /// Take on a trouble, for the icon to carry and the menu to explain.
@@ -709,7 +735,9 @@ impl Resident {
     fn let_go_of_the_unanswered(&mut self, outside: &Outside<'_>) {
         let (gone, kept) = std::mem::take(&mut self.pending)
             .into_iter()
-            .partition::<Vec<_>, _>(|p| p.asked.elapsed() >= self.holds_for);
+            .partition::<Vec<_>, _>(|p| {
+                self.holds_for.is_some_and(|held| p.asked.elapsed() >= held)
+            });
         self.pending = kept;
         for p in &gone {
             Self::stop_asking(p, outside);
@@ -846,6 +874,12 @@ pub fn run(
     outside: &Outside<'_>,
     standing: &dyn crate::present::Standing,
 ) -> io::Result<()> {
+    // A question with somewhere to keep being seen is not on a clock. See
+    // `HELD`, whose reasoning is entirely about a process staying alive for a
+    // question that has nowhere else to live.
+    if standing.holding() {
+        resident.let_questions_stand();
+    }
     let mut shown: Vec<crate::present::Listed> = Vec::new();
     let mut carried: Vec<crate::present::Trouble> = Vec::new();
     let mut wearing = crate::present::Mood::Settled;
@@ -1298,6 +1332,45 @@ mod tests {
         // The session itself stays. Concept 6.3 carries it to the next launch.
         assert!(left.dir().exists());
         assert!(r.is_idle());
+    }
+
+    #[test]
+    fn a_question_with_somewhere_to_live_is_not_taken_back() {
+        // The same setup as above, and the opposite outcome, because something
+        // is standing that can keep showing it. `HELD` exists to stop a process
+        // sitting there for a question nobody can see; where an icon is up the
+        // process is staying anyway, so the limit would only throw the question
+        // away — and naming two command lines in its place is the dead end that
+        // made the icon look necessary to begin with.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "report.pdf", b"first");
+        let left = a_crashed_session(&root, &c, "report.pdf", b"edited");
+
+        let w = World::new();
+        let mut r = Resident::new(&root).waiting(Duration::ZERO, Duration::ZERO);
+        err(r.handle(opening(c), &w.outside()));
+        let about = w.channel.questions()[0].about.clone();
+
+        r.let_questions_stand();
+        for _ in 0..5 {
+            r.turn(&w.outside());
+        }
+
+        assert!(
+            w.channel.withdrawn().is_empty(),
+            "the question was taken back: {:?}",
+            w.channel.withdrawn()
+        );
+        assert!(
+            !w.channel.said().contains(&format!("recover {about}")),
+            "it fell back to the command line while a surface was showing it"
+        );
+        assert!(left.dir().exists());
+        // And it is still the instance's to act on, which is the point: the
+        // buttons in front of somebody still reach a question that is here.
+        assert!(!r.is_idle());
+        assert_eq!(r.mood(), crate::present::Mood::Look);
     }
 
     #[test]
