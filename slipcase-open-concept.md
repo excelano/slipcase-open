@@ -135,9 +135,32 @@ rather than a badge somewhere quiet. What it means is that the container's
 payload is an executable wearing a document's name, which is the shape of a
 phishing attachment, and a person shown that sentence will usually stop.
 
-It still does not refuse. The extension governs what runs, so a PDF reader
-handed a PE image fails on it harmlessly, and refusing would be asserting a
-control this path does not carry. The user is told and then decides.
+**It refuses, and it is a veto rather than a control.** Everything above about
+why sniffing cannot be the control still holds: the allowlist decides what may
+be opened, this check admits nothing, and a payload that gets past it has been
+permitted by policy and not by inspection. All it can do is say *no* to
+something policy already allowed. That is a veto, and a veto needs none of the
+precision a control would — it is allowed to be narrow, and this one is.
+
+An earlier draft had it tell the person and stand aside, on the reasoning that
+the extension governs what runs so a PDF reader handed a PE image fails on it
+harmlessly. That reasoning is sound about *execution* and beside the point about
+*the person*. What the check has found is a file somebody was sent, under a name
+chosen to make them open it; the harm is the deception, and a warning on a
+document that has already opened asks them to undo a decision they have made
+rather than to make one. Refusing is also the cheaper mistake in both
+directions: it fires close to never, and when it is wrong the cost is one
+container that will not open and can be renamed.
+
+The refusal comes before the session is created, so the bytes never leave the
+container — no session directory, no payload on disk, no mark, and nothing for a
+later sweep to find. It is said in a way that cannot be missed, which is where
+§12's native dialog earns its place, and the standing list carries it afterwards
+in the one colour reserved for it.
+
+This makes §5.1's claim that the check fires close to never load-bearing rather
+than incidental. If it were noisy, refusing would be the wrong default, so it is
+worth confirming against a corpus before this ships widely.
 
 **One case does need a refusal, and it is not a mismatch.** A payload with no
 extension, or one the platform has no registration for, makes `ShellExecuteEx`
@@ -663,11 +686,12 @@ This must be stated plainly in administrator documentation. An organisation that
 believes the allowlist is load-bearing may skip the controls that actually are,
 which would leave them worse off than before the tool existed.
 
-§5.1's content check is not a second control and must not be described as one.
-It reports that a payload is not what its name claims; it refuses nothing, and a
-payload that is what it claims to be and still hostile passes it without
-comment. The one refusal in that section, for a payload with no usable
-extension, closes a dialog rather than inspecting anything.
+§5.1's content check is not a second control and must not be described as one,
+and the fact that it now refuses does not make it one. It is a veto: it admits
+nothing, so nothing is permitted *by* it, and a payload that is what it claims
+to be and still hostile passes it without comment. An organisation that read the
+refusal as a malware check would be making exactly the mistake this section
+exists to prevent.
 
 ## 12. Platform coverage
 

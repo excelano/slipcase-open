@@ -243,15 +243,38 @@ impl Resident {
 
         match flow::open(&self.root, container, outside) {
             Err(e) => {
-                // Nothing was extracted and nothing is at risk, so this is a
-                // look rather than a warning — but it is the case the standing
-                // list exists for. A double-click that produces no document and
-                // no window has to say something somewhere that outlasts a
-                // banner, or the tool simply appears not to work.
                 let named = container.file_name().map_or_else(
                     || container.display().to_string(),
                     |n| n.to_string_lossy().into_owned(),
                 );
+                // **The one refusal that is spoken twice.** Concept 5.1's check
+                // fires close to never and means one thing when it does, and
+                // the person is holding a file somebody sent them believing it
+                // is a document. A notification they may not look at is not
+                // enough for that, so it is insisted on as well as recorded —
+                // and the icon goes red, which is the only thing red is for.
+                if let flow::Error::Misrepresented(what) = &e {
+                    outside.channel.insist(
+                        &Report::interrupt(format!("{named} was not opened."))
+                            .and(format!(
+                                "Its payload is {}, not a document.",
+                                what.describes()
+                            ))
+                            .and("That is the shape of a phishing attachment.")
+                            .and("Nothing was extracted and nothing was run."),
+                    );
+                    self.note(
+                        crate::present::Mood::Danger,
+                        format!("content:{}", container.display()),
+                        format!("{named} - is {}, not a document", what.describes()),
+                    );
+                    return refuse(voice, outside, e.to_string());
+                }
+                // Everything else: nothing was extracted and nothing is at
+                // risk, so this is a look rather than a warning — but it is
+                // still the case the standing list exists for. A double-click
+                // that produces no document and no window has to say something
+                // that outlasts a banner, or the tool appears not to work.
                 self.note(
                     crate::present::Mood::Look,
                     format!("open:{}", container.display()),
@@ -265,29 +288,6 @@ impl Resident {
                     .and(format!("Session {}", id_of(opened.session())));
                 if opened.mark != slpc::provenance::Mark::Silent {
                     report = report.and("It came from somewhere else, and the copy says so.");
-                }
-                // Concept 5.1: this one earns an interrupt rather than a badge
-                // somewhere quiet, so it is its own report at its own weight
-                // and not a line appended to the one above. Said whoever is
-                // speaking, because a client that prints it to a terminal is
-                // not what concept 5.1 means by an interrupt.
-                if let Some(what) = opened.misrepresented {
-                    outside.report(
-                        &Report::interrupt(format!("{name} is not what its name says."))
-                            .and(format!("The payload is {}.", what.describes()))
-                            .and("That is the shape of a phishing attachment.")
-                            .and("It has been opened; nothing here has decided it is safe."),
-                    );
-                    // The one thing red is for. It stays until it is put down
-                    // because it is a condition and not a moment: the container
-                    // on the person's disk is still what it was, and an icon
-                    // that went back to blue while they looked away would be
-                    // saying the opposite.
-                    self.note(
-                        crate::present::Mood::Danger,
-                        format!("content:{}", container.display()),
-                        format!("{name} - is {}, not a document", what.describes()),
-                    );
                 }
                 if let Err(e) = self.sessions.insert(container, opened) {
                     return refuse(
@@ -1645,7 +1645,27 @@ mod tests {
         let mut r = Resident::new(tmp.path().join("sessions"));
         let c = container(tmp.path(), "invoice.txt", b"MZ\x90\x00 not a document");
 
-        ok(r.handle(opening(c), &w.outside()));
+        let why = err(r.handle(opening(c), &w.outside()));
+        assert!(why.contains("was not opened"), "{why}");
+        assert!(r.is_idle(), "nothing opened, so nothing is being held");
+        assert!(
+            w.launcher.launched().is_empty(),
+            "nothing was handed to the desktop"
+        );
+        assert!(
+            session::scan(&tmp.path().join("sessions"))
+                .unwrap_or_default()
+                .is_empty(),
+            "the refusal is before the session, so nothing reached the disk"
+        );
+
+        // Insisted on rather than reported. A notification can be missed, and
+        // this is the one refusal where being missed matters: the person is
+        // holding a file somebody sent them believing it is a document.
+        let insisted = w.channel.insisted();
+        assert_eq!(insisted.len(), 1, "{insisted:?}");
+        assert!(insisted[0].summary.contains("invoice.txt"), "{insisted:?}");
+
         assert_eq!(r.mood(), crate::present::Mood::Danger);
         let said = &r.troubles()[0].summary;
         assert!(
@@ -1663,7 +1683,7 @@ mod tests {
         let w = World::new();
         let mut r = Resident::new(tmp.path().join("sessions"));
         let c = container(tmp.path(), "invoice.txt", b"MZ\x90\x00 not a document");
-        ok(r.handle(opening(c), &w.outside()));
+        let _ = err(r.handle(opening(c), &w.outside()));
 
         for _ in 0..5 {
             r.turn(&w.outside());

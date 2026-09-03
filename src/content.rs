@@ -10,10 +10,14 @@
 //!
 //! What survives is narrow and is not policy. It reports a payload whose bytes
 //! are an executable image or a script under a name that claims neither — the
-//! shape of a phishing attachment — and it refuses nothing. The extension
-//! governs what runs, so a PDF reader handed a PE image fails on it harmlessly,
-//! and a refusal here would be asserting a control this path does not carry.
-//! The person is told and then decides.
+//! shape of a phishing attachment.
+//!
+//! **[`crate::flow`] refuses on it, and that is a veto rather than a control.**
+//! Nothing here permits anything: the allowlist decides what may be opened, and
+//! all this can do is say no to something it already allowed. So it is allowed
+//! to be narrow in a way a control could not be — a payload that is exactly
+//! what it claims and still hostile passes without comment, and that is not a
+//! gap in it, because it was never the thing standing in the way.
 //!
 //! **It is a handful of magic numbers and not a type table.** A `.docx`
 //! sniffing as a ZIP is noise and goes unmentioned, so nothing here has to tell

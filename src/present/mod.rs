@@ -349,6 +349,23 @@ pub trait Channel {
     /// Does not block. The resident loop calls this each turn between pumping
     /// the watchers.
     fn answers(&self) -> Vec<Answer>;
+
+    /// Say something in a way that cannot be missed, because something was
+    /// refused and the person is owed an explanation for it.
+    ///
+    /// **Not a question, and it does not block the caller.** By the time this
+    /// is called the refusal has already happened — nothing is waiting on an
+    /// answer, and there is nothing to decide. What it buys over
+    /// [`report`](Self::report) is that a notification can be missed and this
+    /// one must not be: a double-click that produced no document and no
+    /// message is the tool looking broken at the exact moment it worked.
+    ///
+    /// The default is [`report`](Self::report), which is right wherever the
+    /// channel has nothing louder. Concept 12 gives Windows a native message
+    /// box and that is where this becomes a dialog.
+    fn insist(&self, report: &Report) {
+        self.report(report);
+    }
 }
 
 #[cfg(test)]
@@ -381,9 +398,21 @@ pub mod testing {
         questions: Mutex<Vec<Question>>,
         withdrawn: Mutex<Vec<String>>,
         pending: Mutex<Vec<Answer>>,
+        insisted: Mutex<Vec<Report>>,
     }
 
     impl Recording {
+        /// Everything insisted on, in order. Not included in
+        /// [`reports`](Self::reports).
+        ///
+        /// # Panics
+        ///
+        /// As [`reports`](Self::reports).
+        #[must_use]
+        pub fn insisted(&self) -> Vec<Report> {
+            self.insisted.lock().unwrap().clone()
+        }
+
         /// Everything reported, in order.
         ///
         /// # Panics
@@ -465,6 +494,14 @@ pub mod testing {
 
         fn answers(&self) -> Vec<Answer> {
             std::mem::take(&mut *self.pending.lock().unwrap())
+        }
+
+        fn insist(&self, report: &Report) {
+            // Recorded apart from `report`, because what is being asserted is
+            // that this one could not be missed rather than that it was said.
+            // The default implementation forwards to `report`; this one does
+            // not, so a test cannot pass by mistaking the two.
+            self.insisted.lock().unwrap().push(report.clone());
         }
     }
 }

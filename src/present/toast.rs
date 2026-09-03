@@ -152,6 +152,59 @@ impl Channel for Toast {
             .lock()
             .map_or_else(|_| Vec::new(), |mut a| std::mem::take(&mut *a))
     }
+
+    fn insist(&self, report: &Report) {
+        // The toast as well, so that what was refused is still in the
+        // notification centre an hour later. The box is the part that cannot be
+        // missed; the toast is the part that can be gone back to.
+        self.report(report);
+        message_box(report);
+    }
+}
+
+/// Concept 12's native dialog, which this is the first thing to need.
+///
+/// **On a thread, and not waited for.** The caller is `resident::run`, which is
+/// pumping every open session's watcher; a modal loop there would stop other
+/// people's saves reaching their containers for as long as the box was up.
+/// There is nothing to wait for in any case — the refusal has already happened
+/// and this is being told about it, not asked about it.
+///
+/// `MB_SYSTEMMODAL` puts it in front of whatever is focused, which is the
+/// window the person just double-clicked in. Without it the box can open behind
+/// Explorer, which is the same defect the launcher had and the same fix.
+#[allow(unsafe_code)]
+fn message_box(report: &Report) {
+    use windows::core::HSTRING;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        MessageBoxW, MB_ICONERROR, MB_OK, MB_SETFOREGROUND, MB_SYSTEMMODAL,
+    };
+
+    let mut body = report.summary.clone();
+    for line in &report.detail {
+        body.push_str("\n\n");
+        body.push_str(line);
+    }
+    let text = HSTRING::from(body);
+    let title = HSTRING::from("Slipcase Open");
+    // A name, so that a thread panicking here is attributable. Failure to spawn
+    // is the case where the toast above is the whole of what was said, which is
+    // the same outcome as this platform having no dialog at all.
+    let _ = std::thread::Builder::new()
+        .name("slipcase-open dialog".to_owned())
+        .spawn(move || {
+            // SAFETY: both strings are null-terminated and owned by this thread
+            // for the life of the call, and the box has no parent window — this
+            // process has none to give it.
+            unsafe {
+                MessageBoxW(
+                    None,
+                    windows::core::PCWSTR(text.as_ptr()),
+                    windows::core::PCWSTR(title.as_ptr()),
+                    MB_OK | MB_ICONERROR | MB_SETFOREGROUND | MB_SYSTEMMODAL,
+                );
+            }
+        });
 }
 
 /// The apartment this thread speaks `WinRT` in.

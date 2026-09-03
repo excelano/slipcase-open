@@ -30,6 +30,10 @@ use crate::{content, extract, recover, writeback};
 pub enum Error {
     /// It is not a container, or not one this build can read.
     Container(slpc::Error),
+    /// The payload is a program wearing a document's name, so it was not
+    /// opened. Concept 5.1: the one content check there is, and the only thing
+    /// it can do is refuse something policy had already allowed.
+    Misrepresented(content::Executable),
     /// Policy will not have it opened. Carries the decision, so the refusal can
     /// say which of the several reasons applies.
     Refused(Decision),
@@ -54,6 +58,11 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Container(e) => write!(f, "{e}"),
+            Self::Misrepresented(what) => write!(
+                f,
+                "the payload is {}, not the document its name claims, so it was not opened",
+                what.describes()
+            ),
             Self::Refused(d) => match d {
                 Decision::Denied { key } => write!(f, "{key} is on the deny list"),
                 Decision::NotPermitted { key } => write!(f, "{key} is not in the allowed set"),
@@ -82,8 +91,6 @@ pub struct Opened {
     /// What the platform recorded about where the container came from, carried
     /// onto the payload.
     pub mark: slpc::provenance::Mark,
-    /// What concept 5.1's content check found, where it found anything.
-    pub misrepresented: Option<content::Executable>,
     saw_payload_change: bool,
 }
 
@@ -179,10 +186,25 @@ pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result
         return Err(Error::Refused(decision));
     }
 
-    // Read before anything is written, so the warning is available whether or
-    // not the extraction goes on to succeed. It reports and never refuses:
-    // concept 5.1.
-    let misrepresented = misrepresentation(&mut container, &decision);
+    // Concept 5.1's content check, and it refuses.
+    //
+    // **A veto, not a control, and the distinction is what keeps 5.1's argument
+    // standing.** The extension still decides what may be opened — the
+    // allowlist above is the control, this admits nothing, and a payload that
+    // gets past here has been permitted by policy and not by inspection. All
+    // this can do is say *no* to something already permitted. 5.1's reasoning
+    // about why sniffing cannot be the control is untouched; what changed is
+    // the last line of it, which had this telling the person and standing
+    // aside.
+    //
+    // **Before the session, so nothing reaches the disk.** The bytes are read
+    // out of the container, so a refusal here means the executable was never
+    // written anywhere outside it — no session directory, no payload file, no
+    // mark, and nothing for a later sweep to find. That is worth more than the
+    // warning it replaces.
+    if let Some(what) = misrepresentation(&mut container, &decision) {
+        return Err(Error::Misrepresented(what));
+    }
 
     // Step 4.
     let session =
@@ -232,7 +254,6 @@ pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result
         session,
         watch,
         mark,
-        misrepresented,
         saw_payload_change: false,
     })
 }
@@ -591,18 +612,51 @@ mod tests {
     }
 
     #[test]
-    fn an_executable_wearing_a_documents_name_is_reported_and_still_opened() {
-        // Concept 5.1. The extension governs what runs, so a PDF reader handed
-        // a PE image fails on it harmlessly; refusing would assert a control
-        // this path does not carry. The person is told and decides.
+    fn an_executable_wearing_a_documents_name_is_refused() {
+        // Concept 5.1's check, as a veto. It admits nothing — policy had
+        // already allowed `.pdf` — and all it does here is say no to something
+        // policy allowed.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "invoice.pdf", b"MZ\x90\x00 not a pdf");
         let launcher = Recording::default();
 
-        let o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
-        assert_eq!(o.misrepresented, Some(crate::content::Executable::Pe));
-        assert_eq!(launcher.launched().len(), 1);
+        match open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)) {
+            Err(Error::Misrepresented(what)) => {
+                assert_eq!(what, crate::content::Executable::Pe);
+            }
+            Err(e) => panic!("refused for the wrong reason: {e}"),
+            Ok(_) => panic!("a program wearing a document's name was opened"),
+        }
+        assert!(
+            launcher.launched().is_empty(),
+            "nothing was handed to the desktop"
+        );
+        // The refusal is before the session, so the bytes never left the
+        // container: no session directory, no payload on disk, and nothing for
+        // a later sweep to find.
+        assert!(
+            !root.exists() || crate::session::scan(&root).unwrap().is_empty(),
+            "the executable reached the disk"
+        );
+    }
+
+    #[test]
+    fn a_program_under_its_own_name_is_left_to_policy() {
+        // The other half of *veto, not control*: this check never admits
+        // anything and never fires on a payload that is what it says. What
+        // happens to a `.exe` is the allowlist's business, and here nothing
+        // stands in its way.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = container(tmp.path(), "setup.exe", b"MZ\x90\x00 an installer");
+        let launcher = Recording::default();
+
+        let opened = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent));
+        assert!(
+            !matches!(opened, Err(Error::Misrepresented(_))),
+            "the content check refused a payload that is what its name says"
+        );
     }
 
     #[test]
