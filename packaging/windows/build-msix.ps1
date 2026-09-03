@@ -34,12 +34,25 @@
 .PARAMETER Configuration
     Which cargo profile's binary to package. Release by default; debug is for
     when the thing being tested is the packaging rather than the build.
+
+.PARAMETER NoBuild
+    Package whatever binary is already there, without building.
+
+    Only for packaging a binary that came from somewhere else. This script used
+    to behave this way always -- it checked that the binary existed and said
+    nothing about how old it was -- and on 2026-09-03 that shipped a package
+    built from a binary eight hours stale, whose refusal of an executable
+    payload was simply absent from it. The hash check that was supposed to catch
+    this compared the staged file against the installed one, which is two copies
+    of the same stale binary agreeing with each other. Building here is what
+    makes the package a statement about the source.
 #>
 [CmdletBinding()]
 param(
     [switch] $SelfSign,
     [ValidateSet('release', 'debug')]
-    [string] $Configuration = 'release'
+    [string] $Configuration = 'release',
+    [switch] $NoBuild
 )
 
 Set-StrictMode -Version Latest
@@ -84,9 +97,25 @@ Step "version $version -> $versionAppx"
 
 # --- the binary ------------------------------------------------------------
 $binary = Join-Path $root "target\$Configuration\slipcase-open.exe"
-if (-not (Test-Path -LiteralPath $binary)) {
-    Refuse "no binary at $binary. Run 'cargo build --$Configuration' first."
+if ($NoBuild) {
+    Step "not building; packaging whatever is at target\$Configuration"
+} else {
+    Step "cargo build --$Configuration"
+    Push-Location $root
+    try {
+        if ($Configuration -eq 'release') { & cargo build --release } else { & cargo build }
+    } finally {
+        Pop-Location
+    }
+    if ($LASTEXITCODE -ne 0) { Refuse 'cargo build failed' }
 }
+if (-not (Test-Path -LiteralPath $binary)) {
+    Refuse "no binary at $binary."
+}
+# Said out loud, because the failure this replaces was silent: a stale binary
+# looks exactly like a fresh one, and every check downstream of here -- the
+# import check, the hash of what got installed -- passes on it happily.
+Step "packaging a binary built $((Get-Item -LiteralPath $binary).LastWriteTime)"
 Step 'checking what it imports'
 $global:LASTEXITCODE = 0
 & (Join-Path $here 'check-imports.ps1') -Binary $binary
