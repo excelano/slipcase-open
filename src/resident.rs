@@ -57,6 +57,14 @@ const SETTLED: Duration = Duration::from_secs(2);
 /// a button that does nothing is worse than no button.
 const HELD: Duration = Duration::from_secs(300);
 
+/// How long the icon shows that a save is going back into its container.
+///
+/// Long enough to be seen and short enough not to be a state. A repack of an
+/// ordinary document is faster than this, so the wait is not the work — it is
+/// the acknowledgement, and it exists because pressing Save and seeing nothing
+/// change anywhere is what makes somebody doubt the tool is running.
+const PULSE: Duration = Duration::from_millis(900);
+
 /// A question the instance has asked and is holding open so that it can act on
 /// the answer.
 struct Pending {
@@ -84,6 +92,17 @@ pub struct Resident {
     /// and making it one would put a second answer to *how long* in a file.
     settles_after: Duration,
     holds_for: Duration,
+    /// What the standing list is coloured for, until somebody puts it down.
+    ///
+    /// **Held here rather than only spoken**, because a notification is a
+    /// moment and most of these are not. A container that would not open leaves
+    /// no session behind to re-read the trouble from, so the toast saying so
+    /// was the only record there was, and a toast that was missed is a trouble
+    /// that never happened.
+    troubles: Vec<crate::present::Trouble>,
+    /// When a save last went back into a container, for the moment of colour
+    /// that says so. `None` until one has.
+    wrote_back: Option<Instant>,
 }
 
 impl Resident {
@@ -97,6 +116,8 @@ impl Resident {
             pending: Vec::new(),
             settles_after: SETTLED,
             holds_for: HELD,
+            troubles: Vec::new(),
+            wrote_back: None,
         }
     }
 
@@ -114,6 +135,62 @@ impl Resident {
     #[must_use]
     pub fn is_idle(&self) -> bool {
         self.sessions.is_empty() && self.lingering.is_empty() && self.pending.is_empty()
+    }
+
+    /// Take on a trouble, for the icon to carry and the menu to explain.
+    ///
+    /// The same one twice is one trouble. A container that will not open is a
+    /// container somebody is likely to double-click again, and three identical
+    /// lines in a menu say nothing the first did not.
+    fn note(&mut self, mood: crate::present::Mood, id: impl Into<String>, summary: String) {
+        let id = id.into();
+        if let Some(had) = self.troubles.iter_mut().find(|t| t.id == id) {
+            had.mood = mood;
+            had.summary = summary;
+            return;
+        }
+        self.troubles
+            .push(crate::present::Trouble { id, mood, summary });
+    }
+
+    /// Put down a trouble that has been read.
+    fn dismiss(&mut self, id: &str) {
+        self.troubles.retain(|t| t.id != id);
+    }
+
+    /// What the standing list is coloured for.
+    #[must_use]
+    pub fn troubles(&self) -> &[crate::present::Trouble] {
+        &self.troubles
+    }
+
+    /// What colour the icon is, which is the worst thing currently true.
+    ///
+    /// **Two sources, and they are different in kind.** A trouble is remembered
+    /// until somebody puts it down, because it is a moment that would otherwise
+    /// be gone. A session waiting on a decision is not remembered at all — it
+    /// is read off the sessions every time, so answering the question is what
+    /// clears the colour, with nothing to dismiss and nothing that can fall out
+    /// of step with what is on disk.
+    #[must_use]
+    pub fn mood(&self) -> crate::present::Mood {
+        use crate::present::Mood;
+        let worst = self
+            .troubles
+            .iter()
+            .map(|t| t.mood)
+            .max()
+            .unwrap_or(Mood::Settled);
+        let waiting = if self.pending.is_empty() {
+            Mood::Settled
+        } else {
+            Mood::Look
+        };
+        let saving = match self.wrote_back {
+            Some(at) if at.elapsed() < PULSE => Mood::Working,
+            _ => Mood::Settled,
+        };
+        worst.max(waiting).max(saving)
     }
 
     /// Answer one request.
@@ -165,7 +242,23 @@ impl Resident {
         }
 
         match flow::open(&self.root, container, outside) {
-            Err(e) => refuse(voice, outside, e.to_string()),
+            Err(e) => {
+                // Nothing was extracted and nothing is at risk, so this is a
+                // look rather than a warning — but it is the case the standing
+                // list exists for. A double-click that produces no document and
+                // no window has to say something somewhere that outlasts a
+                // banner, or the tool simply appears not to work.
+                let named = container.file_name().map_or_else(
+                    || container.display().to_string(),
+                    |n| n.to_string_lossy().into_owned(),
+                );
+                self.note(
+                    crate::present::Mood::Look,
+                    format!("open:{}", container.display()),
+                    format!("{named} - did not open: {e}"),
+                );
+                refuse(voice, outside, e.to_string())
+            }
             Ok(opened) => {
                 let name = slpc::display_name(&opened.session().record().payload).into_owned();
                 let mut report = Report::routine(format!("{name} is open."))
@@ -184,6 +277,16 @@ impl Resident {
                             .and(format!("The payload is {}.", what.describes()))
                             .and("That is the shape of a phishing attachment.")
                             .and("It has been opened; nothing here has decided it is safe."),
+                    );
+                    // The one thing red is for. It stays until it is put down
+                    // because it is a condition and not a moment: the container
+                    // on the person's disk is still what it was, and an icon
+                    // that went back to blue while they looked away would be
+                    // saying the opposite.
+                    self.note(
+                        crate::present::Mood::Danger,
+                        format!("content:{}", container.display()),
+                        format!("{name} - is {}, not a document", what.describes()),
                     );
                 }
                 if let Err(e) = self.sessions.insert(container, opened) {
@@ -257,33 +360,50 @@ impl Resident {
         Ok(false)
     }
 
-    pub(crate) fn list(&self) -> Response {
-        let mut lines: Vec<String> = self
+    /// Every session, with the id apart from the words.
+    ///
+    /// One source for both surfaces: `list` puts the id back in front and hands
+    /// the lines to the command line, and concept 12's standing list takes the
+    /// pieces, because a menu needs the id to act on and no room to show it.
+    pub(crate) fn listed(&self) -> Vec<crate::present::Listed> {
+        let mut out: Vec<crate::present::Listed> = self
             .sessions
             .iter()
-            .map(|o| {
-                format!(
-                    "{}  {}  open, {} write-back(s)",
-                    id_of(o.session()),
+            .map(|o| crate::present::Listed {
+                id: id_of(o.session()),
+                payload: slpc::display_name(&o.session().record().payload).into_owned(),
+                label: format!(
+                    "{}  open, {} write-back(s)",
                     slpc::display_name(&o.session().record().payload),
                     o.session().record().write_backs
-                )
+                ),
+                live: true,
+                needs_a_person: false,
+                write_backs: Some(o.session().record().write_backs),
             })
             .collect();
-        lines.extend(self.lingering.iter().map(|l| {
-            format!(
-                "{}  {}  closed, waiting for the application to finish",
-                id_of(l.session()),
+        out.extend(self.lingering.iter().map(|l| crate::present::Listed {
+            id: id_of(l.session()),
+            payload: slpc::display_name(&l.session().record().payload).into_owned(),
+            label: format!(
+                "{}  closed, waiting for the application to finish",
                 slpc::display_name(&l.session().record().payload)
-            )
+            ),
+            live: true,
+            needs_a_person: false,
+            write_backs: Some(l.session().record().write_backs),
         }));
-        lines.extend(self.pending.iter().map(|p| {
-            format!(
-                "{}  {}  {}, waiting for you",
-                p.about,
+        out.extend(self.pending.iter().map(|p| crate::present::Listed {
+            id: p.about.clone(),
+            payload: slpc::display_name(&p.session.record().payload).into_owned(),
+            label: format!(
+                "{}  {}, waiting for you",
                 slpc::display_name(&p.session.record().payload),
                 recover::state(&p.session)
-            )
+            ),
+            live: false,
+            needs_a_person: true,
+            write_backs: None,
         }));
 
         // Everything above is also a directory under the root, so a scan that
@@ -294,14 +414,31 @@ impl Resident {
                 .iter()
                 .filter(|s| !held.contains(&s.dir().to_path_buf()))
             {
-                lines.push(format!(
-                    "{}  {}  {}",
-                    id_of(s),
-                    slpc::display_name(&s.record().payload),
-                    recover::state(s)
-                ));
+                out.push(crate::present::Listed {
+                    id: id_of(s),
+                    payload: slpc::display_name(&s.record().payload).into_owned(),
+                    label: format!(
+                        "{}  {}",
+                        slpc::display_name(&s.record().payload),
+                        recover::state(s)
+                    ),
+                    live: false,
+                    // Concept 6.3: what needs nobody is swept and never spoken
+                    // of. Listing it in a standing surface is furniture.
+                    needs_a_person: recover::state(s).needs_a_person(),
+                    write_backs: None,
+                });
             }
         }
+        out
+    }
+
+    pub(crate) fn list(&self) -> Response {
+        let mut lines: Vec<String> = self
+            .listed()
+            .into_iter()
+            .map(|e| format!("{}  {}", e.id, e.label))
+            .collect();
         if lines.is_empty() {
             lines.push("No sessions.".into());
         }
@@ -363,6 +500,8 @@ impl Resident {
     /// Give every open session's watch a turn, and report what came of it.
     fn pump_all(&mut self, outside: &Outside<'_>) {
         let mut wrote_back = Vec::new();
+        let mut landed = Vec::new();
+        let mut failed = Vec::new();
         for open in self.sessions.iter_mut() {
             match open.pump() {
                 Ok(true) => {
@@ -384,6 +523,7 @@ impl Resident {
                             .and("Saves from here on are written back quietly."),
                         );
                     }
+                    landed.push(id_of(s));
                     wrote_back.push(s.record().container.clone());
                 }
                 Ok(false) => {}
@@ -391,19 +531,43 @@ impl Resident {
                 // rest, and it is a reason to say so: concept 6.2 puts the
                 // close at the user's hand, and a save that did not land is the
                 // thing they most need to know did not.
-                Err(e) => outside.report(
-                    &Report::interrupt(format!(
-                        "{} could not be written back.",
-                        slpc::display_name(&open.session().record().payload)
-                    ))
-                    .and(e.to_string()),
-                ),
+                Err(e) => {
+                    let name = slpc::display_name(&open.session().record().payload).into_owned();
+                    outside.report(
+                        &Report::interrupt(format!("{name} could not be written back."))
+                            .and(e.to_string()),
+                    );
+                    failed.push((id_of(open.session()), name));
+                }
             }
         }
         // A write-back renamed a new file over the container, so the identity
         // recorded when the session opened is stale. See `table::refresh`.
+        if !wrote_back.is_empty() {
+            // The moment of colour that says a save went home. Set from a
+            // write-back having happened rather than from an event having
+            // arrived, which is the same rule `pump` itself decides by.
+            self.wrote_back = Some(Instant::now());
+        }
         for container in wrote_back {
             self.sessions.refresh(&container);
+        }
+        // The promise this tool makes is that a save reaches the container, and
+        // this is that promise outstanding. It stays on the icon until somebody
+        // puts it down, because the alternative is a banner that flashed past
+        // while they were typing into the very document that did not save.
+        for (id, name) in failed {
+            self.note(
+                crate::present::Mood::AtRisk,
+                format!("writeback:{id}"),
+                format!("{name} - a save did not reach its container"),
+            );
+        }
+        // And it goes when a later save from the same session lands, without
+        // anybody dismissing anything. The colour is a claim about right now,
+        // so a claim the next save disproves has to answer to it.
+        for id in landed {
+            self.dismiss(&format!("writeback:{id}"));
         }
     }
 
@@ -677,7 +841,9 @@ pub fn run(
     outside: &Outside<'_>,
     standing: &dyn crate::present::Standing,
 ) -> io::Result<()> {
-    let mut shown: Vec<String> = Vec::new();
+    let mut shown: Vec<crate::present::Listed> = Vec::new();
+    let mut carried: Vec<crate::present::Trouble> = Vec::new();
+    let mut wearing = crate::present::Mood::Settled;
     let (tx, rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
         // A caller that went away between connecting and being read is not an
@@ -710,17 +876,35 @@ pub fn run(
 
         // Concept 12's standing list, told what to say and asked what was
         // said back. Only when it changed: this is every 250 milliseconds, and
-        // the list is the same on almost all of them.
-        if let Response::Ok(lines) = resident.list() {
-            if lines != shown {
-                standing.show(&lines);
-                shown = lines;
+        // all three are the same on almost all of them.
+        //
+        // The mood is in that comparison and it is the one that moves on its
+        // own — [`PULSE`] expires with nothing else happening — which is what
+        // takes the icon back to blue after a save without needing a timer of
+        // its own anywhere.
+        let listed = resident.listed();
+        let troubles = resident.troubles().to_vec();
+        let mood = resident.mood();
+        if (&listed, &troubles, mood) != (&shown, &carried, wearing) {
+            standing.show(&listed, &troubles, mood);
+            shown = listed;
+            carried = troubles;
+            wearing = mood;
+        }
+        let mut leaving = false;
+        for chosen in standing.taken() {
+            match chosen {
+                // Somebody has read it. Nothing else happens: the trouble was
+                // the record that it happened at all, and putting it down is
+                // the person saying they have the record now.
+                crate::present::Chosen::Dismiss(id) => resident.dismiss(&id),
+                // The same ending as interrupting the command line, and the
+                // menu item says so: every session stays where it is and stays
+                // recoverable.
+                crate::present::Chosen::Quit => leaving = true,
             }
         }
-        if standing.taken().contains(&crate::present::Chosen::Quit) {
-            // The same ending as interrupting the command line, and the menu
-            // item says so: every session stays where it is and stays
-            // recoverable.
+        if leaving {
             break;
         }
 
@@ -728,9 +912,12 @@ pub fn run(
         // waiting on somebody. Staying resident does nothing for the crash
         // case, where this process is dead by definition.
         //
-        // A standing list is the fourth reason and is not a session: somebody
-        // asked to be able to see what is open, and vanishing is not an answer
-        // to that. `PLAN.md` carries the amendment.
+        // **Where there is a standing list the rule does not apply**, and that
+        // is a change rather than an exception — see
+        // [`crate::present::Standing::holding`]. The rule was written for a
+        // process with no face: nothing for it to be, so no reason for it to
+        // be. An icon gives warnings somewhere to live, and a warning raised by
+        // a process on its way out has nowhere to go.
         if resident.is_idle() && !standing.holding() {
             break;
         }
@@ -1370,5 +1557,153 @@ mod tests {
             Response::Ok(Vec::new())
         );
         assert!(r.is_idle());
+    }
+
+    #[test]
+    fn nothing_wrong_is_the_ordinary_colour() {
+        let tmp = tempfile::tempdir().unwrap();
+        let r = Resident::new(tmp.path().join("sessions"));
+        assert_eq!(r.mood(), crate::present::Mood::Settled);
+        assert!(r.troubles().is_empty());
+    }
+
+    #[test]
+    fn the_icon_wears_the_worst_thing_currently_true() {
+        use crate::present::Mood;
+        let tmp = tempfile::tempdir().unwrap();
+        let mut r = Resident::new(tmp.path().join("sessions"));
+
+        r.note(Mood::Look, "a", "one did not open".into());
+        assert_eq!(r.mood(), Mood::Look);
+        // Worse arrives and wins, whatever order they were taken on in.
+        r.note(Mood::Danger, "b", "one is a program".into());
+        assert_eq!(r.mood(), Mood::Danger);
+        r.note(Mood::AtRisk, "c", "one did not save".into());
+        assert_eq!(
+            r.mood(),
+            Mood::Danger,
+            "a lesser trouble does not talk the icon down"
+        );
+
+        // And it comes back down as they are put down, rather than sticking at
+        // the worst thing that ever happened.
+        r.dismiss("b");
+        assert_eq!(r.mood(), Mood::AtRisk);
+        r.dismiss("c");
+        assert_eq!(r.mood(), Mood::Look);
+        r.dismiss("a");
+        assert_eq!(r.mood(), Mood::Settled);
+    }
+
+    #[test]
+    fn the_same_trouble_twice_is_one_trouble() {
+        use crate::present::Mood;
+        let tmp = tempfile::tempdir().unwrap();
+        let mut r = Resident::new(tmp.path().join("sessions"));
+        r.note(
+            Mood::Look,
+            "open:report",
+            "report.slpc - did not open".into(),
+        );
+        r.note(
+            Mood::Look,
+            "open:report",
+            "report.slpc - did not open".into(),
+        );
+        r.note(Mood::Look, "open:report", "report.slpc - still not".into());
+        assert_eq!(r.troubles().len(), 1, "{:?}", r.troubles());
+        assert_eq!(r.troubles()[0].summary, "report.slpc - still not");
+    }
+
+    #[test]
+    fn a_container_that_will_not_open_leaves_something_behind() {
+        // The case the standing list exists for: a double-click that produces
+        // no document and no window. The notification saying so is a moment,
+        // and a moment that was missed is indistinguishable from the tool being
+        // broken.
+        let tmp = tempfile::tempdir().unwrap();
+        let w = World::new();
+        let mut r = Resident::new(tmp.path().join("sessions"));
+        let nowhere = tmp.path().join("not-a-container.slpc");
+        fs::write(&nowhere, b"this is not a container").unwrap();
+
+        let _ = err(r.handle(opening(nowhere), &w.outside()));
+        assert_eq!(r.mood(), crate::present::Mood::Look);
+        let said = &r.troubles()[0].summary;
+        assert!(
+            said.starts_with("not-a-container.slpc"),
+            "it names the file the person clicked, not the session: {said}"
+        );
+    }
+
+    #[test]
+    fn a_payload_that_is_a_program_is_the_one_thing_red_is_for() {
+        // Concept 5.1's check, which fires close to never and means one thing
+        // when it does. Nothing else in this file may reach `Danger`.
+        let tmp = tempfile::tempdir().unwrap();
+        let w = World::new();
+        let mut r = Resident::new(tmp.path().join("sessions"));
+        let c = container(tmp.path(), "invoice.txt", b"MZ\x90\x00 not a document");
+
+        ok(r.handle(opening(c), &w.outside()));
+        assert_eq!(r.mood(), crate::present::Mood::Danger);
+        let said = &r.troubles()[0].summary;
+        assert!(
+            said.contains("invoice.txt") && said.contains("Windows executable"),
+            "{said}"
+        );
+    }
+
+    #[test]
+    fn a_trouble_stays_until_it_is_put_down() {
+        // The property that makes the colour worth reading: it is not a banner
+        // that expires while somebody is looking the other way. Turning the
+        // loop over changes nothing about it.
+        let tmp = tempfile::tempdir().unwrap();
+        let w = World::new();
+        let mut r = Resident::new(tmp.path().join("sessions"));
+        let c = container(tmp.path(), "invoice.txt", b"MZ\x90\x00 not a document");
+        ok(r.handle(opening(c), &w.outside()));
+
+        for _ in 0..5 {
+            r.turn(&w.outside());
+        }
+        assert_eq!(r.mood(), crate::present::Mood::Danger);
+
+        let id = r.troubles()[0].id.clone();
+        r.dismiss(&id);
+        assert!(r.troubles().is_empty());
+        assert_eq!(r.mood(), crate::present::Mood::Settled);
+    }
+
+    #[test]
+    fn a_question_waiting_colours_the_icon_and_answering_clears_it() {
+        // Read off the sessions rather than remembered, so there is nothing to
+        // dismiss and nothing that can disagree with what is on disk.
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let w = World::new();
+        let c = container(tmp.path(), "report.txt", b"a report\n");
+
+        a_crashed_session(&root, &c, "report.txt", b"an edit nobody wrote back\n");
+
+        let mut r = Resident::new(&root);
+        assert_eq!(r.mood(), crate::present::Mood::Settled);
+        // Opening the same container is what raises concept 6.3's question.
+        let _ = r.handle(announcing(c), &w.loud());
+        assert_eq!(
+            r.mood(),
+            crate::present::Mood::Look,
+            "a decision waiting is worth a look and nothing more"
+        );
+        assert!(
+            r.troubles().is_empty(),
+            "and it is not a trouble: it is on the sessions, so answering ends it"
+        );
+
+        let about = w.channel.questions()[0].about.clone();
+        w.channel.answer(&about, Choice::Discard);
+        r.turn(&w.outside());
+        assert_eq!(r.mood(), crate::present::Mood::Settled);
     }
 }

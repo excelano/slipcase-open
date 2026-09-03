@@ -100,10 +100,23 @@ New-Item -ItemType Directory -Force -Path $stage | Out-Null
 
 Copy-Item -LiteralPath $binary -Destination (Join-Path $stage 'slipcase-open.exe')
 Copy-Item -Recurse -LiteralPath (Join-Path $here 'assets') -Destination (Join-Path $stage 'Assets')
-# Beside the binary rather than under Assets: `present::tray` loads it by path
-# at run time, because compiling it in as a resource would need `rc.exe` and
-# this project has no build step to put one in.
-Copy-Item -LiteralPath (Join-Path $here 'slipcase-open.ico') -Destination (Join-Path $stage 'slipcase-open.ico')
+# Beside the binary rather than under Assets: `present::tray` loads these by
+# path at run time, because compiling them in as resources would need `rc.exe`
+# and this project has no build step to put one in.
+#
+# The whole set, not just the base. The icon is the tray's interface and its
+# colour is what it says; a package carrying only the blue one would answer
+# "everything is fine" to every question it was ever asked. Missing files fall
+# back rather than failing, which is what makes that failure a silent one --
+# so it is checked here instead.
+foreach ($state in @('', '-working', '-yellow', '-orange', '-red')) {
+    $ico = "slipcase-open$state.ico"
+    $from = Join-Path $here $ico
+    if (-not (Test-Path -LiteralPath $from)) {
+        throw "$ico is missing. Run packaging/windows/make-ico.ps1."
+    }
+    Copy-Item -LiteralPath $from -Destination (Join-Path $stage $ico)
+}
 
 $manifest = Get-Content -LiteralPath (Join-Path $here 'AppxManifest.xml.in') -Raw
 $manifest = $manifest.Replace('@IDENTITY_NAME@', $identity.Name)

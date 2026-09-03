@@ -314,9 +314,7 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
         eprintln!("  slipcase-open close <session>");
     }
 
-    // Not holding: this instance has work, and concept 8 ends it when the work
-    // does. Only a tray somebody summoned outlives its sessions.
-    let standing = standing(false);
+    let standing = standing();
     resident::run(listener, &mut instance, &outside, standing.as_ref())?;
     instance.stand_down(&outside);
     Ok(())
@@ -563,27 +561,42 @@ fn settings(root: &Path, door: &Path) -> Fallible {
 ///
 /// The same shape as [`channel`]: try the platform's, and fall back to the one
 /// that does nothing. A session with no shell has no tray, and that is ordinary.
-fn standing(holds: bool) -> Box<dyn present::Standing> {
+/// **Where a terminal started this there is no icon, and that is concept 9's
+/// own rule rather than a special case.** The command line is the floor beneath
+/// the tray: a terminal *is* a standing list, `sessions` answers the same
+/// question, and the person is looking at the output already. It is also what
+/// keeps concept 8's exit rule intact for that invocation — an `open` typed at
+/// a prompt that never returned would be a worse command than the one it
+/// replaced.
+///
+/// Everything else — a double-click, the Start tile, the context menu — has no
+/// terminal and gets an icon that stays until it is asked to leave.
+fn standing() -> Box<dyn present::Standing> {
+    if std::io::stderr().is_terminal() {
+        return Box::new(present::Nowhere);
+    }
     #[cfg(windows)]
-    if let Ok(tray) = present::tray::Tray::show_up(holds) {
+    if let Ok(tray) = present::tray::Tray::show_up() {
         return Box::new(tray);
     }
-    #[cfg(not(windows))]
-    let _ = holds;
     Box::new(present::Nowhere)
 }
 
 /// Stand by with the standing list and nothing open.
 ///
-/// **The Start tile, and the one invocation that holds itself open.** Concept 8
-/// keeps an instance alive for a session, a lingering one, or an unanswered
-/// question, and this is a fourth reason of a different kind: somebody asked to
-/// see what is open, and an icon that appears and vanishes is not an answer. It
-/// is deliberately the *only* way to get one — a double-click still ends when
-/// its work does, or every container opened in a morning would leave an icon
-/// behind it.
+/// **The Start tile**, which is what a packaged product does when somebody
+/// clicks the thing they installed and has no container in mind. It puts up the
+/// icon and waits; every other invocation reaches the same place by opening
+/// something first.
 ///
-/// Where an instance is already running there is already a tray, so this hands
+/// The earlier version of this comment claimed this was the *only* invocation
+/// that outlived its work, on the reasoning that otherwise every container
+/// opened in a morning would leave an icon behind. That reasoning was wrong,
+/// and the front door is why: the second double-click hands over to the
+/// instance the first one started, so a morning's containers are one icon and
+/// not ten. There was never a pile to prevent.
+///
+/// Where an instance is already running there is already an icon, so this hands
 /// over and says nothing rather than raising a second one.
 ///
 /// # Errors
@@ -608,7 +621,7 @@ fn stand_by(root: &Path, door: &Path) -> Fallible {
         let outside = Outside::new(&source, &Host, channel.as_ref()).saying(volume);
         let _ = resident::sweep(root, &[]);
         let mut instance = Resident::new(root);
-        let standing = standing(true);
+        let standing = standing();
         resident::run(listener, &mut instance, &outside, standing.as_ref())?;
         instance.stand_down(&outside);
         Ok(())

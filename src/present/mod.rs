@@ -34,14 +34,96 @@ pub mod toast;
 #[cfg(windows)]
 pub mod tray;
 
-/// What somebody chose from the standing list.
+/// One session, as the standing list shows it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Listed {
+    /// What `sessions` prints and `close` takes.
+    pub id: String,
+    /// The payload and what has become of it, without the id in front. The
+    /// command line puts the id back; a menu has no room for one.
+    pub label: String,
+    /// The payload's name alone, for a menu item that is an action rather than
+    /// a line of a report: *Close report.pdf* says what pressing it does, where
+    /// the whole label repeats what the tooltip already counted.
+    pub payload: String,
+    /// Live: open, or closed and waiting for the application to finish. What
+    /// the standing list is reassuring somebody about.
+    pub live: bool,
+    /// A decision only a person can make — a session left behind with an edit
+    /// in it. Concept 6.3's three choices are what it needs.
+    pub needs_a_person: bool,
+    /// Saves written back so far, where the session is one that counts them.
+    ///
+    /// The one number that changes while somebody works, which is the whole
+    /// reason a standing list is worth more than a notification: a toast says
+    /// what happened once, and this says what is true now.
+    pub write_backs: Option<u64>,
+}
+
+/// What the icon is saying, which for most people is the whole of this tool's
+/// interface.
 ///
-/// One variant so far. The list itself is the point of concept 12's tray — it
-/// answers *what is open* without a command being typed — and acting on a
-/// single session from it is worth adding once there is a session surface to
-/// act through.
+/// **One question, answered continuously: is my work safe.** Somebody who never
+/// opens the menu and never reads a notification should still be able to glance
+/// at the clock and know the answer, and a person who learns to ignore it
+/// entirely is the success case rather than a failure.
+///
+/// Ordered, because the icon can only be one colour and what it shows is the
+/// worst thing currently true.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
+pub enum Mood {
+    /// Watching, and everything that was saved has landed.
+    #[default]
+    Settled,
+    /// A save is on its way back into its container. Seen for a moment and
+    /// gone.
+    ///
+    /// **The least important of these and the one most worth having.** Pressing
+    /// Save and seeing nothing happen anywhere is what makes a person doubt the
+    /// tool is running at all, and it is the first thing that was noticed
+    /// missing. It sits below the warnings because a flicker must never hide
+    /// one.
+    Working,
+    /// Worth a look, with nothing at risk: a decision waiting, or a container
+    /// that did not open because the desktop had nothing to open it with.
+    Look,
+    /// Work that is not in its container — a write-back that failed, or a
+    /// container that moved out from under a session. The one thing this tool
+    /// promises is that a save reaches the container, and this is that promise
+    /// outstanding.
+    AtRisk,
+    /// Danger, and nothing else may use it or it stops meaning anything. Today
+    /// that is one thing: a payload that is a program wearing a document's
+    /// name.
+    Danger,
+}
+
+/// Something the icon has taken on a colour for, in words.
+///
+/// The icon says *something is wrong*; the menu says *what*, in one line, about
+/// a file the person recognises. Held rather than worked out from the sessions,
+/// because most of these are moments — a container that would not open leaves
+/// no session to re-read the trouble from.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Trouble {
+    /// What it is called when it is put down.
+    pub id: String,
+    /// How much colour it is worth.
+    pub mood: Mood,
+    /// One line, naming the file.
+    pub summary: String,
+}
+
+/// What somebody chose from the standing list.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Chosen {
+    /// Put down a trouble that has been read.
+    ///
+    /// **The one thing the standing list asks of anybody**, and it is there
+    /// because a list of things that cannot be acted on is furniture. It is
+    /// also the only way an icon that has gone red gets to go back to blue,
+    /// which is what makes the colour a statement rather than a decoration.
+    Dismiss(String),
     /// Leave, keeping every session recoverable, which is what interrupting
     /// the command line already does.
     Quit,
@@ -55,18 +137,31 @@ pub enum Chosen {
 /// without the engine noticing, and not noticing is what this trait is for: the
 /// loop hands it lines it was going to format anyway and asks what came back.
 pub trait Standing {
-    /// The sessions as `sessions` would print them, whenever they change.
-    fn show(&self, sessions: &[String]);
+    /// What is open, what is wrong, and the colour those add up to, whenever
+    /// any of the three changes.
+    fn show(&self, sessions: &[Listed], troubles: &[Trouble], mood: Mood);
 
     /// What has been chosen since this was last asked. Does not block.
     fn taken(&self) -> Vec<Chosen>;
 
     /// Whether this surface is itself a reason for the instance to stay.
     ///
-    /// Concept 8 keeps the process alive for a session, a lingering one, or an
-    /// unanswered question, and stops it when none remain. A standing list is a
-    /// fourth reason and a different kind: somebody asked to be able to see
-    /// what is open, and answering *nothing* and vanishing is not an answer.
+    /// **A standing list stands until it is dismissed, and that supersedes
+    /// concept 8's exit rule wherever there is one.** The rule ends an instance
+    /// when no session, no lingering session and no unanswered question remain,
+    /// which was right while the process had no face: there was nothing for it
+    /// to be, so there was no reason for it to be. An icon changes that. It is
+    /// where a warning lives, and a warning that appears in a process already
+    /// on its way out has nowhere to go but a notification somebody may never
+    /// see — which is the whole reason the colours exist.
+    ///
+    /// The cost, said plainly: open one container and a background process
+    /// stays until it is asked to leave. That is the bargain every sync client
+    /// makes, and the icon is what turns it from a surprise into a bargain.
+    ///
+    /// Where a terminal started this there is no icon, by [`crate::present`]'s
+    /// own rule that the command line is the floor — so that invocation keeps
+    /// concept 8 exactly as written, and `open` at a prompt still returns.
     fn holding(&self) -> bool {
         false
     }
@@ -76,7 +171,7 @@ pub trait Standing {
 pub struct Nowhere;
 
 impl Standing for Nowhere {
-    fn show(&self, _sessions: &[String]) {}
+    fn show(&self, _sessions: &[Listed], _troubles: &[Trouble], _mood: Mood) {}
     fn taken(&self) -> Vec<Chosen> {
         Vec::new()
     }
