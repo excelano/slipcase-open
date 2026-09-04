@@ -161,7 +161,9 @@ The chain that stood in front of the apt push ran in order: `slpc` 0.3.11 to
 crates.io, this crate off the path dependency, `slipcase-common` 1.0.0 for the
 media type, `slipcase-desktop` 0.1.4 onto it, and then this.
 
-The tool is complete and shipped on one platform. Phase 4 is next.
+The tool is complete and shipped on one platform. Phase 4 is next, and as of
+2026-09-03 it is nearly done: see its section below for what is in, what is left
+to assemble for the Store, and the one defect still open.
 
 ## Before Phase 4 — what CI found
 
@@ -200,9 +202,19 @@ test harness, so it earned one.
 pair, the named pipe with its SID ACL, toast with actions, the tray, the ProgID
 and its secondary verb, MSIX and the Store, winget.
 
-**Under way.** File identity, the named pipe, a gate that runs on a Windows
-machine, and the launcher are in. The registry policy source, the toast, the
-tray, the ProgID and the packaging are not.
+**Where it stands, 2026-09-03, at 0.1.4.** In: file identity, the named pipe, a
+gate that runs on a Windows machine, the launcher, the toast, the ProgID and its
+secondary verb, MSIX and the Store identity, the tray, and the two behaviour
+changes below. Not in: the registry policy source with its ADMX/ADML pair, and
+winget.
+
+**Still to assemble before a submission.** A certification-kit run, screenshots —
+the product has no window, so the candidates are the tray menu, the refusal
+dialog and Explorer's context menu — `store-listing.md`,
+`packaging/windows/README.md`, a demo container served from the site for the
+reviewer, support and privacy URLs, and age ratings. `RELEASE.md` gates
+submission on a readiness review across all three platforms, so Phase 5's pause
+comes first.
 
 **`IAttachmentExecute` is not what reads Mark of the Web, and the line above is
 wrong about it — as is concept §12, which needs the same amendment.** Measured
@@ -266,12 +278,49 @@ than before them, because without those a double-click would then say nothing at
 all. The narration in that console is the terminal channel standing in for a
 toast that does not exist yet.
 
-**Open, and not explained: session directories accumulate with their payload
-gone.** Found on 2026-09-02 on a machine that had been opening one container
-since the previous afternoon — seven sessions listed, six reading *nothing was
-extracted*, each with a `session.toml` from the run that made it and an empty
-payload directory. The tray is what made it visible; `sessions` had been saying
-it all along.
+**The tray was rebuilt around what its colour says, not what its menu lists.**
+Three questions took the first one apart and none had an answer: the greyed
+entries offered nothing, `Close` was indistinguishable from `Quit` with one
+session open, and nothing changed when a file was saved. `present::Mood` is the
+answer — one question asked continuously, *is my work safe*, with red reserved
+for a payload that is a program. The instance now stays until it is asked to
+leave, which **supersedes concept §8's exit rule wherever there is a standing
+surface**: the rule was written for a process with no face, and a warning raised
+by a process on its way out has nowhere to go. Concept §12's session list is not
+why the tray exists; the Start tile is.
+
+**Two behaviour changes that amend the concept rather than implement it**, both
+verified through the real double-click:
+
+- **§5.1's content check refuses.** A payload whose bytes are a program under a
+  name claiming otherwise is not opened, before anything is extracted, and it is
+  said in a way that cannot be missed. It stays a veto and not a control: it
+  admits nothing, so nothing is permitted by it.
+- **§6.3 puts an edit back** where the container has not moved, and asks only
+  where both sides changed. Telling those apart needed one new value in the
+  session record — what the container held when the two last agreed — which is
+  not the payload digest §6.3 removed and says so.
+
+**Open, and still not explained: session directories survive their own
+removal.** The payload is gone, `payload/` is left empty, the record stays, so
+`sessions` and the tray list a corpse. The failure is
+`ERROR_SHARING_VIOLATION` on the empty directory.
+
+What is established is that **the condition clears**: a corpse removed by hand a
+minute later went without complaint, and a scripted reproduction retried one free
+immediately. `Session::remove` now waits it out for three hundred milliseconds.
+
+What is **not** established is what holds it, and three readings have been
+measured and found wrong rather than left standing: Windows delete-pending does
+not block the `rmdir` at all; the editor holding the payload is out, because a
+corpse cleared with Notepad still open on it; and the state directory's location
+looked like the discriminator until six more runs there came back clean. Roughly
+twenty harness rounds produced one corpse against two in a single sitting at the
+keyboard, so the sequence that provokes it is not the one being scripted.
+
+The retry claims only that a removal which would have succeeded shortly now
+does. **Whether corpses stop appearing in use is the test**, and one appearing
+again is evidence rather than a nuisance.
 
 What has been measured, and it is less than it looked:
 
