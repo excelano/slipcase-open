@@ -162,9 +162,70 @@ impl Session {
     ///
     /// # Errors
     ///
-    /// Where the directory cannot be removed.
+    /// Where the directory cannot be removed inside [`PATIENCE`].
     pub fn remove(self) -> io::Result<()> {
-        fs::remove_dir_all(&self.dir)
+        keep_trying(|| fs::remove_dir_all(&self.dir))
+    }
+}
+
+/// How long a removal keeps trying before it reports the failure.
+///
+/// **What was measured, on 2026-09-03, and nothing beyond it.** Sessions were
+/// surviving their own removal: the payload gone, an empty `payload/` left
+/// behind, and the record still there, so `sessions` and the tray listed a
+/// corpse. Two appeared during an ordinary sitting at the keyboard. The failure
+/// is `ERROR_SHARING_VIOLATION` on the empty `payload/`, so `remove_dir_all`
+/// got as far as unlinking the payload and no further.
+///
+/// **It is transient.** One corpse's directory was removed by hand a minute
+/// later with nothing else changed. A scripted reproduction caught one and
+/// retried it free immediately. That is the whole of what this constant rests
+/// on, and it is enough: a condition that clears is one to wait out.
+///
+/// **It is also intermittent, and no trigger has been found.** Around twenty
+/// runs of the sequence that produces it in real use — open, save, kill the
+/// instance, let the next one's startup sweep remove what was left — produced
+/// one corpse. An earlier reading, that the state directory's location was the
+/// discriminator, did not survive six more runs in that same location and is
+/// not the reason for anything here.
+///
+/// So this does not claim to end the corpse; it claims that a removal which
+/// would have succeeded a moment later now does. Whether that covers every
+/// occurrence is unknown, and the honest test is whether they stop appearing in
+/// use.
+///
+/// Three hundred milliseconds is a dozen attempts, far more than the one that
+/// sufficed, and short enough that a sweep of a dozen corpses cannot noticeably
+/// delay a launch.
+const PATIENCE: std::time::Duration = std::time::Duration::from_millis(300);
+
+/// How long to wait between attempts.
+const BETWEEN: std::time::Duration = std::time::Duration::from_millis(20);
+
+/// Do it, and go on doing it while it keeps failing, up to [`PATIENCE`].
+///
+/// **This accommodates a transient condition; it does not fix a known holder,
+/// and it must not be described as doing so.** What is established is that the
+/// directory is unremovable for a moment and removable shortly afterwards. Who
+/// has it is not established, and two stories that fit have already been
+/// measured and found wrong: Windows delete-pending, tested directly and shown
+/// not to block the `rmdir` at all, and the target application holding the
+/// payload, ruled out by a corpse that cleared with the editor still open.
+///
+/// A missing directory is not retried: it is not going to appear, and the
+/// caller asked for it gone.
+fn keep_trying(mut attempt: impl FnMut() -> io::Result<()>) -> io::Result<()> {
+    let mut waited = std::time::Duration::ZERO;
+    loop {
+        match attempt() {
+            Ok(()) => return Ok(()),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => return Err(e),
+            Err(e) if waited >= PATIENCE => return Err(e),
+            Err(_) => {
+                std::thread::sleep(BETWEEN);
+                waited += BETWEEN;
+            }
+        }
     }
 }
 
@@ -421,7 +482,7 @@ fn read_record(dir: &Path) -> io::Result<Record> {
 
 #[cfg(test)]
 mod tests {
-    use super::{create, default_root, scan, PAYLOAD_DIR, RECORD};
+    use super::{create, default_root, keep_trying, scan, PATIENCE, PAYLOAD_DIR, RECORD};
     use std::fs;
 
     /// A container on disk to point a session at. Its contents do not matter
@@ -593,5 +654,82 @@ mod tests {
         let root = default_root().unwrap();
         assert!(root.ends_with("slipcase-open/sessions"));
         assert!(!root.starts_with(std::env::temp_dir()));
+    }
+
+    #[test]
+    fn a_removal_that_fails_and_then_stops_failing_succeeds() {
+        // The property the fix rests on, and the only one it claims: a
+        // condition that clears is waited out rather than reported. The
+        // measured case cleared on the first retry; this one takes two, which
+        // is the same shape with margin.
+        let attempts = std::cell::Cell::new(0);
+        let outcome = keep_trying(|| {
+            attempts.set(attempts.get() + 1);
+            if attempts.get() < 3 {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "in use by another process",
+                ))
+            } else {
+                Ok(())
+            }
+        });
+        assert!(outcome.is_ok(), "{outcome:?}");
+        assert_eq!(attempts.get(), 3);
+    }
+
+    #[test]
+    fn a_removal_that_never_stops_failing_reports_it() {
+        // Patience is not silence. Something that is genuinely stuck is still a
+        // failure, and the caller still hears the operating system's own words
+        // about it rather than a sentence this module invented.
+        let attempts = std::cell::Cell::new(0);
+        let outcome = keep_trying(|| {
+            attempts.set(attempts.get() + 1);
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "in use by another process",
+            ))
+        });
+        let why = outcome.expect_err("it should have given up");
+        assert_eq!(why.kind(), std::io::ErrorKind::PermissionDenied);
+        assert!(why.to_string().contains("in use by another process"));
+        // It tried more than once and stopped, rather than either giving up at
+        // the first refusal or going round forever.
+        assert!(attempts.get() > 1, "it did not retry at all");
+        assert!(attempts.get() < 100, "{} attempts", attempts.get());
+    }
+
+    #[test]
+    fn a_directory_that_is_not_there_is_not_waited_for() {
+        // It is not going to appear. Waiting `PATIENCE` on every already-gone
+        // session would put that wait into the sweep of a tidy state directory,
+        // which is the common case and the one that must stay quick.
+        let attempts = std::cell::Cell::new(0);
+        let began = std::time::Instant::now();
+        let outcome = keep_trying(|| {
+            attempts.set(attempts.get() + 1);
+            Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "no such directory",
+            ))
+        });
+        assert!(outcome.is_err());
+        assert_eq!(attempts.get(), 1);
+        assert!(began.elapsed() < PATIENCE);
+    }
+
+    #[test]
+    fn removing_a_session_takes_the_payload_and_the_record_with_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = a_container(tmp.path());
+        let s = create(&root, &c, "report.pdf").unwrap();
+        fs::write(s.payload_path(), b"something").unwrap();
+        let dir = s.dir().to_path_buf();
+
+        s.remove().unwrap();
+        assert!(!dir.exists());
+        assert!(scan(&root).unwrap().is_empty());
     }
 }

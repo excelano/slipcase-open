@@ -554,12 +554,14 @@ unsafe fn offer(hwnd: HWND) {
             }
         }
         let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
-        let _ = AppendMenuW(
-            menu,
-            MF_STRING,
-            QUIT,
-            w!("Quit, keeping sessions recoverable"),
-        );
+        // **Just "Quit".** The longer label said *keeping sessions
+        // recoverable*, which is the engine's vocabulary and reassurance about
+        // a thing the person was never worried about — they have not been told
+        // a session exists and should not have to learn. It also read as a
+        // warning, which is the opposite of what it describes: nothing is lost
+        // either way, and a menu item that explains itself is one somebody has
+        // to stop and read.
+        let _ = AppendMenuW(menu, MF_STRING, QUIT, w!("Quit"));
 
         let mut at = POINT::default();
         let _ = GetCursorPos(&raw mut at);
