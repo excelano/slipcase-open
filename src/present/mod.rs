@@ -366,6 +366,30 @@ pub trait Channel {
     fn insist(&self, report: &Report) {
         self.report(report);
     }
+
+    /// Wait for anything this channel put on the screen that belongs to this
+    /// process, before the process ends.
+    ///
+    /// **The other half of [`insist`](Self::insist), and it exists because a
+    /// refusal was silently lost.** Measured against the installed package on
+    /// 2026-09-06: a container whose payload is a program, double-clicked with
+    /// no instance already running, produced nothing at all — no box, no window,
+    /// the process gone inside 400ms. With an instance running it produced the
+    /// box every time. The difference is entirely who was left alive: the
+    /// Windows box is a thread, because the resident loop must not stop pumping
+    /// watchers for as long as somebody leaves a dialog up, and an invocation
+    /// that refused and held nothing returns immediately — taking the thread
+    /// down with it before it had drawn.
+    ///
+    /// So the rule is not *show it* but *do not leave while it is up*, and that
+    /// is what this is. A channel whose output outlives the process — a toast,
+    /// a freedesktop notification, a line already written to a terminal — has
+    /// nothing to wait for, which is why the default does nothing.
+    ///
+    /// Called at the points where the process is about to end, not after each
+    /// [`insist`](Self::insist): the resident loop insists mid-flight and must
+    /// carry on, and the whole reason the box is on a thread is so that it can.
+    fn stay_until_seen(&self) {}
 }
 
 #[cfg(test)]

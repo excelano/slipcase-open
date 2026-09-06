@@ -382,6 +382,38 @@ zone warning is displayed for a payload that earns one: nothing automated can
 watch a modal dialog, and the suite never reaches the launcher on any platform.
 That one needs a person at a desktop.
 
+### The refusal nobody saw, 2026-09-06
+
+Reported from the keyboard rather than found here: on a machine where nothing of
+this tool was running, double-clicking a container whose payload is a program did
+*nothing at all*. Opening an ordinary container first and then the same one
+produced the refusal every time.
+
+Measured through the installed package with the same shell verb both ways:
+with no instance running, no window and the process gone inside 400 ms; with one
+running, the box on screen inside 400 ms. The channel had done its work in both
+— the refusal is one call — and only the box was lost.
+
+**The box is a thread, and the thread was nobody's to wait for.** It is on a
+thread because the resident loop must keep pumping watchers while somebody
+leaves a dialog up, and `main` returns straight away from an invocation that
+refused and is holding nothing, which is concept 8's exit rule working exactly
+as written. The two are both right and the gap between them is where the
+refusal went.
+
+So the rule is not *show it* but *do not leave while it is up*:
+`Channel::stay_until_seen`, called where the process ends rather than after each
+`insist`. The front door is dropped before the wait, so a box somebody leaves on
+screen does not hold a pipe nothing is accepting on — checked by opening an
+ordinary container while one was up, which still opened.
+
+**What would have caught it.** Nothing in the suite, and that is the honest
+answer: the channel that draws a box needs package identity, so every test in
+this repository runs against the terminal channel, where there is no box to
+lose. It was caught by a person double-clicking a file on a machine that had
+just started — which is [`packaging/windows/README.md`]'s point about the
+product being the thing to measure, arriving for the third time.
+
 ## Phase 5 — macOS
 
 The sandbox question in §15 is resolved first, because it may move where a

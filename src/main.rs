@@ -283,7 +283,18 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
     let response = instance.handle(request, &outside);
     if instance.is_idle() {
         // Nothing was started and nothing is being held, so there is no reason
-        // to keep the front door.
+        // to keep the front door. Dropped before the wait below and not after:
+        // a refusal that somebody leaves on screen would otherwise hold a bound
+        // door that nothing is accepting on, and the next double-click would
+        // fail to reach an instance that is not there.
+        drop(listener);
+        // **But a refusal this invocation raised may still be on the screen.**
+        // Concept 12's box belongs to this process, and returning here is what
+        // took it down before it had drawn — the whole of the defect measured
+        // on 2026-09-06, where the first container refused after a restart said
+        // nothing at all and the second, with an instance by then running, said
+        // it every time.
+        outside.channel.stay_until_seen();
         return match &response {
             Response::Ok(_) => say(&response),
             Response::Err(_) if voice == Voice::Client => say(&response),
@@ -317,6 +328,9 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
     let standing = standing();
     resident::run(listener, &mut instance, &outside, standing.as_ref())?;
     instance.stand_down(&outside);
+    // The loop can have insisted on its last turn, and the same rule applies on
+    // the way out of it as on the way out above.
+    outside.channel.stay_until_seen();
     Ok(())
 }
 
@@ -634,6 +648,7 @@ fn stand_by(root: &Path, door: &Path) -> Fallible {
         let standing = standing();
         resident::run(listener, &mut instance, &outside, standing.as_ref())?;
         instance.stand_down(&outside);
+        outside.channel.stay_until_seen();
         Ok(())
     }
     #[cfg(not(windows))]

@@ -26,10 +26,16 @@ slipcase-open (0.1.4-1) unstable; urgency=low
     asked of Windows rather than assumed. `slipcase-open policy` consequently
     reports the directory the packaged product actually uses, where before it
     named one it was not being given.
+  * Windows: a refused container now says so on the first one of the day. The
+    refusal is a message box, and the box was being drawn on a thread that the
+    process then ended underneath — so a double-click with nothing else of this
+    tool already running produced no document, no message and no window, and the
+    same container refused loudly a minute later once something was running to
+    hold the box up. It waits for the box now before it goes.
   * No change to the Debian package's behaviour: everything above is Windows,
     and the Linux layers, their paths and their spellings are unchanged.
 
- -- David M. Anderson <david.anderson@excelano.com>  Fri, 05 Sep 2026 12:00:00 -0500
+ -- David M. Anderson <david.anderson@excelano.com>  Sat, 06 Sep 2026 12:00:00 -0500
 
 slipcase-open (0.1.3-1) unstable; urgency=low
 

@@ -121,6 +121,34 @@ of the packaged build.
 While editing the manifest: **a double hyphen cannot appear in an XML comment**,
 which is what `makeappx` refused the file for first.
 
+### A message box on a thread dies with its process
+
+The refusal is a `MessageBoxW` on a thread of its own, because the caller can be
+the resident loop and a modal loop there would stop every open session's watcher
+for as long as somebody left the box up. An invocation that refused and held
+nothing then returned immediately and took the thread down with it.
+
+Measured 2026-09-06 against the installed package, opening the same container
+through the same shell verb twice:
+
+| With | Result |
+| --- | --- |
+| nothing of this tool running | no box, no window, process gone inside 400 ms |
+| an instance already running | box on screen inside 400 ms, every time |
+
+Which is why it looked like the first double-click after a restart was the one
+that failed: it was the only one where the process that refused was also the one
+that would have had to stay. `Channel::stay_until_seen` is the fix — the box
+still goes on a thread, and the process now joins it on its way out. The front
+door is dropped first, so a refusal somebody leaves on screen does not hold a
+bound pipe that nothing is accepting on; checked by opening an ordinary
+container while the box was up.
+
+This is the same shape as the zone warning below, and it is worth saying why one
+of them is now measured and the other still is not: nothing automated can watch
+a modal dialog's *contents*, but whether a window belonging to this process
+exists at all is `MainWindowHandle`, and that is a fact a script can have.
+
 ## Policy is a separate download
 
 `policy/` holds `SlipcaseOpen.admx` and `en-US\SlipcaseOpen.adml`. They are not
