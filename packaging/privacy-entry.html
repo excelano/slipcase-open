@@ -1,0 +1,55 @@
+<!--
+  The privacy section for excelano.com/legal/#slipcase-open.
+
+  Written to be pasted into `~/excelano.com/legal/index.html` under
+  Applications, after the Slipcase Desktop section, whose structure and voice
+  it follows: what it is, the short version, what stays, what it writes to
+  your files, what leaves, what it does not collect, how to check. This tool
+  writes more to the user's disk than its siblings do, by design, and the
+  section lists all of it rather than summarising. Not committed to the
+  website from here, because that repository is not this one's to push.
+
+  Every claim is checkable against this repository at the commit that shipped
+  the release the section describes. Should a Windows or macOS build reach a
+  store, its Privacy Policy URL is https://excelano.com/legal/#slipcase-open.
+
+  Author: David M. Anderson
+  Built with AI assistance (Claude, Anthropic)
+-->
+<h3 id="slipcase-open">Slipcase Open (Linux) — Privacy</h3>
+<p>Slipcase Open is an open-source tool that makes a Slipcase container behave like the document inside it: double-click a <code>.slpc</code> and the payload opens in whatever application normally handles that kind of file; save there, and the edit is written back into the container. It is the companion to Slipcase Desktop above, which shows a container rather than opening through it. It ships for Linux today; Windows and macOS builds are in progress, and this section names what they do where it differs. It makes no network connection of any kind. This section is the canonical statement of what Slipcase Open does and does not do with your data. The tool is open source so that every claim here is independently verifiable, and the claims are enforced by how the code is built rather than by a policy that depends on the developer behaving well. The repository is at <a href="https://github.com/excelano/slipcase-open" rel="noopener noreferrer">github.com/excelano/slipcase-open</a>.</p>
+
+<h4>The short version</h4>
+<p>Slipcase Open talks to nothing. There is no server behind it, no account, no analytics, no telemetry, and no crash reporting. It does write more to your own disk than its siblings do, deliberately, because an edit you make in another application has to survive until it is back inside the container, and everything it writes is listed here.</p>
+
+<h4>What stays on your device</h4>
+<p><strong>A session directory for every container you open.</strong> Opening a container extracts the payload into a directory of its own under your per-user state directory: <code>$XDG_STATE_HOME/slipcase-open</code> on Linux, which is <code>~/.local/state/slipcase-open</code> unless you have set otherwise; <code>%LOCALAPPDATA%</code> on Windows; <code>~/Library/Application Support</code> on macOS. The directory is readable only by your account. It holds a small record naming the container's path, the payload's name, when the session began and how many times it has been written back, and the payload copy itself in a <code>payload</code> folder below that record. The directory lives for the life of the session and is removed when you close it. A session whose process died while the tool was not watching is kept rather than written back on its own, and offered to you on the next launch, because the tool cannot tell a complete save from a half-written one.</p>
+<p><strong>That location is a trade, and you should know it.</strong> The payload sits outside the temporary directory so that a reboot or a cleaner cannot delete an edit before it has been written back. The cost is that it sits somewhere backup and synchronisation software looks. A payload from a confidential container is in your state directory for as long as its session is open.</p>
+<p><strong>A socket, and two files it reads.</strong> The first instance opens a Unix domain socket under your runtime directory, which is cleared at logout, so that later double-clicks hand their container to the running instance; on Windows this is a named pipe restricted to your account. Which payload types may be opened, and how much the tool says, come from a machine policy at <code>/etc/slipcase/open.toml</code> and a user policy at <code>$XDG_CONFIG_HOME/slipcase-open/policy.toml</code>. It reads both and writes neither.</p>
+<p><strong>Trust marks are carried, not dropped.</strong> On Windows and macOS the operating system marks a file that arrived from elsewhere. Slipcase Open carries that mark from the container onto the payload copy, and back onto the container on write-back, and refuses a write-back that would lose it, so a marked container is never replaced by an unmarked one. Linux has no such mark. As with Slipcase Desktop, this is the opposite of collection: the tool declines to launder a fact your system already knew.</p>
+
+<h4>What it writes to your files</h4>
+<p>Every save the watched directory sees is repacked into a new container and swapped over the original in one step, never edited in place, so an interruption cannot leave a half-written container behind. Members of the container the tool does not recognise are preserved. If the container was moved or deleted while the session ran, the tool says so and offers to save the payload elsewhere rather than writing where it used to be.</p>
+
+<h4>What leaves your device</h4>
+<p><strong>Nothing.</strong> Slipcase Open makes no network request. It has no update check, no license check, no analytics service, no crash reporter, and no remote logging.</p>
+<p><strong>Except the payload, which is the point.</strong> The payload is handed to whatever your desktop has registered for that kind of file, and from then on it is in that application's hands and subject to that application's behaviour, not to this one's. The allowed list of payload types is a guardrail against mistakes and social engineering, and not a security boundary: a container is a plain ZIP archive and any user can extract it with ordinary tools.</p>
+<p><strong>Notifications stay on this machine.</strong> On Linux the tool reports and asks through your desktop's own notification service, over the session message bus. A notification names the container or the payload it is about, and your desktop's per-application notification settings govern it as they do any other.</p>
+
+<h4>What Slipcase Open does not collect</h4>
+<p>Slipcase Open does not collect the contents of your payloads, the names of your containers, what you opened, when you opened it, how often, crash reports, performance metrics, diagnostic logs, device identifiers, advertising identifiers, installation identifiers, or anything else. It has no way to, because it makes no network connection.</p>
+
+<h4>Stores</h4>
+<p>Installed from the Excelano apt repository or built from source, no store is involved and nothing is counted. Should a Windows or macOS build reach a store, that store's own aggregate figures apply, as described under Slipcase Desktop above.</p>
+
+<h4>How to verify the claims yourself</h4>
+<p>The full source is at <a href="https://github.com/excelano/slipcase-open" rel="noopener noreferrer">github.com/excelano/slipcase-open</a>. To check the claims here independently:</p>
+<ol class="legal-steps">
+    <li>Search the project for anything that opens a network connection. There is nothing: no HTTP client, no TCP or UDP socket, and no URL is contacted. On Linux, <code>lsof -i</code> against the running instance lists nothing, and <code>ss -xp</code> shows the one Unix socket in your runtime directory. The dependency manifest lists the container library, a filesystem watcher, a TOML parser, a D-Bus client for notifications, and a command-line parser, none of which reaches the network.</li>
+    <li>Search for analytics and crash-reporter names: Firebase, Sentry, Crashlytics, Mixpanel, Amplitude, Segment, GoogleAnalytics. None appears.</li>
+    <li>Run <code>slipcase-open policy</code>. It prints where sessions are kept and which policy files it reads, as this machine resolves them. Run <code>slipcase-open sessions</code> for what is open and what was left behind.</li>
+    <li>Confirm there is no server component in the repository. There is nothing to self-host, because Slipcase Open has no backend by design.</li>
+</ol>
+
+<h4>Updates to this section</h4>
+<p>This section changes as the tool changes. The change history is the git log of <code>packaging/privacy-entry.html</code> in the Slipcase Open source repository, which is where this text is maintained.</p>
