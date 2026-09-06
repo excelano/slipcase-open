@@ -15,6 +15,10 @@
 /packaging/windows/SUBMITTING.local.md
 
 # Built packages, the staging tree they come from, and the throwaway
+
+
+pick-up-here.txt
+
 # certificate. All of it is assembled by `packaging/windows/build-msix.ps1` from
 # what is committed, and none of it is reproducible byte-for-byte anyway: a
 # rebuild of identical source differs in the COFF and debug timestamps and the
