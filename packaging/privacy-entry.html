@@ -10,17 +10,17 @@
   website from here, because that repository is not this one's to push.
 
   Every claim is checkable against this repository at the commit that shipped
-  the release the section describes. Should a Windows or macOS build reach a
-  store, its Privacy Policy URL is https://excelano.com/legal/#slipcase-open.
+  the release the section describes. The stores' Privacy Policy URL is
+  https://excelano.com/legal/#slipcase-open.
 
   Author: David M. Anderson
   Built with AI assistance (Claude, Anthropic)
 -->
-<h3 id="slipcase-open">Slipcase Open (Linux) — Privacy</h3>
-<p>Slipcase Open is an open-source tool that makes a Slipcase container behave like the document inside it: double-click a <code>.slpc</code> and the payload opens in whatever application normally handles that kind of file; save there, and the edit is written back into the container. It is the companion to Slipcase Desktop above, which shows a container rather than opening through it. It ships for Linux today; Windows and macOS builds are in progress, and this section names what they do where it differs. It makes no network connection of any kind. This section is the canonical statement of what Slipcase Open does and does not do with your data. The tool is open source so that every claim here is independently verifiable, and the claims are enforced by how the code is built rather than by a policy that depends on the developer behaving well. The repository is at <a href="https://github.com/excelano/slipcase-open" rel="noopener noreferrer">github.com/excelano/slipcase-open</a>.</p>
+<h3 id="slipcase-open">Slipcase Open (macOS, Windows, Linux) — Privacy</h3>
+<p>Slipcase Open is an open-source tool that makes a Slipcase container behave like the document inside it: double-click a <code>.slpc</code> and the payload opens in whatever application normally handles that kind of file; save there, and the edit is written back into the container. It is the companion to Slipcase Desktop above, which shows a container rather than opening through it. It ships for Linux today, with the Windows and macOS builds to follow on the Microsoft Store and the Mac App Store, and this section names what each platform does where it differs. It makes no network connection of any kind. This section is the canonical statement of what Slipcase Open does and does not do with your data. The tool is open source so that every claim here is independently verifiable, and the claims are enforced by how the code is built rather than by a policy that depends on the developer behaving well. The repository is at <a href="https://github.com/excelano/slipcase-open" rel="noopener noreferrer">github.com/excelano/slipcase-open</a>.</p>
 
 <h4>The short version</h4>
-<p>Slipcase Open talks to nothing. There is no server behind it, no account, no analytics, no telemetry, and no crash reporting. It does write more to your own disk than its siblings do, deliberately, because an edit you make in another application has to survive until it is back inside the container, and everything it writes is listed here.</p>
+<p>Slipcase Open talks to nothing. There is no server behind it, no account, no analytics, no telemetry, and no crash reporting. On the stores its App Privacy declaration is &ldquo;Data Not Collected,&rdquo; because the developer collects nothing and has nowhere to put it. It does write more to your own disk than its siblings do, deliberately, because an edit you make in another application has to survive until it is back inside the container, and everything it writes is listed here.</p>
 
 <h4>What stays on your device</h4>
 <p><strong>A session directory for every container you open.</strong> Opening a container extracts the payload into a directory of its own under your per-user state directory: <code>$XDG_STATE_HOME/slipcase-open</code> on Linux, which is <code>~/.local/state/slipcase-open</code> unless you have set otherwise; <code>%LOCALAPPDATA%</code> on Windows; <code>~/Library/Application Support</code> on macOS. The directory is readable only by your account. It holds a small record naming the container's path, the payload's name, when the session began and how many times it has been written back, and the payload copy itself in a <code>payload</code> folder below that record. The directory lives for the life of the session and is removed when you close it. A session whose process died while the tool was not watching is kept rather than written back on its own, and offered to you on the next launch, because the tool cannot tell a complete save from a half-written one.</p>
@@ -37,10 +37,10 @@
 <p><strong>Notifications stay on this machine.</strong> On Linux the tool reports and asks through your desktop's own notification service, over the session message bus. A notification names the container or the payload it is about, and your desktop's per-application notification settings govern it as they do any other.</p>
 
 <h4>What Slipcase Open does not collect</h4>
-<p>Slipcase Open does not collect the contents of your payloads, the names of your containers, what you opened, when you opened it, how often, crash reports, performance metrics, diagnostic logs, device identifiers, advertising identifiers, installation identifiers, or anything else. It has no way to, because it makes no network connection.</p>
+<p>Slipcase Open does not collect the contents of your payloads, the names of your containers, what you opened, when you opened it, how often, crash reports, performance metrics, diagnostic logs, device identifiers, advertising identifiers, installation identifiers, or anything else. It has no way to, because it makes no network connection. This section and the open-source repository are the substance behind the &ldquo;Data Not Collected&rdquo; label.</p>
 
-<h4>Stores</h4>
-<p>Installed from the Excelano apt repository or built from source, no store is involved and nothing is counted. Should a Windows or macOS build reach a store, that store's own aggregate figures apply, as described under Slipcase Desktop above.</p>
+<h4>One thing outside the tool's control</h4>
+<p>Both stores collect their own figures about installs and, on Apple's platforms, aggregate anonymous crash logs from devices where <strong>Share With App Developers</strong> is turned on. Slipcase Open neither collects that data nor contains any code that touches it, but the store may still show the developer account aggregate, anonymised numbers regardless of what the tool does. On macOS the control is at <strong>System Settings &gt; Privacy &amp; Security &gt; Analytics &amp; Improvements &gt; Share With Mac Developers</strong>; on Windows, under <strong>Settings &gt; Privacy &amp; security &gt; Diagnostics &amp; feedback</strong>. Either applies to every application, not only this one. A copy installed from the Excelano apt repository or built from source involves no store at all.</p>
 
 <h4>How to verify the claims yourself</h4>
 <p>The full source is at <a href="https://github.com/excelano/slipcase-open" rel="noopener noreferrer">github.com/excelano/slipcase-open</a>. To check the claims here independently:</p>
