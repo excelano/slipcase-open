@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Group Policy definitions for Slipcase Open.
+
+  Concept 10 puts machine and user policy in the `Policies` subtree, which is
+  access-controlled against standard users and which Group Policy cleans up when
+  a policy is unapplied. This file is what puts those keys in front of an
+  administrator by name instead of by regedit, and `src/policy/registry.rs` is
+  what reads them; the value names and their spellings are shared between the
+  two on purpose, and are the same ones the Linux policy file uses.
+
+  WHERE THIS GOES, AND WHY IT IS NOT IN THE PACKAGE
+
+  An MSIX runs no code at install, so a package cannot place files in
+  `PolicyDefinitions`. This pair is a separate administrator download, which is
+  how Microsoft ships its own. Either:
+
+      %SystemRoot%\PolicyDefinitions\                       (one machine)
+      \\<domain>\SYSVOL\<domain>\Policies\PolicyDefinitions\ (a central store)
+
+  with `en-US\SlipcaseOpen.adml` beside it in the matching language folder.
+
+  BOTH CLASSES, BECAUSE BOTH ARE READ
+
+  `class="Both"` puts every setting under Computer Configuration and under User
+  Configuration, writing HKLM and HKCU respectively. That is not a convenience:
+  concept 10's precedence has machine policy above user policy, and an ADMX
+  offering only one of them would leave the other reachable by regedit alone.
+
+  Author: David M. Anderson
+  Built with AI assistance (Claude, Anthropic)
+-->
+<policyDefinitions xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   revision="1.0" schemaVersion="1.0"
+                   xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+
+  <policyNamespaces>
+    <target prefix="slipcaseopen" namespace="Excelano.Policies.SlipcaseOpen" />
+    <using prefix="windows" namespace="Microsoft.Policies.Windows" />
+  </policyNamespaces>
+
+  <resources minRequiredRevision="1.0" />
+
+  <supportedOn>
+    <definitions>
+      <definition name="SUPPORTED_SlipcaseOpen_0_1_4"
+                  displayName="$(string.SUPPORTED_SlipcaseOpen_0_1_4)" />
+    </definitions>
+  </supportedOn>
+
+  <categories>
+    <category name="Excelano" displayName="$(string.Cat_Excelano)" />
+    <category name="Slipcase" displayName="$(string.Cat_Slipcase)">
+      <parentCategory ref="Excelano" />
+    </category>
+    <category name="Open" displayName="$(string.Cat_Open)" explainText="$(string.Cat_Open_Help)">
+      <parentCategory ref="Slipcase" />
+    </category>
+  </categories>
+
+  <policies>
+
+    <!--
+      The permitted set. `multiText` is what writes REG_MULTI_SZ, which is what
+      the reader expects; a `list` element would write one REG_SZ per entry
+      under a subkey, which is a different shape entirely.
+
+      Extensions are written without a leading dot, lower case, one to a line.
+    -->
+    <policy name="AllowedExtensions" class="Both" displayName="$(string.AllowedExtensions)"
+            explainText="$(string.AllowedExtensions_Help)"
+            key="SOFTWARE\Policies\Excelano\Slipcase\Open"
+            presentation="$(presentation.AllowedExtensions)">
+      <parentCategory ref="Open" />
+      <supportedOn ref="SUPPORTED_SlipcaseOpen_0_1_4" />
+      <elements>
+        <multiText id="allowed" valueName="allowed" required="true" />
+        <enum id="mode" valueName="mode" required="true">
+          <item displayName="$(string.Mode_Replace)">
+            <value><string>replace</string></value>
+          </item>
+          <item displayName="$(string.Mode_Append)">
+            <value><string>append</string></value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+
+    <!--
+      The deny list, which wins over everything including the allow list above
+      and including anything a user sets. It is a separate policy rather than a
+      third element of the one above so that an administrator can deny without
+      having to state an allow list at the same time.
+    -->
+    <policy name="DeniedExtensions" class="Both" displayName="$(string.DeniedExtensions)"
+            explainText="$(string.DeniedExtensions_Help)"
+            key="SOFTWARE\Policies\Excelano\Slipcase\Open"
+            presentation="$(presentation.DeniedExtensions)">
+      <parentCategory ref="Open" />
+      <supportedOn ref="SUPPORTED_SlipcaseOpen_0_1_4" />
+      <elements>
+        <multiText id="denied" valueName="denied" required="true" />
+      </elements>
+    </policy>
+
+    <!--
+      Whether the user's own settings are consulted at all. Enabled and Disabled
+      write 1 and 0 rather than leaving the value absent, because absent means
+      "this policy says nothing" and an administrator who disables a setting
+      means something by it.
+    -->
+    <policy name="UserMayExtend" class="Both" displayName="$(string.UserMayExtend)"
+            explainText="$(string.UserMayExtend_Help)"
+            key="SOFTWARE\Policies\Excelano\Slipcase\Open" valueName="user_may_extend">
+      <parentCategory ref="Open" />
+      <supportedOn ref="SUPPORTED_SlipcaseOpen_0_1_4" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+
+    <policy name="ConfirmEachWriteBack" class="Both" displayName="$(string.ConfirmEachWriteBack)"
+            explainText="$(string.ConfirmEachWriteBack_Help)"
+            key="SOFTWARE\Policies\Excelano\Slipcase\Open" valueName="confirm_each_write_back">
+      <parentCategory ref="Open" />
+      <supportedOn ref="SUPPORTED_SlipcaseOpen_0_1_4" />
+      <enabledValue><decimal value="1" /></enabledValue>
+      <disabledValue><decimal value="0" /></disabledValue>
+    </policy>
+
+    <policy name="Notify" class="Both" displayName="$(string.Notify)"
+            explainText="$(string.Notify_Help)"
+            key="SOFTWARE\Policies\Excelano\Slipcase\Open"
+            presentation="$(presentation.Notify)">
+      <parentCategory ref="Open" />
+      <supportedOn ref="SUPPORTED_SlipcaseOpen_0_1_4" />
+      <elements>
+        <enum id="notify" valueName="notify" required="true">
+          <item displayName="$(string.Notify_Important)">
+            <value><string>important</string></value>
+          </item>
+          <item displayName="$(string.Notify_Everything)">
+            <value><string>everything</string></value>
+          </item>
+        </enum>
+      </elements>
+    </policy>
+
+  </policies>
+</policyDefinitions>

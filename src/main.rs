@@ -264,7 +264,7 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
     };
 
     let channel = channel();
-    let source = policy::files::Files::for_this_platform();
+    let source = policy::for_this_platform();
     // Resolved once and held for the life of the instance. Concept 10's warning
     // about caching is about what may be opened, where a value held across a
     // policy push is a bypass; `flow::open` still resolves the lists itself on
@@ -474,23 +474,22 @@ fn report_policy(outside: &Outside<'_>) {
 /// broken layer would otherwise print nothing at all. The refusal follows the
 /// listing and still fails the run.
 fn settings(root: &Path, door: &Path) -> Fallible {
-    let source = policy::files::Files::for_this_platform();
+    let source = policy::for_this_platform();
     let resolved = policy::resolve(&source);
 
-    let mut layers = source.locations().peekable();
-    if layers.peek().is_none() {
-        // Every platform but Linux, until PLAN.md Phases 4 and 5. Said out
-        // loud, because a blank heading reads as a program that could not find
-        // its own configuration.
-        println!("No settings files on this platform yet. The built-in set is what decides.");
+    let layers = source.locations();
+    if layers.is_empty() {
+        // macOS, until PLAN.md Phase 5. Said out loud, because a blank heading
+        // reads as a program that could not find its own configuration.
+        println!("No settings on this platform yet. The built-in set is what decides.");
     } else {
         println!("Where settings are read, in order of authority:");
         println!();
-        for (origin, path) in layers {
+        for (origin, where_it_is) in layers {
             println!(
                 "  {:<14}  {} ({})",
                 origin,
-                slpc::display_path(path),
+                where_it_is,
                 layer_state(&source, origin, resolved.as_ref().ok())
             );
         }
@@ -625,7 +624,7 @@ fn stand_by(root: &Path, door: &Path) -> Fallible {
             return Ok(());
         };
         let channel = channel();
-        let source = policy::files::Files::for_this_platform();
+        let source = policy::for_this_platform();
         let volume = policy::resolve(&source)
             .map(|e| e.notify)
             .unwrap_or_default();
@@ -705,7 +704,7 @@ fn how_it_speaks() -> (String, Option<String>) {
 /// *present* without telling them it sets nothing is how the shipped
 /// `/etc/slipcase/open.toml` gets mistaken for a policy nobody wrote.
 fn layer_state(
-    source: &policy::files::Files,
+    source: &policy::Settings,
     origin: policy::Origin,
     effective: Option<&policy::Effective>,
 ) -> String {

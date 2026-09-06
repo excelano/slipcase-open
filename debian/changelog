@@ -13,10 +13,23 @@ slipcase-open (0.1.4-1) unstable; urgency=low
     that is a program, a save that did not reach its container, something
     waiting on a decision, or a save on its way home — and its menu says what,
     naming the file. The icon now stays until it is asked to leave.
-  * No change to the Debian package's behaviour beyond the refusal and how it is
-    announced.
+  * Settings on Windows are read from the registry: machine and user policy from
+    `SOFTWARE\Policies\Excelano\Slipcase\Open` under HKLM and then HKCU, over
+    the user's own key. An ADMX and ADML pair ships as a separate administrator
+    download, because a package runs no code at install and cannot place files
+    in PolicyDefinitions. The setting names are the ones this file's package
+    already uses.
+  * Windows: sessions no longer accumulate directories that could never be
+    removed. A packaged process asking for %LOCALAPPDATA% is given a redirected
+    view of it without being told, and a directory belonging to the layer
+    underneath that view cannot be removed through it; the session root is now
+    asked of Windows rather than assumed. `slipcase-open policy` consequently
+    reports the directory the packaged product actually uses, where before it
+    named one it was not being given.
+  * No change to the Debian package's behaviour: everything above is Windows,
+    and the Linux layers, their paths and their spellings are unchanged.
 
- -- David M. Anderson <david.anderson@excelano.com>  Thu, 03 Sep 2026 12:00:00 -0500
+ -- David M. Anderson <david.anderson@excelano.com>  Fri, 05 Sep 2026 12:00:00 -0500
 
 slipcase-open (0.1.3-1) unstable; urgency=low
 
