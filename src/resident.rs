@@ -562,7 +562,7 @@ impl Resident {
             // removed, and the watch stays on it so that the application's last
             // save is noticed when it happens rather than at the next launch.
             Ok(flow::Closed::LeftForRecovery(lingering)) => {
-                self.lingering.push(lingering);
+                self.lingering.push(*lingering);
                 Response::Ok(vec![
                     "Session closed, and the application still has the payload open.".into(),
                     "It is being watched until the application finishes.".into(),
@@ -837,7 +837,7 @@ impl Resident {
         for open in self.sessions.drain().collect::<Vec<_>>() {
             match open.close() {
                 Ok(flow::Closed::Cleared) => {}
-                Ok(flow::Closed::LeftForRecovery(lingering)) => self.lingering.push(lingering),
+                Ok(flow::Closed::LeftForRecovery(lingering)) => self.lingering.push(*lingering),
                 Err(e) => {
                     outside.report(&Report::interrupt(format!("a session did not close: {e}")));
                 }

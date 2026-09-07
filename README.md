@@ -43,7 +43,9 @@ somebody meant to keep.
 The first `open` becomes the resident instance; every later invocation hands its
 container to that one and exits. On a desktop with a notification service, the
 instance reports and asks through notifications carrying buttons. The command
-line above is always there underneath.
+line above is always there underneath, and on macOS it is the whole of the
+interface for now: a save writes back silently, and `sessions` and `recover`
+are how to see what is open and what was left behind.
 
 ## Policy
 
@@ -55,6 +57,11 @@ On **Linux** that is a root-owned `/etc/slipcase/open.toml` taking precedence
 over `$XDG_CONFIG_HOME/slipcase-open/policy.toml`. The shipped policy file
 documents every key and sets none of them.
 
+On **macOS** it is the same two files. Nothing installs either: an
+administrator writes `/etc/slipcase/open.toml` by hand or through whatever
+their management tool uses to place a file, starting from the shipped one.
+The configuration profile the design names for this platform is not built.
+
 On **Windows** it is the registry: `SOFTWARE\Policies\Excelano\Slipcase\Open`
 under `HKLM` and then `HKCU`, over the user's own
 `HKCU\SOFTWARE\Excelano\Slipcase\Open`. The `Policies` subtree is the one
@@ -65,7 +72,7 @@ the Group Policy editor by name; it is a separate administrator download,
 because a package runs no code at install and so cannot place files in
 `PolicyDefinitions`.
 
-The setting names and their spellings are the same on both platforms.
+The setting names and their spellings are the same on all three platforms.
 
 `slipcase-open policy` prints both paths as this machine resolves them, what
 they add up to, and where the sessions are kept. Every one of those paths comes
@@ -108,8 +115,17 @@ container's context menu, and the command line all come from the package. There
 is no window: an icon by the clock takes its colour from whether your work is
 where it should be, and its menu names the file.
 
-**macOS** is not built yet. `PLAN.md` has the order and
-`slipcase-open-concept.md` has the design.
+**macOS**, as a notarized application bundle through Homebrew:
+
+    brew install --cask excelano/tap/slipcase-open
+
+That puts `Slipcase Open.app` in `/Applications`, which registers the
+association, and links `slipcase-open` into the Homebrew prefix so the command
+line is on `PATH`. The zip the cask downloads is attached to each GitHub
+release and can be unpacked by hand instead. Not the Mac App Store, and
+`packaging/macos/README.md` says why: the sandbox would cost this tool its
+write-back path, its recovery, and its command line. There is no menu bar item
+and no notification on this platform yet.
 
 ## Building
 

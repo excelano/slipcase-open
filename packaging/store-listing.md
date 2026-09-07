@@ -9,10 +9,11 @@ often — a sentence written before anybody looked. Where a sentence describes
 behaviour, `debian/changelog` is where that behaviour was first written down
 against a run; if the two disagree, the changelog is right and this is stale.
 
-**One store, for now.** `slipcase-desktop` maintains one draft for two stores and
-records the one paragraph that differs between them. This product is on Windows
-only until Phase 5, so there is no second cut to keep honest yet. When macOS
-lands, the sentence about the tray icon is the first candidate to need one.
+**One store, and it stays one.** `slipcase-desktop` maintains one draft for two
+stores and records the one paragraph that differs between them. This product's
+macOS channel is a Homebrew cask rather than the Mac App Store —
+`packaging/macos/README.md` says why — so there is no second listing and no
+second cut. The cask's `desc` is one sentence and is the crate's own.
 
 Limits, so a later edit does not overrun them:
 

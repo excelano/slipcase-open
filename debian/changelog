@@ -1,3 +1,17 @@
+slipcase-open (0.1.5-1) unstable; urgency=low
+
+  * macOS: built, and shipped as a notarized application bundle through the
+    Homebrew cask excelano/tap/slipcase-open. A double-clicked container opens
+    its payload, a save is written back, and the command line is linked into
+    the Homebrew prefix. There is no menu bar item and no notification on this
+    platform yet; sessions and recover are how to see what is open.
+  * macOS reads policy from the two files Linux reads: /etc/slipcase/open.toml
+    for the administrator, and $XDG_CONFIG_HOME/slipcase-open/policy.toml for
+    the person. Nothing installs either.
+  * No change in behaviour on Linux or Windows.
+
+ -- David M. Anderson <david.anderson@excelano.com>  Mon, 07 Sep 2026 13:05:39 -0500
+
 slipcase-open (0.1.4-1) unstable; urgency=low
 
   * A payload whose bytes are an executable image or a script, under a name

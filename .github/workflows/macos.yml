@@ -1,0 +1,126 @@
+# Run the gate on macOS, assemble the bundle, and open a container through
+# Launch Services.
+#
+# `linux.yml` compiles the macOS arm and says that a compile is all it claims.
+# This is the rest: the suite on a Mac, because `session::platform_base` and
+# the front door take different paths here and `tests/the_process.rs` had
+# never run on one until 2026-09-07; and the bundle, because the launcher in
+# `packaging/macos/launcher.swift` is the only code in this repository that
+# no test reaches. `open` on a container goes through Launch Services and
+# produces the Apple Event Finder does, so the last step is that launcher
+# receiving a document, handing it to `slipcase-open`, and leaving.
+#
+# **The suite runs three times rather than once.** `CLAUDE.md` says why, and a
+# runner is the case it was written about.
+#
+# **Nothing here is signed.** A signing identity is not a thing a runner has,
+# so the bundle is assembled unsigned and Gatekeeper never sees it: a bundle
+# built on the machine that opens it carries no quarantine mark and is not
+# assessed. Notarization is a release step and `RELEASE.md` holds it.
+#
+# **The runner is Apple silicon**, which is the architecture no machine this
+# was developed on has, so the arm64 slice of a released bundle is code that
+# runs here and nowhere else before it ships.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+
+name: macOS
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  macos:
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: What is installed
+        run: rustc -V && cargo -V && swiftc --version | head -1 && uname -m
+
+      - name: Formatting
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Build
+        run: cargo build --all-targets
+
+      - name: Test, three times
+        run: for i in 1 2 3; do echo "run $i"; cargo test --quiet; done
+
+      # From the debug binary the step above produced — `--binary` exists for
+      # this — because a release build here would cost minutes to answer a
+      # question that does not depend on optimisation. The floor check in
+      # `build-app.sh` reads the launcher and the binary both, so the
+      # deployment target is set for the one compile this step does.
+      - name: Assemble the bundle
+        run: |
+          target=$(cargo metadata --format-version 1 --no-deps |
+              sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
+          MACOSX_DEPLOYMENT_TARGET=11.0 cargo build
+          ./packaging/macos/build-app.sh --binary "${target}/debug/slipcase-open"
+          lipo -archs "dist/Slipcase Open.app/Contents/MacOS/Slipcase Open"
+          plutil -lint "dist/Slipcase Open.app/Contents/Info.plist"
+
+      # The step the launcher exists for. A container is built here rather than
+      # committed, for the reason `linux.yml` gives; `open` delivers it the way
+      # Finder does; and the questions asked afterwards are the ones a person
+      # asks by hand in `packaging/macos/README.md`: is there a session, is the
+      # launcher gone, does the instance answer, does `close` end it.
+      - name: A container opens through Launch Services
+        run: |
+          app="$PWD/dist/Slipcase Open.app"
+          tool="${app}/Contents/MacOS/slipcase-open"
+          lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+          "$lsregister" -f "$app"
+
+          python3 -c 'import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("slipcase.metadata.toml","slipcase_version = \"1.0\"\n\n[payload]\nfile = \"report.txt\"\n"); z.writestr("report.txt","a report\n"); z.close()' "${RUNNER_TEMP}/sample.slpc"
+
+          open -a "$app" "${RUNNER_TEMP}/sample.slpc"
+
+          # A cold launch and a hand-over. Polled rather than slept at, so a
+          # fast answer is fast; 30 seconds is far past anything measured.
+          for _ in $(seq 1 15); do
+            sleep 2
+            "$tool" sessions | grep -q 'report.txt' && break
+          done
+          listed=$("$tool" sessions)
+          echo "$listed"
+          printf '%s\n' "$listed" | grep -q 'report.txt  open' ||
+              { echo "::error::No session opened for a container handed to the bundle through Launch Services. That is packaging/macos/launcher.swift, which no test reaches." >&2; exit 1; }
+
+          # The launcher is a moment: it must be gone, and the instance must
+          # be the only process left, or a second double-click would reach a
+          # launcher that cannot receive it.
+          if pgrep -f 'Contents/MacOS/Slipcase Open$' >/dev/null; then
+              echo "::error::The launcher is still running after handing the document over." >&2
+              exit 1
+          fi
+          pgrep -fl 'Contents/MacOS/slipcase-open open' ||
+              { echo "::error::No instance is holding the session." >&2; exit 1; }
+
+          id=$(printf '%s\n' "$listed" | awk '{print $1; exit}')
+          "$tool" close "$id"
+          sleep 2
+          if pgrep -f 'Contents/MacOS/slipcase-open' >/dev/null; then
+              echo "::error::The instance did not exit after its last session closed." >&2
+              exit 1
+          fi
+          "$tool" sessions | grep -q 'No sessions' ||
+              { echo "::error::A session survived close." >&2; exit 1; }
+
+      # The arm for the platform this runner is not, so a Mac says whether a
+      # change still compiles for Windows without anybody waiting for a
+      # Windows runner. Linux checks both of the others the same way.
+      - name: The Windows arm still compiles
+        run: |
+          rustup target add x86_64-pc-windows-msvc
+          cargo check --all-targets --target x86_64-pc-windows-msvc

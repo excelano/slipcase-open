@@ -1,9 +1,10 @@
 # Packaging
 
 Concept 4 registers the association, concept 10 puts machine policy under
-`/etc`, and concept 15 makes `cargo-deb` and the Excelano apt repository the
-Linux channel. This directory is those three, and one platform's worth so far.
-`PLAN.md` Phases 4 and 5 add `windows` and `macos` beside it.
+`/etc`, and concept 15 chooses a channel per platform. This directory is
+those three for each of them: `linux` and `debian` below, `windows` for the
+MSIX and the Store, and `macos` for the bundle and the cask. The two
+platform directories carry their own README with the decisions behind them.
 
 ## linux
 
@@ -68,6 +69,15 @@ The desktop entry still falls back to the stock `document-open` icon, and the
 notification channel uses that name too. An application icon of its own is
 wanted here and is a different thing from the file-type icon above, which is why
 it did not come with it.
+
+## macos
+
+    ./packaging/macos/build-app.sh --universal --sign ID --notarize KEY ISSUER
+
+The bundle, the launcher that receives the double-click, Developer ID signing,
+notarization, and the cask in `excelano/homebrew-tap`. `macos/README.md` has
+all of it, including why the channel is not the Mac App Store and what was
+measured by hand on 2026-09-07.
 
 ## debian
 

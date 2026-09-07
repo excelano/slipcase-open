@@ -107,7 +107,14 @@ pub enum Closed {
     /// The watch comes with it. Concept 8: what a resident process is good for
     /// on this path is noticing the application's last save when it happens,
     /// rather than leaving the question until somebody next opens a container.
-    LeftForRecovery(Lingering),
+    ///
+    /// Boxed because of what the watch weighs on macOS. The first time the
+    /// gate ran on a Mac, 2026-09-07, clippy refused this enum for a variant
+    /// carrying nothing beside one carrying 256 bytes, and `size_of` put the
+    /// numbers on it there: `Lingering` 256, of which `Watch` is 144, of which
+    /// the platform's watcher is 128. A close is not a hot path, so the
+    /// indirection costs nothing anybody would notice.
+    LeftForRecovery(Box<Lingering>),
 }
 
 /// A closed session the target application has not finished with, still
@@ -417,11 +424,11 @@ impl Opened {
         // editor still holding the payload has somewhere for its next save to
         // land and the next launch asks about it.
         if self.application_is_working().unwrap_or(true) {
-            return Ok(Closed::LeftForRecovery(Lingering {
+            return Ok(Closed::LeftForRecovery(Box::new(Lingering {
                 session: self.session,
                 watch: self.watch,
                 quiet_since: Instant::now(),
-            }));
+            })));
         }
         // A failure to remove leaves a session recovery will pick up, which is
         // the same outcome by another road and not worth a second error type.
