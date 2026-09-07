@@ -149,6 +149,40 @@ of them is now measured and the other still is not: nothing automated can watch
 a modal dialog's *contents*, but whether a window belonging to this process
 exists at all is `MainWindowHandle`, and that is a fact a script can have.
 
+### Two ways of asking "is the tray up", one of which lies
+
+The tray's window is an ordinary top-level window of class `slipcase-open-tray`,
+invisible (`WINDOW_STYLE(0)`, no parent). **`FindWindowW` returns 0 for it and
+`EnumWindows` finds it**, measured 2026-09-06 on the same running process in the
+same second. Several rounds of "no tray icon" here were that broken probe and
+not a finding. Enumerate and match on the owning process id — the same
+correction `screenshot.ps1` already carries for a different reason.
+
+Two further notes for anything scripted against the tray. An instance killed
+with `Stop-Process -Force` never runs the tray's `Drop`, so
+`Shell_NotifyIcon(NIM_DELETE)` is skipped and the dead icon stays in the
+notification area until something hovers over it — a sweep of tests leaves a row
+of them, and they are debris rather than a defect. And `Shell.Application`'s
+verb launched from a console host puts a console in the process's ancestry;
+`wscript.exe` running a two-line `.vbs` is a launcher with none, which is what
+Explorer looks like.
+
+### `is_terminal` is not "a command line started this"
+
+`std::io::stderr().is_terminal()` is false for a **pipe**, so a shell that
+redirects — and this crate's own process tests, which spawn with `Stdio::piped`
+— answers no to a question meant to distinguish a shell from a double-click.
+Measured 2026-09-06 when the standing list began gating whether a process stays:
+a redirected refusal was given a tray icon and stayed for ever, hanging two
+integration tests.
+
+What separates them is whether the process was handed standard handles at all.
+Explorer gives a windows-subsystem process none, `attach_console` has already
+joined the parent's console where there was one, and a redirect still counts as
+a shell — which is the intent concept §9 states and `is_terminal` only
+approximates. `Voice` keeps `is_terminal`, because *is somebody reading these
+lines* is a different question that a redirect really does change.
+
 ## Policy is a separate download
 
 `policy/` holds `SlipcaseOpen.admx` and `en-US\SlipcaseOpen.adml`. They are not

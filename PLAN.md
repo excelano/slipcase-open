@@ -414,6 +414,53 @@ lose. It was caught by a person double-clicking a file on a machine that had
 just started — which is [`packaging/windows/README.md`]'s point about the
 product being the thing to measure, arriving for the third time.
 
+### And the icon that should have gone with it, 2026-09-06
+
+Reported straight after: the box now appears on a cold double-click and no tray
+icon does. §5.1 says a refused container is told about in a way that cannot be
+missed "and the standing list carries it afterwards in the one colour reserved
+for it", so the icon is specified rather than optional.
+
+**Established by instrumenting `standing` rather than by reading it.** With a
+line written to a file on each branch:
+
+| cold double-click | what `standing` did |
+| --- | --- |
+| a payload that must be refused | never called at all |
+| an ordinary container | called; `show_up` succeeded |
+
+`main::open` returned through its idle exit, which sat *above* the line that
+raises the standing list. Warm, the icon existed because the earlier ordinary
+open had raised it — the same shape as the box, one layer up.
+
+**Two instruments were wrong before this was right, and both are worth keeping.**
+`FindWindowW` returns 0 for the tray's window while `EnumWindows` finds it
+plainly, so several rounds of "no tray" were a broken probe rather than a
+finding; the enumeration is the instrument. And a first attempt to blame the
+harness — that `attach_console` had joined the parent's console — was disproved
+by launching through `wscript`, which has none, and getting the same answer.
+
+**The exit rule is now a function.** `has_a_reason_to_stay(idle, carrying,
+showing)`: stay while something is open, or while there is a trouble *and*
+somewhere to show it. The third argument is what keeps `open` at a prompt
+returning with the refusal's own exit code, because there the command line is
+already the standing list.
+
+**Which turned up a third thing, and it was load-bearing.** Raising the
+standing list before the exit decision meant `standing`'s own test — `is_terminal`
+— started deciding whether a process stayed, and `is_terminal` is false for a
+*pipe*. So a redirected refusal was given a tray and stayed, and two of
+`tests/the_process.rs` hung on it. The predicate is now whether this process was
+given an error stream at all: a shell that redirects still gave it one, and
+Explorer gives a windows-subsystem process none. While the icon was raised only
+for an invocation that was staying anyway, the wrong answer cost nothing and so
+went unmeasured for weeks.
+
+And the same question gates waiting for the dialog: a packaged `slipcase-open
+open` with its output redirected sat 151 seconds on a box nobody was there to
+close, which is a script stopped dead. At a command line the refusal is already
+in the text and the exit code.
+
 ## Phase 5 — macOS
 
 The sandbox question in §15 is resolved first, because it may move where a

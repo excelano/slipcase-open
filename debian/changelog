@@ -32,6 +32,14 @@ slipcase-open (0.1.4-1) unstable; urgency=low
     tool already running produced no document, no message and no window, and the
     same container refused loudly a minute later once something was running to
     hold the box up. It waits for the box now before it goes.
+  * Windows: a refused container now leaves the tray icon red until somebody
+    puts it down, which is what the icon's one reserved colour is for. The
+    refusal was ending the process that would have raised the icon, so the
+    colour only ever appeared when something else happened to be running.
+  * Windows: whether an invocation gets a tray icon is now decided by whether a
+    command line started it rather than by whether its error stream is a screen.
+    A redirected command is still a command, and was being given an icon and a
+    resident process it never asked for.
   * No change to the Debian package's behaviour: everything above is Windows,
     and the Linux layers, their paths and their spellings are unchanged.
 
