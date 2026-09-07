@@ -248,9 +248,14 @@ for.** `packaging/windows` holds the manifest, the build script, the import
 check and the identity template; the identity itself is Partner Center's and is
 not committed. Measured on 2026-09-01 through the real association: a marked
 container opens from Explorer, the payload is extracted carrying its zone into a
-session under the real `%LOCALAPPDATA%` — MSIX redirects neither, which the
-sibling had only measured for registry writes — and the registered application
-is launched with it.
+session, and the registered application is launched with it.
+
+**That sentence used to say the session was under the real `%LOCALAPPDATA%`,
+"MSIX redirects neither", and it was wrong.** It generalised the sibling's
+registry measurement to files without measuring files, and it stood for four
+days while the defect it caused was hunted as something else. What the
+observation actually showed is that a session appeared and the payload worked;
+where it appeared was never checked. See Phase 4's closing section.
 
 **"Last installed wins" is not what Windows does, and concept §4 needs the line
 amended.** That section takes duplicated associations as settled by the platform
@@ -301,48 +306,73 @@ verified through the real double-click:
   session record — what the container held when the two last agreed — which is
   not the payload digest §6.3 removed and says so.
 
-**Open, and still not explained: session directories survive their own
-removal.** The payload is gone, `payload/` is left empty, the record stays, so
-`sessions` and the tray list a corpse. The failure is
-`ERROR_SHARING_VIOLATION` on the empty directory.
+**Closed, 2026-09-05: session directories survived their own removal because a
+packaged process is not given the directory it asks for.** The payload went, an
+empty `payload/` was left, the record stayed, and `sessions` and the tray listed
+a corpse. It was carried here as open for two days with three explanations
+measured and discarded, and the reason none of them fit is that all of them
+looked inside the product.
 
-What is established is that **the condition clears**: a corpse removed by hand a
-minute later went without complaint, and a scripted reproduction retried one free
-immediately. `Session::remove` now waits it out for three hundred milliseconds.
+**MSIX redirects `%LOCALAPPDATA%`, and the process is not told.** With both
+roots emptied and a container opened through the shell verb by the installed
+0.1.4 alone, no `%LOCALAPPDATA%\slipcase-open` was created at all and the
+session appeared under
+`…\Packages\Excelano.SlipcaseOpen_nbxmgv0sk86m4\LocalCache\Local\slipcase-open\sessions`.
+The read view is *merged*, so the process also sees session directories sitting
+in the real location and cannot tell which layer one is in.
 
-What is **not** established is what holds it, and three readings have been
-measured and found wrong rather than left standing: Windows delete-pending does
-not block the `rmdir` at all; the editor holding the payload is out, because a
-corpse cleared with Notepad still open on it; and the state directory's location
-looked like the discriminator until six more runs there came back clean. Roughly
-twenty harness rounds produced one corpse against two in a single sitting at the
-keyboard, so the sequence that provokes it is not the one being scripted.
+**A redirection layer can tombstone a file underneath it and cannot remove a
+directory there.** That is the corpse exactly: `remove_dir_all` unlinks the
+payload, then fails on `payload/` with `ERROR_SHARING_VIOLATION`, permanently,
+with nothing holding anything.
 
-The retry claims only that a removal which would have succeeded shortly now
-does. **Whether corpses stop appearing in use is the test**, and one appearing
-again is evidence rather than a nuisance.
+What separates it from every earlier reading is that the discriminator is
+outside the code. The same executable, byte for byte
+(`sha256 b77b03cc…`), with the same package identity:
 
-What has been measured, and it is less than it looked:
+| run from | asked to discard a corpse |
+| --- | --- |
+| `dist\stage\slipcase-open.exe` | removed it |
+| the package's install location under `WindowsApps` | `os error 32`, for ever |
 
-- `recover --discard` refuses with `os error 32` while something holds the
-  payload without sharing delete. Reproduced. But that path leaves the payload
-  *there*, which is not the state on disk.
-- A file handle opened the way `std` opens one shares delete, and
-  `remove_dir_all` gets through it. Measured, so an editor holding the payload
-  is not it.
-- A directory handle held the way a `notify` watcher holds one also shares
-  delete, and `remove_dir_all` gets through that too. Measured, so the watcher
-  is not it either.
+and with the root pointed at `%TEMP%` instead, the packaged binary removes it
+cleanly. Plain PowerShell given the same package identity removes these
+directories without complaint, so identity is not it either; running from inside
+the package's filesystem view is.
 
-Two explanations were written, given a retry apiece, and both failed their own
-tests — the first passed with the retry disabled, which is the test saying it
-never reproduced anything. Both are reverted. **The cause is open**, and the
-next step is a run that reproduces the accumulation rather than another
-mechanism that sounds right.
+**"The condition clears" was wrong, and so was the retry built on it.** It
+clears for *other* processes and never for the packaged one: fifteen corpses
+survived twelve seconds of a packaged sweep retrying them, and `handle.exe`
+named no holder at any point. `Session::remove`'s three hundred milliseconds
+(`823a972`) was waiting out something that does not pass, and it is gone —
+`session.rs` says so where it was.
 
-Nothing is lost while it stands: a session left behind is what concept 6.3
-calls recoverable, and one with no payload has nothing in it to lose. What it
-costs is a list that grows and a tray menu that shows the growth.
+**It looked intermittent because the harness was measuring the wrong binary.**
+Roughly twenty scripted rounds produced one corpse against two in a sitting at
+the keyboard, and the scripted rounds drove the *unpackaged* build, which never
+fails. Rebuilt against the installed package it reproduces every time. A harness
+that does not go through the shipped artefact is not measuring the product —
+which is the same lesson as the stale package on 2026-09-03, in a second shape.
+
+**The earlier reading that the state directory's location was the
+discriminator was right and was dropped too early.** It was recorded, then
+retracted after six clean runs; those six were the unpackaged binary. A finding
+discarded on evidence that could not bear on it is worse than one never made.
+
+**The fix is to stop asking for a path this process will not be given.**
+`session::platform_base` asks Windows where the package keeps its data and uses
+`%LOCALAPPDATA%` only where there is no package. `LocalCacheFolder` rather than
+`LocalFolder`: both were measured to create and remove cleanly, and the cache is
+the one Windows neither roams nor puts in a device backup — which settles
+concept 17's backup-exposure question on this platform by where the directory
+is rather than by a warning about it.
+
+**One consequence is worth more than the corpse was.** `slipcase-open policy`
+was printing `…\AppData\Local\slipcase-open\sessions` while the packaged
+product used the redirected tree — the verb whose whole argument in concept 10
+is that only the running program can say where its files really are, answering
+with the path it asked for instead of the one it got. It reports the true path
+now because it reports what `default_root` resolved.
 
 **Two things are proven end to end on Windows and one is not.** A marked
 container opens, the payload is extracted carrying `ZoneId=3` and its `HostUrl`,
@@ -351,6 +381,85 @@ and the repacked container is still marked. What is *not* proven is that the
 zone warning is displayed for a payload that earns one: nothing automated can
 watch a modal dialog, and the suite never reaches the launcher on any platform.
 That one needs a person at a desktop.
+
+### The refusal nobody saw, 2026-09-06
+
+Reported from the keyboard rather than found here: on a machine where nothing of
+this tool was running, double-clicking a container whose payload is a program did
+*nothing at all*. Opening an ordinary container first and then the same one
+produced the refusal every time.
+
+Measured through the installed package with the same shell verb both ways:
+with no instance running, no window and the process gone inside 400 ms; with one
+running, the box on screen inside 400 ms. The channel had done its work in both
+— the refusal is one call — and only the box was lost.
+
+**The box is a thread, and the thread was nobody's to wait for.** It is on a
+thread because the resident loop must keep pumping watchers while somebody
+leaves a dialog up, and `main` returns straight away from an invocation that
+refused and is holding nothing, which is concept 8's exit rule working exactly
+as written. The two are both right and the gap between them is where the
+refusal went.
+
+So the rule is not *show it* but *do not leave while it is up*:
+`Channel::stay_until_seen`, called where the process ends rather than after each
+`insist`. The front door is dropped before the wait, so a box somebody leaves on
+screen does not hold a pipe nothing is accepting on — checked by opening an
+ordinary container while one was up, which still opened.
+
+**What would have caught it.** Nothing in the suite, and that is the honest
+answer: the channel that draws a box needs package identity, so every test in
+this repository runs against the terminal channel, where there is no box to
+lose. It was caught by a person double-clicking a file on a machine that had
+just started — which is [`packaging/windows/README.md`]'s point about the
+product being the thing to measure, arriving for the third time.
+
+### And the icon that should have gone with it, 2026-09-06
+
+Reported straight after: the box now appears on a cold double-click and no tray
+icon does. §5.1 says a refused container is told about in a way that cannot be
+missed "and the standing list carries it afterwards in the one colour reserved
+for it", so the icon is specified rather than optional.
+
+**Established by instrumenting `standing` rather than by reading it.** With a
+line written to a file on each branch:
+
+| cold double-click | what `standing` did |
+| --- | --- |
+| a payload that must be refused | never called at all |
+| an ordinary container | called; `show_up` succeeded |
+
+`main::open` returned through its idle exit, which sat *above* the line that
+raises the standing list. Warm, the icon existed because the earlier ordinary
+open had raised it — the same shape as the box, one layer up.
+
+**Two instruments were wrong before this was right, and both are worth keeping.**
+`FindWindowW` returns 0 for the tray's window while `EnumWindows` finds it
+plainly, so several rounds of "no tray" were a broken probe rather than a
+finding; the enumeration is the instrument. And a first attempt to blame the
+harness — that `attach_console` had joined the parent's console — was disproved
+by launching through `wscript`, which has none, and getting the same answer.
+
+**The exit rule is now a function.** `has_a_reason_to_stay(idle, carrying,
+showing)`: stay while something is open, or while there is a trouble *and*
+somewhere to show it. The third argument is what keeps `open` at a prompt
+returning with the refusal's own exit code, because there the command line is
+already the standing list.
+
+**Which turned up a third thing, and it was load-bearing.** Raising the
+standing list before the exit decision meant `standing`'s own test — `is_terminal`
+— started deciding whether a process stayed, and `is_terminal` is false for a
+*pipe*. So a redirected refusal was given a tray and stayed, and two of
+`tests/the_process.rs` hung on it. The predicate is now whether this process was
+given an error stream at all: a shell that redirects still gave it one, and
+Explorer gives a windows-subsystem process none. While the icon was raised only
+for an invocation that was staying anyway, the wrong answer cost nothing and so
+went unmeasured for weeks.
+
+And the same question gates waiting for the dialog: a packaged `slipcase-open
+open` with its output redirected sat 151 seconds on a box nobody was there to
+close, which is a script stopped dead. At a command line the refusal is already
+in the text and the exit code.
 
 ## Phase 5 — macOS
 

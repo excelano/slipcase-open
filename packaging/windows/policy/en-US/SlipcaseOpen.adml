@@ -1,0 +1,120 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The words for SlipcaseOpen.admx.
+
+  These are what an administrator reads in the Group Policy editor, so they are
+  written for somebody deciding whether to apply a control rather than for
+  somebody who has already read the design. Each explanation says what the
+  setting does, what happens when it is not configured, and — where it matters —
+  what it does not do.
+
+  The allowlist is a guardrail and not a security boundary, and the text says so
+  where an administrator is most likely to assume otherwise. A container is a
+  plain ZIP: anyone who can read one can extract its payload with the tools they
+  already have. What this setting governs is the convenient path.
+
+  Author: David M. Anderson
+  Built with AI assistance (Claude, Anthropic)
+-->
+<policyDefinitionResources xmlns:xsd="http://www.w3.org/2001/XMLSchema"
+                           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                           revision="1.0" schemaVersion="1.0"
+                           xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
+  <displayName>Slipcase Open</displayName>
+  <description>Settings for Slipcase Open, which opens the payload of a Slipcase container in whatever application handles that kind of file.</description>
+
+  <resources>
+    <stringTable>
+
+      <string id="SUPPORTED_SlipcaseOpen_0_1_4">Slipcase Open 0.1.4 or later</string>
+
+      <string id="Cat_Excelano">Excelano</string>
+      <string id="Cat_Slipcase">Slipcase</string>
+      <string id="Cat_Open">Slipcase Open</string>
+      <string id="Cat_Open_Help">Settings for Slipcase Open.
+
+Slipcase Open extracts the payload of a .slpc container, hands it to whichever application is registered for that kind of file, and writes edits back into the container when the file is saved.
+
+Settings applied here take precedence over anything a user sets. Machine settings take precedence over user settings.</string>
+
+      <string id="AllowedExtensions">Payload types that may be opened</string>
+      <string id="AllowedExtensions_Help">Controls which payload file types Slipcase Open will hand to another application.
+
+Enter one extension per line, without a leading dot and in lower case. For example:
+
+    pdf
+    docx
+    xlsx
+
+Choose whether the list replaces the built-in set or is added to it. Replace is the safer reading and is the default: an administrator who writes a list expecting it to be exhaustive, and instead gets it combined with the built-in set, has permitted file types they never listed and will not find out.
+
+If you disable or do not configure this policy, the application's built-in set applies, which is ordinary document and image types. A payload whose type is not permitted is not opened, and the person is told why.
+
+This is a guardrail against mistakes and social engineering on the convenient path, and it is not a security boundary. A container is an ordinary ZIP archive, so anybody who can read one can extract its payload with tools they already have. Application control — AppLocker, Windows Defender Application Control, or an equivalent — is the boundary.</string>
+
+      <string id="DeniedExtensions">Payload types that may never be opened</string>
+      <string id="DeniedExtensions_Help">Lists payload file types Slipcase Open will refuse, whatever else permits them.
+
+Enter one extension per line, without a leading dot and in lower case.
+
+A type listed here is refused even if the allow list above names it, and even if a user has added it to their own settings. Nothing overrides it.
+
+If you disable or do not configure this policy, nothing is denied outright and the allow list decides.
+
+Note that Slipcase Open already refuses, regardless of any setting here, a payload whose contents are an executable image or a script while its name claims otherwise, and a payload with no extension at all.</string>
+
+      <string id="UserMayExtend">Allow users to change these settings</string>
+      <string id="UserMayExtend_Help">Controls whether a user's own settings are consulted.
+
+If you enable this policy, settings a user has made are read and combined with the policy above, subject to the deny list, which always wins.
+
+If you disable this policy, the user's own settings are ignored entirely and only settings applied here decide. The application tells the person that their settings are not being consulted, so that a refusal reads as a decision somebody made rather than as the application behaving unpredictably.
+
+If you do not configure this policy, the user's own settings are consulted.</string>
+
+      <string id="ConfirmEachWriteBack">Confirm every write-back</string>
+      <string id="ConfirmEachWriteBack_Help">Controls whether the person is asked before each edit is written back into its container.
+
+If you enable this policy, every save is confirmed before the container is rewritten. This suits archival work, where a container is a record and an unintended change to one matters more than the friction of confirming.
+
+If you disable or do not configure this policy, a save is written back without asking. The rewrite is atomic, so a container is never left half-written, and the application reports that a write-back happened.</string>
+
+      <string id="Notify">How much the application says</string>
+      <string id="Notify_Help">Controls how much Slipcase Open reports without being asked.
+
+Important, the default, keeps warnings, failures, questions, and the answer to anything the person just did, while dropping what happens on its own — so the first write-back of a session is announced and the rest are quiet.
+
+Everything additionally reports each individual save.
+
+Neither setting can silence a question: anything the application cannot decide for itself is still put to the person. Windows notification settings for this application remain the way to switch its notifications off entirely.
+
+If you do not configure this policy, Important applies.</string>
+
+      <string id="Mode_Replace">Replace the built-in set</string>
+      <string id="Mode_Append">Add to the built-in set</string>
+      <string id="Notify_Important">Important — warnings, failures and questions</string>
+      <string id="Notify_Everything">Everything, including each save</string>
+
+    </stringTable>
+
+    <presentationTable>
+
+      <presentation id="AllowedExtensions">
+        <text>One extension per line, without a leading dot:</text>
+        <multiTextBox refId="allowed" />
+        <dropdownList refId="mode" noSort="true" defaultItem="0">This list:</dropdownList>
+      </presentation>
+
+      <presentation id="DeniedExtensions">
+        <text>One extension per line, without a leading dot.</text>
+        <text>These are refused whatever else permits them.</text>
+        <multiTextBox refId="denied" />
+      </presentation>
+
+      <presentation id="Notify">
+        <dropdownList refId="notify" noSort="true" defaultItem="0">Report:</dropdownList>
+      </presentation>
+
+    </presentationTable>
+  </resources>
+</policyDefinitionResources>

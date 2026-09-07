@@ -128,6 +128,18 @@ zbus = { version = "5", default-features = false, features = ["blocking-api", "a
 windows = { version = "0.62", features = [
     "Data_Xml_Dom",
     "Foundation",
+    # `Storage` is here for one call: asking Windows where this package keeps
+    # its data instead of asking for `%LOCALAPPDATA%` and being handed a
+    # redirected view of it without being told. `session::platform_base` has
+    # the measurement, and the defect it closes.
+    "Storage",
+    # And `Storage_Search`, which is not about searching. `LocalCacheFolder` is
+    # declared on `IApplicationData2` and the bindings gate that whole interface
+    # behind this feature, so it is the price of the one accessor rather than a
+    # capability being asked for. The cache and not `LocalFolder` because it is
+    # the store Windows neither roams nor puts in a device backup, which is what
+    # a copy of somebody's payload should be.
+    "Storage_Search",
     "UI_Notifications",
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
@@ -138,9 +150,28 @@ windows = { version = "0.62", features = [
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
+# Concept 10's Windows layers, which are registry keys. Reading them by hand
+# means `RegOpenKeyEx` and `RegQueryValueEx` with their two-call buffer sizing
+# and a `REG_MULTI_SZ` to walk, which is perhaps a hundred lines this crate
+# would have to hold `unsafe` for — to read six values. This is the same
+# vendor's safe wrapper over exactly those calls, so the level stays where
+# `identity.rs` and `platform.rs` put it: lifted only where something is being
+# done that no safe API covers.
+#
+# It costs one crate and no duplicate: `cargo tree -i windows-result` shows
+# 0.6.1 and `windows-core` 0.62.2 sharing `windows-result` 0.4.1, so the lock
+# gained an edge rather than a second copy of the Windows crates — which is the
+# thing the note above about `windows-sys` was written to watch for. Measured
+# 2026-09-05. A later version of this crate is published and is not taken,
+# because that one is what pulls a second copy in.
+windows-registry = "0.6"
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Security",
+    # One call, `GetCurrentPackageFamilyName`, asked only whether it answers at
+    # all. `session::packaged` says why the question has to be put in Win32
+    # rather than to the WinRT call it guards.
+    "Win32_Storage_Packaging_Appx",
     "Win32_Security_Authorization",
     "Win32_Storage_FileSystem",
     "Win32_System_IO",

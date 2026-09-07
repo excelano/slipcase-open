@@ -26,6 +26,70 @@ use std::path::PathBuf;
 use crate::extension;
 
 pub mod files;
+#[cfg(windows)]
+pub mod registry;
+
+/// The layers this platform actually keeps, and where it keeps them.
+///
+/// **One type rather than a trait object, because the two implementations are
+/// the whole set.** A platform keeps its policy in files or in a registry, this
+/// enum is those two, and `for_this_platform` is the only thing that builds
+/// one. A `Box<dyn Source>` would buy extensibility nobody wants and lose
+/// `locations`, which is not on [`Source`] deliberately — reading a layer and
+/// naming where it came from are different questions, and only the interface
+/// asks the second.
+#[derive(Debug, Clone)]
+pub enum Settings {
+    /// Files at paths, which is Linux and the tests.
+    Files(files::Files),
+    /// Registry keys, which is Windows.
+    #[cfg(windows)]
+    Registry(registry::Registry),
+}
+
+impl Settings {
+    /// Where this machine reads its layers from, most authoritative first, in
+    /// whatever words a person would use to go and look.
+    ///
+    /// A path on one platform and a key on another, so the answer is a string
+    /// rather than a `Path`: concept 10's point is that only the running
+    /// program can say where its settings are, and a type that can only hold
+    /// filenames cannot say it on Windows.
+    #[must_use]
+    pub fn locations(&self) -> Vec<(Origin, String)> {
+        match self {
+            Self::Files(f) => f
+                .locations()
+                .map(|(o, p)| (o, slpc::display_path(p).clone()))
+                .collect(),
+            #[cfg(windows)]
+            Self::Registry(r) => r.locations(),
+        }
+    }
+}
+
+impl Source for Settings {
+    fn layer(&self, origin: Origin) -> Read {
+        match self {
+            Self::Files(f) => f.layer(origin),
+            #[cfg(windows)]
+            Self::Registry(r) => r.layer(origin),
+        }
+    }
+}
+
+/// What this machine reads, chosen by what platform it is.
+#[must_use]
+pub fn for_this_platform() -> Settings {
+    #[cfg(windows)]
+    {
+        Settings::Registry(registry::Registry::for_this_platform())
+    }
+    #[cfg(not(windows))]
+    {
+        Settings::Files(files::Files::for_this_platform())
+    }
+}
 
 /// Why a layer could not be read.
 ///

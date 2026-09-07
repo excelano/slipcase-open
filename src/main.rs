@@ -264,7 +264,7 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
     };
 
     let channel = channel();
-    let source = policy::files::Files::for_this_platform();
+    let source = policy::for_this_platform();
     // Resolved once and held for the life of the instance. Concept 10's warning
     // about caching is about what may be opened, where a value held across a
     // policy push is a bypass; `flow::open` still resolves the lists itself on
@@ -281,9 +281,40 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
 
     let mut instance = Resident::new(root);
     let response = instance.handle(request, &outside);
-    if instance.is_idle() {
+
+    // **Raised before the exit decision rather than after it**, because whether
+    // there is anywhere for a trouble to live is part of that decision.
+    //
+    // Concept 5.1 says a refused container is told about in a way that cannot
+    // be missed "and the standing list carries it afterwards in the one colour
+    // reserved for it". A refusal holds no session, so concept 8's exit rule
+    // was ending this process before the icon existed. Measured on 2026-09-06
+    // against the installed package: on a cold double-click of a container that
+    // must be refused, `standing` was never reached at all, while the same
+    // double-click with an instance already running showed the icon — because
+    // that icon belonged to the earlier invocation.
+    //
+    // An `open` that succeeded has a session and is not idle, so this raises
+    // nothing that is then immediately put down.
+    let standing = standing();
+    if !has_a_reason_to_stay(
+        instance.is_idle(),
+        !instance.troubles().is_empty(),
+        standing.holding(),
+    ) {
         // Nothing was started and nothing is being held, so there is no reason
-        // to keep the front door.
+        // to keep the front door. Dropped before the wait below and not after:
+        // a refusal that somebody leaves on screen would otherwise hold a bound
+        // door that nothing is accepting on, and the next double-click would
+        // fail to reach an instance that is not there.
+        drop(listener);
+        // **But a refusal this invocation raised may still be on the screen.**
+        // Concept 12's box belongs to this process, and returning here is what
+        // took it down before it had drawn — the whole of the defect measured
+        // on 2026-09-06, where the first container refused after a restart said
+        // nothing at all and the second, with an instance by then running, said
+        // it every time.
+        see_out(&outside);
         return match &response {
             Response::Ok(_) => say(&response),
             Response::Err(_) if voice == Voice::Client => say(&response),
@@ -314,10 +345,45 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
         eprintln!("  slipcase-open close <session>");
     }
 
-    let standing = standing();
     resident::run(listener, &mut instance, &outside, standing.as_ref())?;
     instance.stand_down(&outside);
+    // The loop can have insisted on its last turn, and the same rule applies on
+    // the way out of it as on the way out above.
+    see_out(&outside);
     Ok(())
+}
+
+/// Do not end while a refusal this process raised is still on the screen.
+///
+/// **Only where the dialog is the whole of what was said.** At a command line
+/// the refusal is already in the text and in the exit code, so a modal that
+/// outlived the command would be the worse failure of the two: measured on
+/// 2026-09-06, a packaged `slipcase-open open` with its output redirected sat
+/// waiting on a box nobody was there to close, which is a script stopped dead.
+/// A double-click has no text and no exit code anybody reads, and there the box
+/// is the entire message — see [`present::Channel::stay_until_seen`].
+///
+/// The same question as [`standing`] asks, and deliberately the same answer:
+/// who started this decides both whether an icon is raised and whether a dialog
+/// is worth waiting for.
+fn see_out(outside: &Outside<'_>) {
+    if !from_a_command_line() {
+        outside.channel.stay_until_seen();
+    }
+}
+
+/// Concept 8's exit rule, as concept 5.1 and [`present::Standing::holding`]
+/// amend it.
+///
+/// Three facts and no state, so that the rule can be read and tested rather
+/// than traced through `open`. *Idle* is concept 8's own: no open session, none
+/// lingering, no question outstanding. *Carrying* is something the icon has
+/// gone a colour for. *Showing* is whether this invocation has a surface that
+/// colour can appear on — which at a prompt it has not, and there the command
+/// line is the standing list and `open` must still return with the refusal's
+/// own exit code.
+const fn has_a_reason_to_stay(idle: bool, carrying: bool, showing: bool) -> bool {
+    !idle || (carrying && showing)
 }
 
 /// Concept 9's channel, or the floor beneath it.
@@ -474,23 +540,22 @@ fn report_policy(outside: &Outside<'_>) {
 /// broken layer would otherwise print nothing at all. The refusal follows the
 /// listing and still fails the run.
 fn settings(root: &Path, door: &Path) -> Fallible {
-    let source = policy::files::Files::for_this_platform();
+    let source = policy::for_this_platform();
     let resolved = policy::resolve(&source);
 
-    let mut layers = source.locations().peekable();
-    if layers.peek().is_none() {
-        // Every platform but Linux, until PLAN.md Phases 4 and 5. Said out
-        // loud, because a blank heading reads as a program that could not find
-        // its own configuration.
-        println!("No settings files on this platform yet. The built-in set is what decides.");
+    let layers = source.locations();
+    if layers.is_empty() {
+        // macOS, until PLAN.md Phase 5. Said out loud, because a blank heading
+        // reads as a program that could not find its own configuration.
+        println!("No settings on this platform yet. The built-in set is what decides.");
     } else {
         println!("Where settings are read, in order of authority:");
         println!();
-        for (origin, path) in layers {
+        for (origin, where_it_is) in layers {
             println!(
                 "  {:<14}  {} ({})",
                 origin,
-                slpc::display_path(path),
+                where_it_is,
                 layer_state(&source, origin, resolved.as_ref().ok())
             );
         }
@@ -583,7 +648,7 @@ fn settings(root: &Path, door: &Path) -> Fallible {
 /// Everything else — a double-click, the Start tile, the context menu — has no
 /// terminal and gets an icon that stays until it is asked to leave.
 fn standing() -> Box<dyn present::Standing> {
-    if std::io::stderr().is_terminal() {
+    if from_a_command_line() {
         return Box::new(present::Nowhere);
     }
     #[cfg(windows)]
@@ -591,6 +656,42 @@ fn standing() -> Box<dyn present::Standing> {
         return Box::new(tray);
     }
     Box::new(present::Nowhere)
+}
+
+/// Whether a command line started this, which is the rule above written as a
+/// question this process can actually answer.
+///
+/// **Not `is_terminal`, and that is a correction.** `is_terminal` asks whether
+/// the error stream is a screen, and a shell that redirects one —
+/// `slipcase-open open x.slpc 2> log`, or this crate's own process tests, which
+/// spawn with pipes — is a command line that answers no. Measured on
+/// 2026-09-06: with the standing list raised before the exit decision, a piped
+/// refusal was given a tray and stayed, and two of `tests/the_process.rs` hung
+/// on it. While the icon was only raised for an invocation that was staying
+/// anyway, the wrong answer here cost nothing and so went unnoticed.
+///
+/// Explorer gives a windows-subsystem process no standard handles at all, and
+/// [`attach_console`] has already joined the parent's console where there was
+/// one — so *were we given an error stream* separates a shell from a
+/// double-click where *is it a screen* does not.
+///
+/// [`Voice`] keeps `is_terminal`, and that is not an inconsistency: it asks
+/// whether somebody is reading the lines handed back, which a redirect really
+/// does change.
+#[cfg(windows)]
+#[allow(unsafe_code)]
+fn from_a_command_line() -> bool {
+    use windows::Win32::System::Console::{GetStdHandle, STD_ERROR_HANDLE};
+    // SAFETY: a plain query against this process's own handle table.
+    unsafe { GetStdHandle(STD_ERROR_HANDLE).is_ok_and(|h| !h.is_invalid()) }
+}
+
+/// Nowhere else has a tray for this to gate, so the narrower question is the
+/// right one: concept 12 makes the command line the standing list on Linux
+/// whatever this answers.
+#[cfg(not(windows))]
+fn from_a_command_line() -> bool {
+    std::io::stderr().is_terminal()
 }
 
 /// Stand by with the standing list and nothing open.
@@ -625,7 +726,7 @@ fn stand_by(root: &Path, door: &Path) -> Fallible {
             return Ok(());
         };
         let channel = channel();
-        let source = policy::files::Files::for_this_platform();
+        let source = policy::for_this_platform();
         let volume = policy::resolve(&source)
             .map(|e| e.notify)
             .unwrap_or_default();
@@ -635,6 +736,7 @@ fn stand_by(root: &Path, door: &Path) -> Fallible {
         let standing = standing();
         resident::run(listener, &mut instance, &outside, standing.as_ref())?;
         instance.stand_down(&outside);
+        see_out(&outside);
         Ok(())
     }
     #[cfg(not(windows))]
@@ -705,7 +807,7 @@ fn how_it_speaks() -> (String, Option<String>) {
 /// *present* without telling them it sets nothing is how the shipped
 /// `/etc/slipcase/open.toml` gets mistaken for a policy nobody wrote.
 fn layer_state(
-    source: &policy::files::Files,
+    source: &policy::Settings,
     origin: policy::Origin,
     effective: Option<&policy::Effective>,
 ) -> String {
@@ -773,4 +875,46 @@ fn id_of(s: &session::Session) -> String {
     s.dir()
         .file_name()
         .map_or_else(|| "?".to_string(), |n| n.to_string_lossy().into_owned())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::has_a_reason_to_stay;
+
+    /// The case the icon was missing from, which is the whole reason this rule
+    /// is a function.
+    #[test]
+    fn a_refusal_stays_where_there_is_an_icon_to_carry_it() {
+        // Nothing open, a trouble to show, and a tray to show it on.
+        assert!(has_a_reason_to_stay(true, true, true));
+    }
+
+    #[test]
+    fn the_same_refusal_at_a_prompt_returns() {
+        // The command line is already the standing list, so there is no surface
+        // to stay for and `open` must still hand back its exit code.
+        assert!(!has_a_reason_to_stay(true, true, false));
+    }
+
+    #[test]
+    fn an_open_session_stays_whether_or_not_anything_is_wrong() {
+        // Concept 8's rule, untouched: the watcher is the reason, not the icon.
+        for carrying in [false, true] {
+            for showing in [false, true] {
+                assert!(
+                    has_a_reason_to_stay(false, carrying, showing),
+                    "left with a session open ({carrying}, {showing})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn nothing_held_and_nothing_wrong_returns_even_with_an_icon() {
+        // A tray is not itself a reason for *this* decision. `resident::run`
+        // keeps the instance alive once it is running, which is a different
+        // question from whether it should start running at all.
+        assert!(!has_a_reason_to_stay(true, false, true));
+        assert!(!has_a_reason_to_stay(true, false, false));
+    }
 }

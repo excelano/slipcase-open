@@ -162,72 +162,32 @@ impl Session {
     ///
     /// # Errors
     ///
-    /// Where the directory cannot be removed inside [`PATIENCE`].
+    /// Where the directory cannot be removed.
     pub fn remove(self) -> io::Result<()> {
-        keep_trying(|| fs::remove_dir_all(&self.dir))
+        fs::remove_dir_all(&self.dir)
     }
 }
 
-/// How long a removal keeps trying before it reports the failure.
-///
-/// **What was measured, on 2026-09-03, and nothing beyond it.** Sessions were
-/// surviving their own removal: the payload gone, an empty `payload/` left
-/// behind, and the record still there, so `sessions` and the tray listed a
-/// corpse. Two appeared during an ordinary sitting at the keyboard. The failure
-/// is `ERROR_SHARING_VIOLATION` on the empty `payload/`, so `remove_dir_all`
-/// got as far as unlinking the payload and no further.
-///
-/// **It is transient.** One corpse's directory was removed by hand a minute
-/// later with nothing else changed. A scripted reproduction caught one and
-/// retried it free immediately. That is the whole of what this constant rests
-/// on, and it is enough: a condition that clears is one to wait out.
-///
-/// **It is also intermittent, and no trigger has been found.** Around twenty
-/// runs of the sequence that produces it in real use — open, save, kill the
-/// instance, let the next one's startup sweep remove what was left — produced
-/// one corpse. An earlier reading, that the state directory's location was the
-/// discriminator, did not survive six more runs in that same location and is
-/// not the reason for anything here.
-///
-/// So this does not claim to end the corpse; it claims that a removal which
-/// would have succeeded a moment later now does. Whether that covers every
-/// occurrence is unknown, and the honest test is whether they stop appearing in
-/// use.
-///
-/// Three hundred milliseconds is a dozen attempts, far more than the one that
-/// sufficed, and short enough that a sweep of a dozen corpses cannot noticeably
-/// delay a launch.
-const PATIENCE: std::time::Duration = std::time::Duration::from_millis(300);
-
-/// How long to wait between attempts.
-const BETWEEN: std::time::Duration = std::time::Duration::from_millis(20);
-
-/// Do it, and go on doing it while it keeps failing, up to [`PATIENCE`].
-///
-/// **This accommodates a transient condition; it does not fix a known holder,
-/// and it must not be described as doing so.** What is established is that the
-/// directory is unremovable for a moment and removable shortly afterwards. Who
-/// has it is not established, and two stories that fit have already been
-/// measured and found wrong: Windows delete-pending, tested directly and shown
-/// not to block the `rmdir` at all, and the target application holding the
-/// payload, ruled out by a corpse that cleared with the editor still open.
-///
-/// A missing directory is not retried: it is not going to appear, and the
-/// caller asked for it gone.
-fn keep_trying(mut attempt: impl FnMut() -> io::Result<()>) -> io::Result<()> {
-    let mut waited = std::time::Duration::ZERO;
-    loop {
-        match attempt() {
-            Ok(()) => return Ok(()),
-            Err(e) if e.kind() == io::ErrorKind::NotFound => return Err(e),
-            Err(e) if waited >= PATIENCE => return Err(e),
-            Err(_) => {
-                std::thread::sleep(BETWEEN);
-                waited += BETWEEN;
-            }
-        }
-    }
-}
+// **There was a retry here, and it was removed because what it waited for does
+// not pass.** `823a972` made `remove` keep trying for three hundred
+// milliseconds, on the strength of two observations: a session directory that
+// would not go, and the same directory going without complaint a minute later.
+// The second was read as the condition clearing on its own.
+//
+// It is not. The removals that failed were the packaged product's and the ones
+// that succeeded were another process's, and that difference is the whole
+// defect — see `platform_base` below, where the measurement is. A packaged
+// process asking for `%LOCALAPPDATA%` is given a redirected view it is not told
+// about, and a directory belonging to the layer underneath that view can never
+// be removed through it, however long anybody waits. Fifteen of them survived
+// twelve seconds of retrying.
+//
+// So the retry addressed nothing, and its doc comment asserted a cause that is
+// now measured false. `CLAUDE.md` says an unproven claim is worse than no
+// claim, because the next reader cannot tell it from a proven one; a disproven
+// one left in place is worse again. If a removal here is ever seen to fail
+// transiently for a reason somebody has measured, a retry comes back with that
+// measurement attached.
 
 /// The per-user state directory this build keeps sessions under.
 ///
@@ -267,9 +227,114 @@ fn platform_base() -> Option<PathBuf> {
     Some(PathBuf::from(std::env::var_os("HOME")?).join("Library/Application Support"))
 }
 
+/// `%LOCALAPPDATA%` where this process is an ordinary program, and the
+/// package's own store where it is a packaged one — asked of Windows rather
+/// than assumed.
+///
+/// **A packaged process that asks for `%LOCALAPPDATA%` does not get it, and is
+/// not told.** Measured on 2026-09-05 against the installed 0.1.4 package: with
+/// both roots emptied and a container opened through the shell verb, no
+/// `%LOCALAPPDATA%\slipcase-open` was created at all and the session appeared
+/// under `…\Packages\<family>\LocalCache\Local\slipcase-open\sessions`. MSIX
+/// redirects that variable, and the read view is *merged*, so the process also
+/// sees whatever is in the real location and cannot tell the two apart.
+///
+/// **That merge is what produced the sessions surviving their own removal**,
+/// which `PLAN.md` carried as an open defect with three explanations measured
+/// and found wrong. A redirection layer can tombstone a *file* in the layer
+/// beneath it and cannot remove a *directory* there, so `remove_dir_all`
+/// unlinked the payload and failed on `payload/` with `ERROR_SHARING_VIOLATION`
+/// — for ever, not transiently, and with no process holding anything. Measured
+/// the same day: the same executable, byte for byte, with the same package
+/// identity, removes the directory when it runs from a staging tree and never
+/// removes it when it runs from the package's install location; fifteen such
+/// directories survived twelve seconds of a packaged sweep retrying them, while
+/// any other process removed each one on the first ask.
+///
+/// So the answer is to stop asking for a path this process will not be given.
+/// `LocalCacheFolder` and not `LocalFolder`: both were measured to create and
+/// remove cleanly here, and the cache is the one Windows neither roams nor
+/// includes in a device backup, which is what a copy of somebody's payload
+/// should be — concept 17's backup-exposure question, settled on this platform
+/// by where the directory is rather than by a warning about it.
 #[cfg(target_os = "windows")]
 fn platform_base() -> Option<PathBuf> {
-    std::env::var_os("LOCALAPPDATA").map(PathBuf::from)
+    package_store().or_else(|| std::env::var_os("LOCALAPPDATA").map(PathBuf::from))
+}
+
+/// Where Windows says this package keeps its data, or `None` where there is no
+/// package.
+///
+/// **On a thread of its own, and that is not caution.** Answering this enters a
+/// COM apartment, and the launch path enters a single-threaded one later
+/// because `ShellExecuteEx` hands work to shell extensions that require it
+/// (`platform::shell`). A multi-threaded apartment entered here first would
+/// make that call fail with `RPC_E_CHANGED_MODE` and leave the launcher running
+/// in the wrong model — a real regression bought for a path lookup. A thread
+/// that exits takes its apartment with it.
+///
+/// **Identity is asked about before `WinRT` is touched, because without a package
+/// `ApplicationData::Current` does not fail — it crashes.** Measured while
+/// writing this: the suite died with `STATUS_ACCESS_VIOLATION` the first time
+/// this function ran in a test binary, which has no package. So the question
+/// *is there a package* is put to a plain Win32 call that answers it with an
+/// error code, and the `WinRT` call is only ever made where the answer was yes.
+/// `Toast::connect` gets away with the direct attempt because
+/// `CreateToastNotifier` refuses politely; this one does not, and the two are
+/// not interchangeable.
+#[cfg(target_os = "windows")]
+fn package_store() -> Option<PathBuf> {
+    if !packaged() {
+        return None;
+    }
+    std::thread::spawn(|| {
+        use windows::Storage::ApplicationData;
+        apartment();
+        let path = ApplicationData::Current()
+            .ok()?
+            .LocalCacheFolder()
+            .ok()?
+            .Path()
+            .ok()?;
+        Some(PathBuf::from(path.to_os_string()))
+    })
+    .join()
+    .ok()
+    .flatten()
+}
+
+/// Whether this process is running with package identity.
+///
+/// `GetCurrentPackageFamilyName` asked with no buffer: a packaged process is
+/// told the buffer is too small, and an unpackaged one is told there is no
+/// package. Nothing is read back, so the name itself is never needed — the
+/// question here is only which of those two answers comes.
+#[cfg(target_os = "windows")]
+#[allow(unsafe_code)]
+fn packaged() -> bool {
+    use windows_sys::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
+    use windows_sys::Win32::Storage::Packaging::Appx::GetCurrentPackageFamilyName;
+
+    let mut len: u32 = 0;
+    // SAFETY: the documented way to ask for the required length. The length is
+    // in-out and lives here; the buffer is null, which is what a zero length
+    // licenses, and nothing is written through it.
+    let how = unsafe { GetCurrentPackageFamilyName(&raw mut len, std::ptr::null_mut()) };
+    how == ERROR_INSUFFICIENT_BUFFER
+}
+
+/// A multi-threaded apartment for the calling thread, which `WinRT` activation
+/// needs and which this crate only ever enters on a thread it is about to
+/// throw away.
+#[cfg(target_os = "windows")]
+#[allow(unsafe_code)]
+fn apartment() {
+    use windows::Win32::System::Com::{CoInitializeEx, COINIT_MULTITHREADED};
+    // SAFETY: the documented entry point, with no reserved parameter, on a
+    // thread this function owns. The result is ignored deliberately: `S_FALSE`
+    // means somebody had already entered on this thread, and there is nobody
+    // else on this one.
+    let _ = unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) };
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
@@ -482,7 +547,7 @@ fn read_record(dir: &Path) -> io::Result<Record> {
 
 #[cfg(test)]
 mod tests {
-    use super::{create, default_root, keep_trying, scan, PATIENCE, PAYLOAD_DIR, RECORD};
+    use super::{create, default_root, scan, PAYLOAD_DIR, RECORD};
     use std::fs;
 
     /// A container on disk to point a session at. Its contents do not matter
@@ -656,67 +721,23 @@ mod tests {
         assert!(!root.starts_with(std::env::temp_dir()));
     }
 
+    #[cfg(windows)]
     #[test]
-    fn a_removal_that_fails_and_then_stops_failing_succeeds() {
-        // The property the fix rests on, and the only one it claims: a
-        // condition that clears is waited out rather than reported. The
-        // measured case cleared on the first retry; this one takes two, which
-        // is the same shape with margin.
-        let attempts = std::cell::Cell::new(0);
-        let outcome = keep_trying(|| {
-            attempts.set(attempts.get() + 1);
-            if attempts.get() < 3 {
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::PermissionDenied,
-                    "in use by another process",
-                ))
-            } else {
-                Ok(())
-            }
-        });
-        assert!(outcome.is_ok(), "{outcome:?}");
-        assert_eq!(attempts.get(), 3);
-    }
-
-    #[test]
-    fn a_removal_that_never_stops_failing_reports_it() {
-        // Patience is not silence. Something that is genuinely stuck is still a
-        // failure, and the caller still hears the operating system's own words
-        // about it rather than a sentence this module invented.
-        let attempts = std::cell::Cell::new(0);
-        let outcome = keep_trying(|| {
-            attempts.set(attempts.get() + 1);
-            Err(std::io::Error::new(
-                std::io::ErrorKind::PermissionDenied,
-                "in use by another process",
-            ))
-        });
-        let why = outcome.expect_err("it should have given up");
-        assert_eq!(why.kind(), std::io::ErrorKind::PermissionDenied);
-        assert!(why.to_string().contains("in use by another process"));
-        // It tried more than once and stopped, rather than either giving up at
-        // the first refusal or going round forever.
-        assert!(attempts.get() > 1, "it did not retry at all");
-        assert!(attempts.get() < 100, "{} attempts", attempts.get());
-    }
-
-    #[test]
-    fn a_directory_that_is_not_there_is_not_waited_for() {
-        // It is not going to appear. Waiting `PATIENCE` on every already-gone
-        // session would put that wait into the sweep of a tidy state directory,
-        // which is the common case and the one that must stay quick.
-        let attempts = std::cell::Cell::new(0);
-        let began = std::time::Instant::now();
-        let outcome = keep_trying(|| {
-            attempts.set(attempts.get() + 1);
-            Err(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "no such directory",
-            ))
-        });
-        assert!(outcome.is_err());
-        assert_eq!(attempts.get(), 1);
-        assert!(began.elapsed() < PATIENCE);
+    fn with_no_package_around_it_the_root_is_the_one_the_environment_names() {
+        // The suite runs unpackaged, so `package_store` has nothing to answer
+        // with and the fallback is what decides. This pins that: the lookup
+        // added for the packaged case must not change where an ordinary build
+        // keeps its sessions, which is where every existing install's are.
+        //
+        // What it cannot check is the packaged answer, because a test binary
+        // cannot have package identity. That half is measured against an
+        // installed package and written up in `platform_base`.
+        assert!(super::package_store().is_none());
+        let named = std::path::PathBuf::from(std::env::var_os("LOCALAPPDATA").unwrap());
+        assert_eq!(
+            default_root().unwrap(),
+            named.join("slipcase-open").join("sessions")
+        );
     }
 
     #[test]

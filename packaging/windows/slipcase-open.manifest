@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<!--
+  The Win32 application manifest embedded in slipcase-open.exe, and the only
+  thing in it is the DPI declaration.
+
+  WHY IT EXISTS
+
+  The Windows App Certification Kit reported this application as not DPI aware
+  on 2026-09-06, because there was no manifest here to read:
+
+      DPIAwarenessValidation  WARNING
+      The app Excelano.SlipcaseOpen_0.1.4.0_x64__nbxmgv0sk86m4 is not DPI Aware.
+
+  WHAT IT ACTUALLY CHANGES, WHICH IS MORE THAN THE SIBLING'S DOES
+
+  `slipcase-desktop` carries the same declaration and it is close to a formality
+  there: `winit` sets per-monitor awareness at run time inside `EventLoop::new`,
+  so the process was already aware and the kit was reading a file rather than
+  the process. **This crate calls nothing of the kind.** Without this file the
+  process really is unaware, and Windows bitmap-stretches what it draws — which
+  on this product means the refusal dialog and the notification-area icon, and
+  those two are the whole of what a person ever sees. So this is a behaviour
+  change wearing the clothes of a declaration, and it is the right one: the
+  alternative is a blurry message box on every high-DPI display.
+
+  A declaration also takes effect before any of this program's code runs, where
+  a run-time call would leave a window in which the process exists at the wrong
+  awareness.
+
+  WHY IT IS NOT A BUILD STEP
+
+  The usual way to embed a manifest is `rc.exe` or `windres`, and this project
+  has no resource compiler and wants none — `packaging/windows/README.md`
+  rejected exactly that when the tray needed its icons, which is why those are
+  loaded from files beside the binary at run time. `build.rs` hands the MSVC
+  linker `/MANIFEST:EMBED` and `/MANIFESTINPUT` instead, and the linker that was
+  already linking the binary embeds it. No resource compiler, no object file,
+  nothing compiled that was not compiled before.
+
+  WHAT IS DELIBERATELY ABSENT
+
+  No `assemblyIdentity`: it would carry another version number in a project that
+  keeps one number in two spellings, and nothing reads it.
+
+  No `<compatibility>` or `supportedOS` block. Those change what Windows reports
+  to the process about itself, which is a behaviour change with none of this
+  one's justification, and nothing has asked for one.
+
+  Both values, because different vintages of Windows read different ones and
+  they must agree: `dpiAware` is what a pre-1703 reader understands and
+  `dpiAwareness` is what everything since prefers. `PerMonitorV2` rather than
+  system awareness because V2 is the one that scales dialogs and common controls
+  for us — and a dialog is this application's only drawn surface, so the thing
+  V2 adds is precisely the thing this needs.
+
+  Author: David M. Anderson
+  Built with AI assistance (Claude, Anthropic)
+-->
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+    </windowsSettings>
+  </application>
+</assembly>

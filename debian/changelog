@@ -13,10 +13,37 @@ slipcase-open (0.1.4-1) unstable; urgency=low
     that is a program, a save that did not reach its container, something
     waiting on a decision, or a save on its way home — and its menu says what,
     naming the file. The icon now stays until it is asked to leave.
-  * No change to the Debian package's behaviour beyond the refusal and how it is
-    announced.
+  * Settings on Windows are read from the registry: machine and user policy from
+    `SOFTWARE\Policies\Excelano\Slipcase\Open` under HKLM and then HKCU, over
+    the user's own key. An ADMX and ADML pair ships as a separate administrator
+    download, because a package runs no code at install and cannot place files
+    in PolicyDefinitions. The setting names are the ones this file's package
+    already uses.
+  * Windows: sessions no longer accumulate directories that could never be
+    removed. A packaged process asking for %LOCALAPPDATA% is given a redirected
+    view of it without being told, and a directory belonging to the layer
+    underneath that view cannot be removed through it; the session root is now
+    asked of Windows rather than assumed. `slipcase-open policy` consequently
+    reports the directory the packaged product actually uses, where before it
+    named one it was not being given.
+  * Windows: a refused container now says so on the first one of the day. The
+    refusal is a message box, and the box was being drawn on a thread that the
+    process then ended underneath — so a double-click with nothing else of this
+    tool already running produced no document, no message and no window, and the
+    same container refused loudly a minute later once something was running to
+    hold the box up. It waits for the box now before it goes.
+  * Windows: a refused container now leaves the tray icon red until somebody
+    puts it down, which is what the icon's one reserved colour is for. The
+    refusal was ending the process that would have raised the icon, so the
+    colour only ever appeared when something else happened to be running.
+  * Windows: whether an invocation gets a tray icon is now decided by whether a
+    command line started it rather than by whether its error stream is a screen.
+    A redirected command is still a command, and was being given an icon and a
+    resident process it never asked for.
+  * No change to the Debian package's behaviour: everything above is Windows,
+    and the Linux layers, their paths and their spellings are unchanged.
 
- -- David M. Anderson <david.anderson@excelano.com>  Thu, 03 Sep 2026 12:00:00 -0500
+ -- David M. Anderson <david.anderson@excelano.com>  Sat, 06 Sep 2026 12:00:00 -0500
 
 slipcase-open (0.1.3-1) unstable; urgency=low
 
