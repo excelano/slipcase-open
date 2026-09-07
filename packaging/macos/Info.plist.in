@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  The bundle's property list. `build-app.sh` substitutes @VERSION@ from
+  Cargo.toml, the way `debian/changelog` and `AppxManifest.xml.in` carry the
+  same number in their own spellings.
+
+  The bundle is the unit on macOS. A bare executable can be run, but it has no
+  bundle identifier, Launch Services files it as a nameless process, and
+  nothing can be associated with it. Everything concept 4 wants on this
+  platform — the double-click, the Open With entry, the icon a container is
+  drawn with — comes from this file.
+
+  Two identifiers. `com.excelano.slipcase` names the format and belongs to the
+  family: `slipcase-desktop` exports it and this bundle *imports* the same
+  declaration, so a machine with only this product installed still has the
+  type declared, and a machine with both has one declaration rather than two
+  contending. `com.excelano.slipcase-open` names this application.
+
+  The role is Editor. Concept 6 writes edits back into the container, so this
+  application does modify the documents it opens, and Viewer would be a claim
+  to the platform that is not true. LSHandlerRank is Owner for the same reason
+  the viewer's is: concept 4 has the two products claim the association on
+  equal footing and lets the platform's own default-application UI settle it.
+
+  LSUIElement is what makes the launcher a moment rather than a program. The
+  executable this names receives the document Finder sends, hands it to
+  `slipcase-open` beside it, and exits; with this key it does that without
+  bouncing in the Dock or taking the menu bar for the fraction of a second it
+  lives. `packaging/macos/README.md` says why the launcher exists at all.
+
+  LSMinimumSystemVersion is 11.0 because that is the floor of Apple silicon and
+  nothing here calls anything newer. `build-app.sh` checks the executables were
+  built for the same floor, because Cargo's default is not.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleExecutable</key>
+	<string>Slipcase Open</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.excelano.slipcase-open</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleName</key>
+	<string>Slipcase Open</string>
+	<key>CFBundleDisplayName</key>
+	<string>Slipcase Open</string>
+	<key>CFBundleShortVersionString</key>
+	<string>@VERSION@</string>
+	<!--
+	  The same number. The viewer keeps a separate, always-rising build number
+	  here because App Store Connect deduplicates uploads by it; a Developer ID
+	  bundle is uploaded nowhere that counts, so a second spelling would be a
+	  number with no reader.
+	-->
+	<key>CFBundleVersion</key>
+	<string>@VERSION@</string>
+	<key>CFBundleIconFile</key>
+	<string>slipcase-open</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.utilities</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>11.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<!--
+	  Answers the export compliance question in the bundle rather than in a
+	  form. Nothing here implements cryptography or makes a network request;
+	  `slpc` refuses an encrypted payload rather than decrypting one.
+	-->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+
+	<key>CFBundleDocumentTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeName</key>
+			<string>Slipcase container</string>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>LSHandlerRank</key>
+			<string>Owner</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>com.excelano.slipcase</string>
+			</array>
+			<key>CFBundleTypeIconFile</key>
+			<string>slipcase-open</string>
+		</dict>
+	</array>
+
+	<!--
+	  Word for word the viewer's exported declaration, imported. Conformance to
+	  `public.zip-archive` is the macOS half of what `sub-class-of
+	  application/zip` does on Linux and is true for the same reason: a
+	  container is a ZIP. The extension and the media type are SPEC 4's and
+	  neither is invented here; there is no magic-bytes tag because SPEC 4
+	  reserves none.
+	-->
+	<key>UTImportedTypeDeclarations</key>
+	<array>
+		<dict>
+			<key>UTTypeIdentifier</key>
+			<string>com.excelano.slipcase</string>
+			<key>UTTypeDescription</key>
+			<string>Slipcase container</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.zip-archive</string>
+				<string>public.data</string>
+			</array>
+			<key>UTTypeIconFile</key>
+			<string>slipcase-open</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>slpc</string>
+				</array>
+				<key>public.mime-type</key>
+				<array>
+					<string>application/x.slipcase+zip</string>
+				</array>
+			</dict>
+		</dict>
+	</array>
+</dict>
+</plist>

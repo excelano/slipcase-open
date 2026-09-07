@@ -55,8 +55,20 @@ impl Alone {
         self.dir.path()
     }
 
+    /// Where this world's sessions land, which is the platform's own place
+    /// under the `HOME` above rather than one path for every Unix: concept 6.4
+    /// puts macOS under Application Support and not under the XDG state
+    /// directory, and this suite had never run there when it said otherwise.
     fn sessions(&self) -> PathBuf {
-        self.path().join("state/slipcase-open/sessions")
+        #[cfg(target_os = "macos")]
+        {
+            self.path()
+                .join("Library/Application Support/slipcase-open/sessions")
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            self.path().join("state/slipcase-open/sessions")
+        }
     }
 
     /// The program, aimed at this world and at no bus.

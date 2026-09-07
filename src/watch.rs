@@ -304,11 +304,35 @@ mod tests {
         // write-back its own trigger: measured on 2026-08-30, one edit produced
         // three repacks and would have produced more had the session stayed
         // open.
+        //
+        // **The read has to be told apart from the setup, and only after the
+        // watch is quiet.** FSEvents is path-based and replays: registering a
+        // watch delivers the events that just happened to the directory,
+        // including the tempdir appearing and the `write` below, at the
+        // platform's own latency rather than before this returns. Measured on
+        // an Apple silicon runner 2026-09-07, the third run in a loop: the
+        // setup arrived as `[SiblingAppeared, Payload, Payload]` inside the
+        // window and read as the read. inotify and ReadDirectoryChangesW
+        // deliver only what follows registration and never showed it. So the
+        // watch is drained until it goes quiet, which absorbs the replay on
+        // every platform, and only what the read then produces is measured —
+        // which is nothing: probed five times on that platform, a settled read
+        // produced no `Payload`, because a read is `Access` and `EventKind::of`
+        // discards it. The earlier version had no settle and asserted against
+        // the whole window, so it was measuring the notifier.
         let tmp = tempfile::tempdir().unwrap();
         let payload = tmp.path().join("report.pdf");
         std::fs::write(&payload, b"first").unwrap();
 
         let watch = Watch::on(tmp.path(), "report.pdf").unwrap();
+
+        // Quiet is nothing for 400ms, capped so a notifier that never falls
+        // silent cannot hang the suite. The replay is what is being waited out.
+        let cap = std::time::Instant::now() + Duration::from_secs(5);
+        while watch.next_change(Duration::from_millis(400)).is_some()
+            && std::time::Instant::now() < cap
+        {}
+
         let _ = std::fs::read(&payload).unwrap();
 
         let deadline = std::time::Instant::now() + Duration::from_secs(2);

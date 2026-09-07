@@ -4,10 +4,11 @@ What happens, in what order, and what has to be true before any of it. The
 reasoning for the product lives in `slipcase-open-concept.md` and the order of
 the work in `PLAN.md`; this is only the release.
 
-**Two platforms, not three.** Linux ships from the Excelano apt repository, and
-Windows ships to the Microsoft Store. macOS is Phase 5 and is not built — when
-it lands, this file grows a section and `packaging/store-listing.md` grows a
-second cut.
+**Three platforms, two of them queues.** Linux ships from the Excelano apt
+repository, Windows ships to the Microsoft Store, and macOS ships as a notarized
+Developer ID bundle through a Homebrew cask. `packaging/macos/README.md` says
+why the third is not the Mac App Store, and `packaging/store-listing.md` has no
+second cut because there is no second listing.
 
 **Much of what follows is the sibling's experience rather than this project's.**
 `slipcase-desktop` has been through Microsoft Store certification, failed it
@@ -22,16 +23,19 @@ person has to be able to tell them apart.
 1. **Preflight**, which is local and refuses.
 2. **Linux**, which needs no other machine.
 3. **Windows**, including the certification kit.
-4. **The readiness review**, which is the listing read against the artefact.
-5. **Submit.**
+4. **macOS**, which needs a Mac and a notary ticket.
+5. **The readiness review**, which is the listing read against the artefact.
+6. **Submit.**
 
-**Nothing is submitted until step 4.** A Store submission is an event with a
+**Nothing is submitted until step 5.** A Store submission is an event with a
 queue behind it, and the point of the review is that the thing in the queue is
 one somebody looked at.
 
-**apt is the exception, taken deliberately.** It is our own repository:
-publishing is one command and unpublishing is a prune, and nothing sits in
-anybody's review queue meanwhile.
+**apt and the cask are the exceptions, taken deliberately.** Both are our own:
+publishing is one command and unpublishing is a prune or a revert, and nothing
+sits in anybody's review queue meanwhile. Notarization is a queue of a kind,
+but it is minutes and automated, and its verdict is about the signature rather
+than the product.
 
 ---
 
@@ -215,6 +219,52 @@ the listing was verified.
 
 ---
 
+## macOS
+
+    for t in aarch64-apple-darwin x86_64-apple-darwin; do
+      MACOSX_DEPLOYMENT_TARGET=11.0 cargo build --release --target $t
+    done
+    ./packaging/macos/build-app.sh --universal \
+        --sign "Developer ID Application: Excelano LLC (9K6W5PMFYP)" \
+        --notarize ZFK4K98Q7M ISSUER_ID
+
+One artefact comes out: `dist/slipcase-open-VERSION-macos.zip`, holding the
+bundle with its notary ticket stapled and the manual page, with its SHA-256
+printed. `packaging/macos/README.md` has the decisions and the hand
+measurements; what belongs here is the order.
+
+**The Issuer ID is written nowhere.** It is in App Store Connect under Users
+and Access, Integrations, and the API key it pairs with is at
+`~/.appstoreconnect/private_keys/AuthKey_ZFK4K98Q7M.p8` on the machine that
+builds. The sibling made the same choice for the same identifier.
+
+**Do not rebuild between notarizing and attaching**, for the reason Windows
+gives: a rebuild of identical source is a different file, and the ticket is
+stapled to the one that was submitted. The script writes the zip from the
+stapled bundle in one pass so there is nothing to rebuild.
+
+Then, in this order:
+
+1. Attach the zip to the GitHub release for the tag.
+2. In `excelano/homebrew-tap`, set `Casks/slipcase-open.rb` to the version
+   and the SHA-256 the script printed, and push.
+3. `brew update && brew install --cask excelano/tap/slipcase-open` on a Mac
+   that is not the one that built it, and double-click a container.
+
+### Reading it back, which needs no login
+
+    brew info --cask excelano/tap/slipcase-open
+    spctl -a -vv "/Applications/Slipcase Open.app"
+    xcrun stapler validate "/Applications/Slipcase Open.app"
+
+The first says what version the cask serves and from where. The second is
+Gatekeeper's own verdict on the installed bundle, and `source=Notarized
+Developer ID` is the line that says the ticket is Apple's. The third says the
+ticket is inside the bundle rather than only on Apple's servers, which is what
+an offline first launch depends on.
+
+---
+
 ## The readiness review
 
 The listing makes claims about behaviour. Every one has to be true of the
@@ -265,7 +315,6 @@ rule with teeth.
 
 ## Still to write
 
-- **A macOS section**, with Phase 5.
 - **`SUBMITTING.local.md`**, the walk-through of the form as it actually is,
   carrying this account's identifiers. Deliberately not committed, like
   `packaging/windows/identity.psd1`.

@@ -476,6 +476,48 @@ session lives on that platform (§6.4). Then the bundle, the exported UTI,
 `openFile`, `NSStatusItem`, `UNUserNotificationCenter`, configuration profile
 policy, and whichever channel that check chose.
 
+**Where it stands, 2026-09-07: built, measured by hand, and the channel is
+not the Store.** In: the bundle with an imported declaration of the family's
+type, a Swift launcher that receives the Apple Event and hands the document to
+`slipcase-open` beside it, Developer ID signing with the hardened runtime,
+notarization and stapling in `build-app.sh`, a cask in `excelano/homebrew-tap`,
+file policy at the two paths Linux uses, a workflow that opens a container
+through Launch Services on an Apple silicon runner, and the suite passing on a
+Mac — which it had not been run on before, and `tests/the_process.rs`
+asserted the XDG state path where concept §6.4 had put Application Support.
+Not in: `NSStatusItem`, `UNUserNotificationCenter`, configuration profiles.
+The floor ships; `packaging/macos/README.md` has the measurements.
+
+**The §15 check was answered by the viewer, and the answer sends this tool
+the other way.** `slipcase-desktop` measured on 2026-08-25 that the handover
+to an editor survives the sandbox and the in-place swap does not, because the
+grant covers the file and not its directory. The viewer paid for that with a
+platform-specific save; this tool would pay for that and for three more things
+that follow from being resident — a bookmark per session for recovery after a
+restart, a command line that cannot read a path in `argv`, and notification
+actions delivered to a relaunched bundle rather than to the instance. Weeks of
+work in exactly the places concept §12 says must stay in the engine once, to
+buy a Finder search the viewer already answers. Developer ID leaves the engine
+untouched: the same `writeback.rs`, the same `recover.rs`, the same floor.
+The last three of the four costs are reasoned from the sandbox's documented
+shape rather than measured, and are recorded as such.
+
+**The launcher terminates on purpose, and that was the design question.** A
+launcher that `exec`ed the Rust binary would leave the bundle's registered
+process unable to receive the next double-click, which is the viewer's own
+first failure by another route. One that spawns and exits leaves Launch
+Services with no running instance, so every double-click starts a fresh
+launcher that hands over through the front door. Measured: two opens, one
+instance, one session, and the launcher gone after each.
+
+**What the first increment above the floor would be, and why it was not
+taken.** The three questions — close, recovery, the executable warning — have
+nowhere to land on a double-clicked Mac, where on Linux they land in a
+notification. The cheap next step is a native dialog through the platform's
+scripting bridge, which needs no framework, no run loop, and no `unsafe`; its
+known blemish is attribution, and it has not been measured. It was left out so
+that the first release is the floor and nothing that has not been watched.
+
 ---
 
 ## Running alongside
@@ -484,7 +526,8 @@ policy, and whichever channel that check chose.
 another application's container. `slipcase-desktop` already ships an
 extract-and-launch button to the Mac App Store, so the subject is to hand.
 Wanted early because it decides both §6.4 on macOS and the §15 channel, but it
-gates nothing before Phase 5.
+gates nothing before Phase 5. *Answered by the viewer on 2026-08-25 and taken
+into Phase 5 above: the editor can, and the save cannot.*
 
 **Deferred to implementation.** Concept §17 holds four items that are settled by
 writing the code rather than by more design: a payload size warranting a

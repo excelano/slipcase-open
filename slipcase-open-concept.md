@@ -587,6 +587,14 @@ which a notification is poor at. **The command line is the floor**, always
 available, and it is how the session list stays reachable on a desktop that
 offers neither.
 
+**Amended 2026-09-07: macOS shipped the floor and neither layer above it.**
+The baseline this section names for macOS needs a bundle, which it now has,
+and a process that receives the notification's action, which the resident
+instance is not — `packaging/macos/README.md` says why the bundle's process is
+a moment rather than the instance. So macOS is, for now, the platform this
+section imagined Linux would be: the command line is the standing list and the
+questions wait there. `PLAN.md` Phase 5 names the first increment above it.
+
 The cost is packaging work on two platforms rather than one. A Windows toast
 with actions from an unpackaged binary needs an AppUserModelID and a Start Menu
 shortcut, and macOS needs a real bundle for `UNUserNotificationCenter`. Both are
@@ -915,6 +923,22 @@ the sandboxed build against a sandboxed editor, the objection dissolves and the
 Store is right for both products. If it does not, that is worth knowing for the
 viewer as well, and this tool takes Developer ID with notarization through a
 Homebrew cask.
+
+**Amended 2026-09-07: the check was made, Open works, and this tool takes
+Developer ID anyway.** The paragraph above framed one question, and the viewer
+answered it on 2026-08-25: a sandboxed handover reaches the editor. The same
+measurement answered a question this paragraph did not ask — the in-place swap
+§7 relies on is refused under the sandbox, because the grant covers the file
+and not its directory — and for a resident tool that is the first of four
+costs rather than the only one. The grant dies with the process, so §6.3's
+recovery after a restart needs a bookmark per session; a path in `argv`
+carries no grant, so §9's command-line floor cannot open a container; and
+`UNUserNotificationCenter` delivers an action to a relaunched bundle rather
+than to the instance holding the session. Every one of those lands in the
+engine, which §12 keeps to one implementation. So the cask it is, with the
+engine untouched, and the Finder search the Store would have bought is one the
+viewer's listing already answers. `PLAN.md` Phase 5 and
+`packaging/macos/README.md` carry the rest.
 
 **Linux is settled.** `cargo-deb` and the Excelano apt repository are the
 established path in `slpc-rust`, and a `.deb` carries the binary, the desktop

@@ -10,9 +10,12 @@
 //! **This is the portable shape and not the whole of concept 10.** Windows
 //! reads its two policy layers from the `Policies` registry subtree, which is
 //! access-controlled against standard users and cleaned up by Group Policy on
-//! unapply, and macOS reads a configuration profile through
-//! `CFPreferencesAppValueIsForced`. Neither is a file and neither belongs here.
-//! What is here is Linux's shape, and the trait implementation every test uses.
+//! unapply, and that is not a file and does not belong here. Concept 10 gives
+//! macOS a configuration profile read through `CFPreferencesAppValueIsForced`,
+//! and that is not built: PLAN.md Phase 5 takes the file shape there instead,
+//! for as long as the channel is one that runs nothing as root at install.
+//! What is here is the shape Linux and macOS share, and the trait
+//! implementation every test uses.
 //!
 //! ## What a layer looks like
 //!
@@ -76,19 +79,28 @@ impl Files {
 
     /// The layers this platform keeps in files, at the places concept 10 names.
     ///
-    /// Linux only, and deliberately: a root-owned `/etc/slipcase` taking
-    /// precedence over the user's own configuration. There is no per-user
-    /// *policy* layer here, because Linux has no mechanism that would
-    /// administer one — `Origin::UserPolicy` is Windows and macOS vocabulary,
-    /// and inventing a file for it would be offering an administrator a control
-    /// that nothing enforces.
+    /// Linux and macOS, and the same two places on both: a root-owned
+    /// `/etc/slipcase` taking precedence over the user's own configuration
+    /// under `$XDG_CONFIG_HOME`. macOS has `/etc` and keeps it root-owned the
+    /// same way, and the XDG path for the user's file is the family's
+    /// precedent there — `slipcase-desktop` keeps its state under the XDG
+    /// directories on macOS — which is also what lets `tests/the_process.rs`
+    /// hold both platforms to one answer. Sessions are the exception and
+    /// `session::platform_base` says why.
     ///
-    /// Every other platform gets nothing from this and reads its policy through
-    /// its own mechanism (PLAN.md Phases 4 and 5). The exact filenames are
-    /// confirmed against the package in Phase 3, which is what installs them.
+    /// There is no per-user *policy* layer on either, because neither has a
+    /// mechanism in files that would administer one — `Origin::UserPolicy` is
+    /// Windows vocabulary, and the configuration profile concept 10 names for
+    /// macOS is not built. Inventing a file for it would be offering an
+    /// administrator a control that nothing enforces.
+    ///
+    /// Windows gets nothing from this and reads its policy from the registry.
+    /// The Linux filenames are confirmed against the package that installs
+    /// them; on macOS nothing installs them and `packaging/macos/README.md`
+    /// says what an administrator writes by hand.
     #[must_use]
     pub fn for_this_platform() -> Self {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "macos"))]
         {
             let mut files = Self::none().at(Origin::MachinePolicy, "/etc/slipcase/open.toml");
             if let Some(dir) = config_home() {
@@ -96,7 +108,7 @@ impl Files {
             }
             files
         }
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
         {
             Self::none()
         }
@@ -104,7 +116,7 @@ impl Files {
 }
 
 /// `$XDG_CONFIG_HOME`, or the fallback the specification names.
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "macos"))]
 fn config_home() -> Option<PathBuf> {
     if let Some(x) = std::env::var_os("XDG_CONFIG_HOME").filter(|v| !v.is_empty()) {
         return Some(PathBuf::from(x));
