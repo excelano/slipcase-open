@@ -158,6 +158,24 @@ person actually meets it:
 whether a screenshot is any good, and it does not choose the container: which
 one appears is an editorial decision and belongs here rather than in a script.
 
+**All three need a person at the desktop, including the one that is automated.**
+The refusal can be opened and captured without anybody watching, but the Store's
+floor is 1366x768 and the box is about 370x210 — so what gets photographed is
+the box *in its desktop*, and everything else on that desktop goes in the
+listing with it. Measured on 2026-09-06 by running it: the capture came out
+correct in every technical respect and showed a terminal full of this project's
+own source behind the dialog. Tidy the desktop first; nothing in the script can
+do that for you.
+
+**Two further things the script had to learn, both in
+`packaging/windows/README.md`.** It launches through `wscript` rather than
+calling the shell verb itself, because a process started from a console *is* a
+command line to this product — concept §9's floor, where there is no tray icon
+and no dialog to wait for — so capturing from a console photographs an
+invocation nobody makes. And it matches the window by owning process rather than
+by title, after a title match found a terminal that merely had the word
+*Slipcase* in it.
+
 **Taken against the packaged build**, which is what a person installs. Note that
 they cannot be of the exact artefact uploaded, for the reason `RELEASE.md` gives
 about rebuilds differing.

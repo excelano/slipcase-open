@@ -164,18 +164,57 @@ if ($Refusal) {
     if (-not $Container) { Refuse '-Refusal needs -Container, pointing at one whose payload is a program' }
     if (-not (Test-Path $Container)) { Refuse "no container at $Container" }
     $Container = (Resolve-Path $Container).Path
-    Step 'opening it through the shell, which is what a person does'
+    Step 'opening it through the shell, from a launcher with no console'
+    # **Through `wscript` and not from here, and that is not fussiness.**
+    # `attach_console` joins the console of whatever started this product, and
+    # a process started from a console is a command line -- which is the floor
+    # concept 9 puts beneath the tray, where there is no icon and no dialog to
+    # wait for. So calling the verb straight out of this script photographs an
+    # invocation nobody makes: measured 2026-09-06, the box did not appear at
+    # all, and the same container opened through the launcher below showed the
+    # box and the icon every time.
+    #
+    # `wscript.exe` is a GUI-subsystem host with no console, which is what
+    # Explorer looks like to the process it starts.
+    #
     # The verb rather than a double-click: with the viewer installed as well and
     # no UserChoice set, a double-click raises the picker, which cannot be
-    # scripted. `packaging/windows/README.md` has the measurement.
+    # scripted. `packaging/windows/README.md` has both measurements.
     $shell = New-Object -ComObject Shell.Application
     $item = $shell.Namespace((Split-Path -Parent $Container)).ParseName((Split-Path -Leaf $Container))
     $verb = $item.Verbs() | Where-Object { ($_.Name -replace '&', '') -eq 'Open payload' } | Select-Object -First 1
     if (-not $verb) { Refuse "no 'Open payload' verb on that container - is the package installed?" }
-    $verb.DoIt()
-    # The refusal belongs to the product, so that is what is asked for.
-    $bmp = Shoot-Window '' 'slipcase-open'
-    Save-Bitmap $bmp $Out
+    if (-not (Get-Command wscript.exe -ErrorAction SilentlyContinue)) {
+        Refuse 'no wscript.exe, and calling the verb from this console would photograph the wrong invocation'
+    }
+    $launcher = Join-Path ([System.IO.Path]::GetTempPath()) 'slipcase-open-verb.vbs'
+    @'
+Set shell = CreateObject("Shell.Application")
+path = WScript.Arguments(0)
+Set folder = shell.Namespace(Left(path, InStrRev(path, "\") - 1))
+Set item = folder.ParseName(Mid(path, InStrRev(path, "\") + 1))
+For Each v In item.Verbs()
+    If Replace(v.Name, "&", "") = "Open payload" Then
+        v.DoIt()
+        Exit For
+    End If
+Next
+'@ | Set-Content -LiteralPath $launcher -Encoding ascii
+    Start-Process wscript.exe -ArgumentList "`"$launcher`"", "`"$Container`""
+    # **The window is waited for and the desktop is what gets photographed.**
+    # The box is about 370x210, and the Store's floor is 1366x768, so a capture
+    # of its frame alone is rejected at upload -- measured 2026-09-06, when this
+    # wrote an 8KB image the form would not take. Waiting for the window first
+    # is still what proves the refusal happened rather than the desktop being
+    # photographed hopefully; `Shoot-Window`'s bitmap is discarded and only its
+    # having found something is kept.
+    #
+    # What is behind the box is editorial and belongs to whoever runs this:
+    # tidy the desktop first, because everything on it goes in the listing.
+    $found = Shoot-Window '' 'slipcase-open'
+    $found.Dispose()
+    Start-Sleep -Milliseconds 400
+    Save-Bitmap (Capture-Screen $Width $Height) $Out
     Get-Process slipcase-open -ErrorAction SilentlyContinue |
         ForEach-Object { Stop-Process -Id $_.Id -Force -ErrorAction SilentlyContinue }
     exit 0
