@@ -15,9 +15,10 @@
 //! test of it is a test of a process or it is a test of nothing.
 //!
 //! **Nothing here touches the machine it runs on.** The state directory, the
-//! front door and the configuration are all pointed at a temporary tree, and
-//! the session bus is pointed at nothing — so concept 9's channel falls back to
-//! the terminal and the suite does not put notifications on somebody's screen.
+//! front door and the configuration are all pointed at a temporary tree, the
+//! session bus is pointed at nothing — so concept 9's channel falls back to
+//! the terminal and the suite does not put notifications on somebody's screen —
+//! and the launcher is a stub, so a payload it opens goes nowhere.
 
 // The level `Cargo.toml` explains: `forbid` everywhere Windows is not.
 #![cfg_attr(not(windows), forbid(unsafe_code))]
@@ -42,9 +43,11 @@ struct Alone {
 impl Alone {
     fn new() -> Self {
         let dir = tempfile::tempdir().unwrap();
-        for sub in ["state", "run", "config"] {
+        for sub in ["state", "run", "config", "bin"] {
             std::fs::create_dir_all(dir.path().join(sub)).unwrap();
         }
+        #[cfg(unix)]
+        an_inert_launcher(&dir.path().join("bin"));
         Self { dir }
     }
 
@@ -76,6 +79,9 @@ impl Alone {
             // takes over. A test that reached the developer's own notification
             // service would put its fixtures on their screen.
             .env("DBUS_SESSION_BUS_ADDRESS", "unix:path=/nonexistent/no-bus")
+            // And no desktop: the launcher is resolved through `PATH`, and
+            // the inert one in this world's `bin` comes first.
+            .env("PATH", with_this_world_first(&self.path().join("bin")))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
@@ -109,6 +115,39 @@ impl Alone {
         self.a_crashed_session(container, name, edit);
         self.container(name, b"what somebody else put there in the meantime");
     }
+}
+
+/// An `xdg-open` (or `open`) that opens nothing.
+///
+/// The crash-recovery test below gets as far as launching, and the program
+/// under test launches through the platform's launcher. Until this existed,
+/// every run of the suite handed `report.txt` to whatever opens text on the
+/// developer's desktop, and `check.sh` runs the suite five times. The stub goes
+/// first on `PATH`, which is how the launcher is resolved, so the product is
+/// unchanged and the payload goes nowhere. Measured on 2026-09-07 by having the
+/// stub write its argument down: it was handed the session's payload path.
+///
+/// Unix only. On Windows the launcher is `ShellExecuteEx`, which resolves the
+/// handler through the registry and not `PATH`, so the suite there still opens
+/// the payload in whatever is registered for it.
+#[cfg(unix)]
+fn an_inert_launcher(bin: &Path) {
+    use std::os::unix::fs::PermissionsExt;
+    let name = if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
+    };
+    let stub = bin.join(name);
+    std::fs::write(&stub, "#!/bin/sh\nexit 0\n").unwrap();
+    std::fs::set_permissions(&stub, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
+/// `PATH` with `bin` ahead of everything the machine has.
+fn with_this_world_first(bin: &Path) -> std::ffi::OsString {
+    let rest = std::env::var_os("PATH").unwrap_or_default();
+    std::env::join_paths(std::iter::once(bin.to_path_buf()).chain(std::env::split_paths(&rest)))
+        .unwrap()
 }
 
 /// Whether it has finished within `within`.
