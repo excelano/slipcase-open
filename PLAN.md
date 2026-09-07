@@ -161,9 +161,12 @@ The chain that stood in front of the apt push ran in order: `slpc` 0.3.11 to
 crates.io, this crate off the path dependency, `slipcase-common` 1.0.0 for the
 media type, `slipcase-desktop` 0.1.4 onto it, and then this.
 
-The tool is complete and shipped on one platform. Phase 4 is next, and as of
-2026-09-03 it is nearly done: see its section below for what is in, what is left
-to assemble for the Store, and the one defect still open.
+The tool is complete and shipped on two platforms. Phase 4 put 0.1.4 on the
+Microsoft Store on 2026-09-06, and apt caught up the same day: it had been
+serving 0.1.3, without the refusal that 0.1.4's changelog leads with, because
+`RELEASE.md` puts Linux ahead of Windows in the order and that step was skipped.
+The package on apt is built from `main` after the Store branch was merged into
+it, so the two channels carry the same code.
 
 ## Before Phase 4 — what CI found
 
@@ -202,19 +205,22 @@ test harness, so it earned one.
 pair, the named pipe with its SID ACL, toast with actions, the tray, the ProgID
 and its secondary verb, MSIX and the Store, winget.
 
-**Where it stands, 2026-09-03, at 0.1.4.** In: file identity, the named pipe, a
-gate that runs on a Windows machine, the launcher, the toast, the ProgID and its
-secondary verb, MSIX and the Store identity, the tray, and the two behaviour
-changes below. Not in: the registry policy source with its ADMX/ADML pair, and
-winget.
+**Where it stands, 2026-09-06, at 0.1.4: on the Store.** In: file identity, the
+named pipe, a gate that runs on a Windows machine, the launcher, the toast, the
+ProgID and its secondary verb, MSIX and the Store identity, the tray, the
+registry policy source with its ADMX/ADML pair, and the two behaviour changes
+below. Not in: a winget manifest of its own. The listing is reachable through
+winget's `msstore` source meanwhile, which is how `RELEASE.md` reads it back.
 
-**Still to assemble before a submission.** A certification-kit run, screenshots —
-the product has no window, so the candidates are the tray menu, the refusal
-dialog and Explorer's context menu — `store-listing.md`,
-`packaging/windows/README.md`, a demo container served from the site for the
-reviewer, support and privacy URLs, and age ratings. `RELEASE.md` gates
-submission on a readiness review across all three platforms, so Phase 5's pause
-comes first.
+**What the submission needed was assembled and went in.** The certification-kit
+run, with its one accepted finding traced in `RELEASE.md`; the screenshots,
+which are a pair — the payoff and the refusal, one tray icon in two colours —
+rather than the three first planned, and `store-listing.md` says why; `packaging/windows/README.md`; the demo container,
+which is the sibling's and served from the site; the support and privacy URLs;
+and the age ratings. `RELEASE.md` holds the order and the readiness review. Its
+two hand checks — the zone warning seen on screen, and the ADMX rendered in
+`gpedit.msc` — stand as it left them: outstanding until somebody has watched
+them.
 
 **`IAttachmentExecute` is not what reads Mark of the Web, and the line above is
 wrong about it — as is concept §12, which needs the same amendment.** Measured
