@@ -174,30 +174,6 @@ impl Lingering {
     }
 }
 
-// TEMP DIAGNOSTIC (2026-09-07): env-gated probes to locate a Windows CI hang in
-// `a_save_reaches_the_container_without_anybody_closing_the_session`. Fires only
-// when SLPC_DIAG is set, so normal runs are untouched. Revert with the workflow
-// `.github/workflows/win-diag.yml` once the hang is located.
-#[doc(hidden)]
-pub fn diag(msg: &str) {
-    // To a file when `SLPC_DIAG_FILE` names one, which survives libtest's
-    // stdout/stderr capture so the phase is visible on a hang under the real
-    // `cargo test` conditions. To stderr under `SLPC_DIAG` otherwise, for a
-    // local `--nocapture` run.
-    if let Some(path) = std::env::var_os("SLPC_DIAG_FILE") {
-        use std::io::Write as _;
-        if let Ok(mut f) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(path)
-        {
-            let _ = writeln!(f, "[diag] {msg}");
-        }
-    } else if std::env::var_os("SLPC_DIAG").is_some() {
-        eprintln!("[diag] {msg}");
-    }
-}
-
 /// Open a container: concept 5, steps 1 through 7.
 ///
 /// # Errors
@@ -367,25 +343,16 @@ impl Opened {
     /// is not a thing this code is in a position to know.
     fn pump_including(&mut self, first: Option<Change>) -> Result<bool, writeback::Error> {
         let mut payload_changed = first == Some(Change::Payload);
-        diag("pump: before drain");
-        let mut drained = 0u64;
         for change in self.watch.drain() {
-            drained += 1;
             if change == Change::Payload {
                 payload_changed = true;
             }
         }
-        diag(&format!(
-            "pump: drained {drained}, payload_changed={payload_changed}"
-        ));
         if !payload_changed {
             return Ok(false);
         }
         self.saw_payload_change = true;
-        diag("pump: before save_if_changed");
-        let r = self.save_if_changed();
-        diag("pump: save_if_changed returned");
-        r
+        self.save_if_changed()
     }
 
     /// Write the payload back, unless it already matches what the container
@@ -430,12 +397,8 @@ impl Opened {
     ///
     /// As [`pump`](Self::pump).
     pub fn wait_and_pump(&mut self, within: Duration) -> Result<bool, writeback::Error> {
-        diag("wap: before next_change");
         let first = self.watch.next_change(within);
-        diag(&format!("wap: next_change -> {first:?}"));
-        let r = self.pump_including(first);
-        diag("wap: pump_including returned");
-        r
+        self.pump_including(first)
     }
 
     /// Close the session: catch up on the watch, then clean up.
@@ -535,27 +498,17 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
         let launcher = Recording::default();
 
-        super::diag("test: before open");
         let mut o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
-        super::diag("test: open done");
 
         // The way a serious editor saves: a temporary sibling renamed over the
         // target, which is the case a watch on the file would miss.
         let scratch = o.payload_path().with_extension("pdf.tmp");
         fs::write(&scratch, b"edited").unwrap();
         fs::rename(&scratch, o.payload_path()).unwrap();
-        super::diag("test: save written to disk");
 
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
-        let mut iter = 0u64;
         while std::time::Instant::now() < deadline && !o.saw_a_change() {
-            iter += 1;
-            super::diag(&format!(
-                "test: iter {iter} start (saw_a_change={})",
-                o.saw_a_change()
-            ));
             o.wait_and_pump(Duration::from_millis(250)).unwrap();
-            super::diag(&format!("test: iter {iter} end"));
         }
         assert!(o.saw_a_change(), "the save never reached the session");
 
