@@ -146,17 +146,55 @@ extension, and that is concept §2's audience arriving.
 ## Screenshots
 
 **The product has no window**, so there is no equivalent of the sibling's
-photograph of its own application. What there is to show is the three places a
-person actually meets it:
+photograph of its own application. What ships, both 1920x984 and in
+`packaging/windows/listing/`:
 
-1. **Explorer's context menu on a container**, showing *Open payload* — the
-   entry that makes the product reachable when the viewer is the default.
-2. **The tray menu**, naming a container it is holding.
-3. **The refusal**, for a payload that is a program under a document's name.
+| | Shows |
+| --- | --- |
+| `01-payoff.png` | Explorer with three containers, each typed *Slipcase Container*, and the document from one of them open in Notepad beside it. The tray icon is **blue**. |
+| `02-refusal.png` | The same desktop, with the refusal for a payload that is a program under a document's name. The same tray icon, in the same place, now **red**. |
 
-`packaging/windows/screenshot.ps1` takes them. What it will not do is decide
-whether a screenshot is any good, and it does not choose the container: which
-one appears is an editorial decision and belongs here rather than in a script.
+**They are a pair, and the pairing is the argument.** One icon, one position,
+two colours — which is concept §12's claim about the icon being the whole
+interface, demonstrated rather than asserted. Neither image needs a caption to
+make that point, and a person who looks at both learns the product's central
+idea without reading a word of the description.
+
+**The plan was three different shots and it was wrong.** It listed the context
+menu first, then the tray menu, then the refusal. The first screenshot is what
+appears in Store search results, so it has to carry the value — *your document
+opens in the application you already use* — and a context menu does not say
+that. The context menu and the tray menu are still worth taking; they are not
+taken, because each needs a person to hold a menu open while a timer fires, and
+neither is required to submit.
+
+`packaging/windows/screenshot.ps1` takes the refusal on its own. What it will
+not do is decide whether a screenshot is any good, and it does not choose the
+container: which one appears is an editorial decision and belongs here rather
+than in a script.
+
+### The desktop these were taken on
+
+Recorded because the next release should not have to rediscover it. Everything
+below is a property of the machine, not of the product, and every one of them
+was wrong on at least one attempt on 2026-09-06:
+
+- **Light theme.** The refusal is a Win32 message box, which stays light whatever
+  the theme is — so a dark shell puts a light dialog on a dark desktop and reads
+  as a glitch.
+- **A plain background.** The first attempts photographed a wallpaper carrying
+  this project's own source code.
+- **No desktop icons**, and **no clock**: a visible date stamps the listing with
+  the day it was made and ages badly.
+- **Only this application's icon in the notification area**, which puts it beside
+  the clock instead of lost in a row of six.
+- **Nothing else running.** Attempts photographed the terminal driving the shoot
+  and a browser tab open on Partner Center.
+- **A tidy navigation pane in Explorer**, which otherwise names other products'
+  folders down the side of the listing.
+
+The document is invented — no real person, organisation, matter or date — for
+the same reason the sibling's demo container is.
 
 **All three need a person at the desktop, including the one that is automated.**
 The refusal can be opened and captured without anybody watching, but the Store's
