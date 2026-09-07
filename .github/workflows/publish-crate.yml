@@ -1,0 +1,36 @@
+name: Publish to crates.io
+
+# Fires on the version tag the hand-cut release loop pushes (RELEASE.md), and
+# can be run by hand. `cargo publish` compiles and uploads from source, so it
+# is independent of the .deb and the store packages and runs beside them; the
+# tag is pushed before the GitHub release exists, so the crate lands first.
+#
+# The step is token-gated: it skips cleanly, with no failed run, unless a
+# CRATES_IO_TOKEN secret is available (repo- or org-level). Once it is, every
+# tagged release keeps the crate on crates.io in lockstep with the GitHub
+# release. Versions there are immutable: a bad one is yanked, never
+# re-published, and the fix is the next number.
+on:
+  push:
+    tags:
+      - '**[0-9]+.[0-9]+.[0-9]+*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check for a crates.io token
+        id: token
+        env:
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: echo "present=${CRATES_IO_TOKEN:+true}" >> "$GITHUB_OUTPUT"
+      - name: Publish
+        if: steps.token.outputs.present == 'true'
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+        run: cargo publish

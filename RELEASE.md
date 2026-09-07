@@ -88,6 +88,13 @@ administrator's, and the trigger behaviour of the directories it writes into.
 somebody installing the package. Preflight checks it names the version; nothing
 can check that it is *true*, which is the same problem the store listing has.
 
+The tag push also runs `publish-crate.yml`, which publishes the crate to crates.io
+with the organisation's token before the GitHub release exists; the fleet's
+`~/notes/releasing.md` step 5 is the procedure and the rule that a version
+there is never re-published. Confirm it ran:
+
+    gh run list --workflow=publish-crate.yml --limit 1
+
 ---
 
 ## Windows

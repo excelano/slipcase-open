@@ -72,7 +72,9 @@ exercised as a published crate by a consumer outside its workspace, which
 nothing in that workspace can do on its own, because the CLI reaches it by path.
 
 `testsupport` stays a git dependency. It is `publish = false` and carries no
-version, and this crate is not published either, so nothing about it changed.
+version. This crate went to crates.io on 2026-09-07 regardless, and `Cargo.toml`
+records what that costs the packaged tests and why the apt package remains the
+install.
 
 ## Phase 1 — the engine, headless
 
