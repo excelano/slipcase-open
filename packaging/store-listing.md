@@ -181,6 +181,15 @@ does nothing visible but put up an icon, and the notes field takes no attachment
 which is why the sample container is served from the website. Its URL goes in
 *Notes for certification* with an instruction to download it and double-click it.
 
+**It is the sibling's container, and deliberately not a second one.** It is built
+by `slipcase-desktop/packaging/demo-container.sh`, whose stated reason for
+existing is that three demonstrations of the same format that do not look alike
+is not a thing to discover after two listings are live. This repository has no
+script of its own for it: a second script writing a second file to one URL is
+exactly the failure that one was written to prevent. Its payload is a PDF, which
+exercises the path this product is for — extract, hand to the registered reader,
+write back on save. `RELEASE.md` carries this.
+
 **`runFullTrust` is the only capability**, and the justification field has a
 500-character limit which counts newlines and truncates silently at the paste:
 
