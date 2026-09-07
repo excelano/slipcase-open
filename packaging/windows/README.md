@@ -42,12 +42,16 @@ The certification kit is a third step and an elevated one:
     powershell -File packaging\windows\build-msix.ps1 -SelfSign -Certify
 
 It refuses on anything the kit reports that is not already in `$KNOWN_FINDINGS`
-in that script — which starts **empty**, because the kit has never been run
-against this package. The sibling's one entry, `Blocked executables`, is likely
-to appear here for the same reason it appears there, but likely is not measured
-and a baseline written in advance is a list of assumptions. The first run prints
-what it found; each finding earns its place after somebody traces it, and
-`RELEASE.md` carries the decision to submit with it outstanding.
+in that script. It started **empty** on purpose — a baseline written before the
+first run is a list of assumptions — and the first run, 2026-09-06, duly
+refused with two findings:
+
+| Finding | Verdict | What happened |
+| --- | --- | --- |
+| `Blocked executables` | FAIL | `ShellExecuteExW`, which is what this product does. Baselined; `RELEASE.md` carries the tracing and the decision. |
+| `DPIAwarenessValidation` | WARNING | No PE application manifest to read. **Fixed rather than baselined** — `build.rs` embeds one now. |
+
+Each finding earns its place in that list only after somebody traces it.
 
 The gate is deliberately a comparison against that list and not a count of
 things that are not PASS: the sibling has a finding that fails every run, so

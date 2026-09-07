@@ -128,16 +128,23 @@ here.
 finding that fails on every run it will ever do, so the obvious gate would be
 red always — and a check whose red is the normal state announces nothing.
 
-**`$KNOWN_FINDINGS` is empty, because the kit has never been run against this
-package.** The sibling's `Blocked executables` is likely to appear here for the
-same reason it appears there — this product calls `ShellExecuteEx` where that
-one calls `ShellExecuteW`, and both carry the Rust standard library's `cmd.exe`
-strings — but likely is not measured. The first run prints what it found and
-refuses. **Each finding earns its place in that list only after somebody traces
+**Each finding earns its place in `$KNOWN_FINDINGS` only after somebody traces
 it, and the decision to submit with it outstanding is recorded here**, below,
-with the tracing.
+with the tracing. The list started empty on purpose — a baseline written before
+the first run is a list of assumptions — and the first run refused, which is
+what a first run should do.
 
-Findings accepted so far: **none, because the kit has not been run.**
+**Findings accepted so far: one.** Run 2026-09-06, `dist\wack-0.1.4.xml`.
+
+| Finding | Verdict | Why it is accepted |
+| --- | --- | --- |
+| `Blocked executables` | FAIL | `slipcase-open.exe` references `shell32.dll!ShellExecuteExW`. That call *is* concept §5 step 7 — hand the payload to the registered application, deliberately without `SEE_MASK_NOZONECHECKS`, which is what makes the zone check happen at all. Removing the reference removes the product. Read from our own report: `APP_TYPE="Centennial"`, and the kit marks this task optional for Centennial packages, which is why the overall verdict is WARNING over a test reading FAIL. `slipcase-desktop` shipped with the same finding. |
+
+`DPIAwarenessValidation` was reported WARNING on the same run and was **fixed
+rather than accepted**: there was no PE application manifest for the kit to
+read, and unlike the sibling — where `winit` sets awareness at run time anyway —
+this process genuinely was unaware, so the dialog and the tray icon were being
+bitmap-stretched on any high-DPI display. `build.rs` embeds one now.
 
 `-ReadReport <path>` applies the gate to a report that already exists and does
 nothing else. That is what makes the gate checkable without an elevated session:

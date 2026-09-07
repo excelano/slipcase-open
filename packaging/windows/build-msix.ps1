@@ -100,21 +100,35 @@ function Step([string] $what) { Write-Host "build-msix: $what" -ForegroundColor 
 # What the Windows App Certification Kit says about this package every time, so
 # that `-Certify` can be quiet about those and loud about anything else.
 #
-# **Empty, because the kit has never been run against this package.** The
-# sibling carries `Blocked executables = FAIL`, traced there to the Rust standard
-# library's `cmd.exe` strings and to `ShellExecuteW`, and this product calls
-# `ShellExecuteEx` for the same reason the sibling calls `ShellExecuteW` -- so
-# the same finding is *likely* here. Likely is not measured, and a baseline
-# written before the first run is a list of things somebody assumed. The first
-# run will refuse and print what it found, one line per finding; each goes in
-# here only once somebody has traced it, and `RELEASE.md` carries the decision
-# to submit with it outstanding.
+# **This is a record of what is known, not a claim that it is acceptable.**
+# Recording a finding here does not take the decision to ship with it;
+# `RELEASE.md` carries that, with the tracing behind it.
 #
-# **Recording a finding here does not take that decision.** It records that the
-# finding is known.
+# It started empty on purpose -- a baseline written before the first run is a
+# list of things somebody assumed -- and the first run, 2026-09-06, refused with
+# two findings. One is below. The other was fixed instead.
 #
 # Shrink this list when a finding goes away; the run says so when one does.
-$KNOWN_FINDINGS = @{}
+#
+#   Blocked executables   `ShellExecuteExW`, which is concept 5 step 7 and the
+#                         thing this product is for: hand the payload to the
+#                         desktop, deliberately without the two flags that would
+#                         switch off the Mark-of-the-Web check. Removing the
+#                         reference would remove the application. Read out of
+#                         our own report on 2026-09-06 rather than borrowed:
+#                         `APP_TYPE="Centennial"`, and the kit marks this task
+#                         optional for Centennial packages -- which is why
+#                         `OVERALL_RESULT` reads WARNING over a test reading
+#                         FAIL. `RELEASE.md` carries the decision to submit with
+#                         it outstanding.
+#
+# `DPIAwarenessValidation` was the second finding on that run and is gone: the
+# kit read the PE application manifest, found none, and said so. `build.rs`
+# embeds one now. Removed here on the run that reported it gone, which is what
+# the line above asks for.
+$KNOWN_FINDINGS = @{
+    'Blocked executables' = 'FAIL'
+}
 
 # Read a certification report and apply the gate. A function, so that it can be
 # run against a report on its own -- `-ReadReport` -- which is the only way to
