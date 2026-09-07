@@ -76,7 +76,14 @@
   </Dependencies>
 
   <Resources>
-    <Resource Language="en-gb" />
+    <!-- The package's language. `en-us` because the application is written
+         in US English; it said `en-gb` until 2026-09-06, inherited from
+         slipcase-desktop's manifest and argued for nowhere. It shows in
+         Partner Center's Packages panel. Unlike the other lanes there is no
+         makepri step in `build-msix.ps1`, so this element is the whole
+         declaration. The Store *listing* language is a separate choice, made
+         on the Store listings page; this line does not control it. -->
+    <Resource Language="en-us" />
   </Resources>
 
   <Applications>

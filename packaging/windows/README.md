@@ -36,6 +36,28 @@ that a package contains a change is traced to the source, not to another copy of
 the artefact**; the cheap decisive test is to grep the staged binary for a string
 only the new code has.
 
+The certification kit is a third step and an elevated one:
+
+    # from an ADMINISTRATOR prompt, after the certificate is trusted
+    powershell -File packaging\windows\build-msix.ps1 -SelfSign -Certify
+
+It refuses on anything the kit reports that is not already in `$KNOWN_FINDINGS`
+in that script — which starts **empty**, because the kit has never been run
+against this package. The sibling's one entry, `Blocked executables`, is likely
+to appear here for the same reason it appears there, but likely is not measured
+and a baseline written in advance is a list of assumptions. The first run prints
+what it found; each finding earns its place after somebody traces it, and
+`RELEASE.md` carries the decision to submit with it outstanding.
+
+The gate is deliberately a comparison against that list and not a count of
+things that are not PASS: the sibling has a finding that fails every run, so
+that gate would be red always, and a check whose red is the normal state
+announces nothing. `-ReadReport <path>` applies the gate to an existing report
+and does nothing else, which is how it was checked without an elevated run —
+against synthetic reports covering all-pass, an unexpected finding, a known one,
+a known one whose verdict changed, one that has gone away, a report with no
+overall verdict, and a report that is not there.
+
 Installing the signed copy needs one administrator action, which the script
 prints and does not attempt: the throwaway certificate has to reach
 `LocalMachine\TrustedPeople`. The per-user store is not consulted for this and

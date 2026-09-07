@@ -20,6 +20,26 @@
     and the CodeView PDB GUID. The artefact uploaded has to be the one that was
     tested, not a fresh build of the same commit.
 
+    THE CERTIFICATION KIT, AND WHY ITS GATE IS A LIST RATHER THAN A COUNT
+
+    `-Certify` runs the Windows App Certification Kit over the signed copy and
+    refuses on anything the kit says that is not already in `$KNOWN_FINDINGS`.
+    It needs `-SelfSign`, because the kit installs what it tests, and it needs
+    an elevated session, which it checks for rather than discovering halfway
+    through.
+
+    Refusing on *anything not PASS* would be the obvious gate and the wrong one:
+    the sibling has a finding that fails on every run it will ever do, so that
+    gate would be red always, and a check whose red is the normal state
+    announces nothing. This one is quiet when the kit says what it said last
+    time and loud when it says anything else — including when a known test
+    changes its verdict, or stops being reported at all.
+
+    `-ReadReport <path>` applies the same gate to a report that already exists
+    and does nothing else. That is what makes the gate testable: it builds
+    nothing, needs no elevation, and lets somebody break `$KNOWN_FINDINGS` on
+    purpose and watch this refuse.
+
     ONE ADMINISTRATOR ACTION, WHICH THIS SCRIPT DOES NOT ATTEMPT
 
     `makeappx`, `New-SelfSignedCertificate`, `signtool` and `Add-AppxPackage` all
@@ -52,7 +72,17 @@ param(
     [switch] $SelfSign,
     [ValidateSet('release', 'debug')]
     [string] $Configuration = 'release',
-    [switch] $NoBuild
+    [switch] $NoBuild,
+    # Run the Windows App Certification Kit over the package and fail on it.
+    # Needs elevation, and needs the package to be installable, so it needs
+    # -SelfSign as well.
+    [switch] $Certify,
+    # Apply the -Certify gate to a report that already exists, and do nothing
+    # else. Needs no elevation and builds nothing, which is what makes the gate
+    # checkable at all: breaking KNOWN_FINDINGS on purpose and watching this
+    # refuse is the only way to know it still bites, and a kit run costs an
+    # elevated session and several minutes.
+    [string] $ReadReport
 )
 
 Set-StrictMode -Version Latest
@@ -66,6 +96,102 @@ function Refuse([string] $why) {
     exit 1
 }
 function Step([string] $what) { Write-Host "build-msix: $what" -ForegroundColor Cyan }
+
+# What the Windows App Certification Kit says about this package every time, so
+# that `-Certify` can be quiet about those and loud about anything else.
+#
+# **Empty, because the kit has never been run against this package.** The
+# sibling carries `Blocked executables = FAIL`, traced there to the Rust standard
+# library's `cmd.exe` strings and to `ShellExecuteW`, and this product calls
+# `ShellExecuteEx` for the same reason the sibling calls `ShellExecuteW` -- so
+# the same finding is *likely* here. Likely is not measured, and a baseline
+# written before the first run is a list of things somebody assumed. The first
+# run will refuse and print what it found, one line per finding; each goes in
+# here only once somebody has traced it, and `RELEASE.md` carries the decision
+# to submit with it outstanding.
+#
+# **Recording a finding here does not take that decision.** It records that the
+# finding is known.
+#
+# Shrink this list when a finding goes away; the run says so when one does.
+$KNOWN_FINDINGS = @{}
+
+# Read a certification report and apply the gate. A function, so that it can be
+# run against a report on its own -- `-ReadReport` -- which is the only way to
+# check that the gate bites without an elevated session and a fresh kit run.
+function Test-CertificationReport([string] $report) {
+    # The verdict is read out of the report and never out of an exit code. A kit
+    # that ran and failed and a kit that never ran are different things, and a
+    # missing verdict is a refusal too.
+    [xml] $xml = Get-Content -LiteralPath $report
+    $reportNode = $xml.SelectSingleNode('/REPORT')
+    if (-not $reportNode) { Refuse "no REPORT element in $report - read it rather than trusting this script" }
+    $overall = $reportNode.GetAttribute('OVERALL_RESULT')
+    if (-not $overall) {
+        Refuse "the report at $report has no OVERALL_RESULT - read it rather than trusting this script"
+    }
+
+    # Read out of `<TEST><RESULT>` and not out of the overall attribute. Only the
+    # report element carries that attribute, and the kit does not escalate a
+    # failing test into it -- a test can read FAIL under an overall of WARNING --
+    # so a gate that looked only at the overall would pass a failing test in
+    # silence. Whatever this refuses on, it says which test and why.
+    $unexpected = @()
+    $seen = @{}
+    foreach ($test in $xml.SelectNodes('//TEST')) {
+        $node = $test.SelectSingleNode('RESULT')
+        if (-not $node) { continue }
+        $verdict = $node.InnerText.Trim()
+        if ($verdict -eq 'PASS') { continue }
+        $name = $test.GetAttribute('NAME')
+        $seen[$name] = $verdict
+        # ContainsKey rather than indexing: `Set-StrictMode -Version Latest` is
+        # on in this script, and a missing key is the ordinary case here.
+        if ($KNOWN_FINDINGS.ContainsKey($name) -and $KNOWN_FINDINGS[$name] -eq $verdict) {
+            Write-Host "$verdict  $name  (known - see RELEASE.md)"
+        } else {
+            $unexpected += "$verdict $name"
+            Write-Host "$verdict  $name  ** NOT IN THE KNOWN LIST **" -ForegroundColor Yellow
+        }
+        foreach ($message in $test.SelectNodes('.//MESSAGE')) {
+            $text = $message.GetAttribute('TEXT')
+            if ($text) { Write-Host "        $text" }
+        }
+    }
+
+    # A known finding that stopped being reported is good news rather than a
+    # refusal, and it is said out loud: a baseline nobody ever shrinks becomes a
+    # list of things that used to be true.
+    foreach ($name in $KNOWN_FINDINGS.Keys) {
+        if (-not $seen.ContainsKey($name)) {
+            Write-Host "gone   $name is no longer reported - take it out of KNOWN_FINDINGS"
+        }
+    }
+    Write-Host "certification kit: $overall  ($report)"
+
+    # **The gate is the comparison against the list, not the count of things
+    # that are not PASS.** A check whose red is the normal state announces
+    # nothing -- which is `CLAUDE.md`'s rule about a green-looking gate, in the
+    # other direction. This one is quiet when the kit says what it said last
+    # time and loud when it says anything else.
+    if ($unexpected) {
+        Refuse "the certification kit reported $($unexpected.Count) finding(s) not in the known list: $($unexpected -join '; ') - certification runs this too, so it comes back"
+    }
+    # An overall of FAIL is still a refusal on its own: the kit does not
+    # escalate a failing test into it, so if it ever says FAIL it has decided
+    # something the per-test list does not cover.
+    if ($overall -eq 'FAIL') {
+        Refuse 'the Windows App Certification Kit says FAIL overall'
+    }
+}
+
+# Nothing below this has run yet, which is the point: a report is read on its
+# own, without building, packing or signing anything.
+if ($ReadReport) {
+    if (-not (Test-Path -LiteralPath $ReadReport)) { Refuse "no report at $ReadReport" }
+    Test-CertificationReport (Resolve-Path -LiteralPath $ReadReport).Path
+    exit 0
+}
 
 # --- the identity, which cannot be guessed ---------------------------------
 $identityFile = Join-Path $here 'identity.psd1'
@@ -216,3 +342,47 @@ Write-Host 'Then, as yourself:'
 Write-Host ''
 Write-Host "  Add-AppxPackage -Path '$signed'" -ForegroundColor Yellow
 Write-Host ''
+
+# --- the certification kit --------------------------------------------------
+
+if ($Certify) {
+    if (-not $SelfSign) {
+        Refuse '-Certify needs -SelfSign: the kit installs the package it tests, and an unsigned one will not install'
+    }
+    $elevated = ([Security.Principal.WindowsPrincipal] `
+            [Security.Principal.WindowsIdentity]::GetCurrent()
+        ).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $elevated) {
+        Refuse 'the Windows App Certification Kit needs an elevated session - rerun this from an administrator prompt'
+    }
+    $appcert = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\App Certification Kit\appcert.exe'
+    if (-not (Test-Path -LiteralPath $appcert)) {
+        Refuse "no appcert.exe at $appcert - the App Certification Kit is a separate feature of the Windows SDK installer"
+    }
+
+    $report = Join-Path $dist "wack-$version.xml"
+
+    # **The old report is removed, and the new one is checked for being newer
+    # than this run.** Both, and the sibling learned why: `appcert` refuses to
+    # overwrite a report, printing "Please specify a unique report file name"
+    # and stopping before it runs a single test. The file was still there,
+    # `Test-Path` was satisfied, and the findings printed were the *previous*
+    # package's -- on a run whose whole purpose was to test a different package
+    # under the same version number.
+    #
+    # A kit that ran and failed and a kit that never ran must not come out the
+    # same, and *stale* is a third state neither of those words covers.
+    if (Test-Path -LiteralPath $report) { Remove-Item -LiteralPath $report -Force }
+    $startedAt = Get-Date
+    Step 'running the certification kit, which takes several minutes'
+    & $appcert reset | Out-Null
+    & $appcert test -appxpackagepath $signed -reportoutputpath $report
+    if (-not (Test-Path -LiteralPath $report)) {
+        Refuse "the certification kit wrote no report to $report"
+    }
+    if ((Get-Item -LiteralPath $report).LastWriteTime -lt $startedAt) {
+        Refuse "the report at $report is older than this run - the kit did not write it, so nothing below would be about this package"
+    }
+
+    Test-CertificationReport $report
+}
