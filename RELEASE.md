@@ -144,7 +144,10 @@ what a first run should do.
 rather than accepted**: there was no PE application manifest for the kit to
 read, and unlike the sibling — where `winit` sets awareness at run time anyway —
 this process genuinely was unaware, so the dialog and the tray icon were being
-bitmap-stretched on any high-DPI display. `build.rs` embeds one now.
+bitmap-stretched on any high-DPI display. `build.rs` embeds one now, and the
+re-run the same day did not report it at all — which took `OVERALL_RESULT` from
+WARNING to **PASS**, with `Blocked executables` the only thing still reported and
+now quiet because it is baselined.
 
 `-ReadReport <path>` applies the gate to a report that already exists and does
 nothing else. That is what makes the gate checkable without an elevated session:

@@ -106,7 +106,8 @@ function Step([string] $what) { Write-Host "build-msix: $what" -ForegroundColor 
 #
 # It started empty on purpose -- a baseline written before the first run is a
 # list of things somebody assumed -- and the first run, 2026-09-06, refused with
-# two findings. One is below. The other was fixed instead.
+# two findings. One is below. The other was fixed instead, and the re-run came
+# back PASS with only the entry below reported.
 #
 # Shrink this list when a finding goes away; the run says so when one does.
 #
@@ -122,10 +123,10 @@ function Step([string] $what) { Write-Host "build-msix: $what" -ForegroundColor 
 #                         FAIL. `RELEASE.md` carries the decision to submit with
 #                         it outstanding.
 #
-# `DPIAwarenessValidation` was the second finding on that run and is gone: the
-# kit read the PE application manifest, found none, and said so. `build.rs`
-# embeds one now. Removed here on the run that reported it gone, which is what
-# the line above asks for.
+# `DPIAwarenessValidation` was the second finding on that run. It never entered
+# this list: it was fixed instead -- there was no PE application manifest for the
+# kit to read, and `build.rs` embeds one now. The re-run on the same day reported
+# it not at all and took the overall verdict from WARNING to PASS.
 $KNOWN_FINDINGS = @{
     'Blocked executables' = 'FAIL'
 }
