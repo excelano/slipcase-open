@@ -31,43 +31,43 @@ jobs:
       - name: Build the tests
         run: cargo test --no-run
 
+      # The real step's exact command — `cargo test --quiet`, capture on,
+      # multi-threaded — because the hang did not reproduce under `--nocapture`,
+      # which changes libtest's threading. Probes go to a per-attempt file so
+      # they survive capture and are readable after a kill.
       - name: Reproduce and probe
         env:
-          SLPC_DIAG: "1"
           RUST_BACKTRACE: "1"
         run: |
           $hung = $false
-          foreach ($i in 1..20) {
+          foreach ($i in 1..30) {
             Write-Host "=== attempt $i ==="
-            $err = Join-Path $env:RUNNER_TEMP "diag-$i.err"
+            $probe = Join-Path $env:RUNNER_TEMP "probe-$i.txt"
+            $env:SLPC_DIAG_FILE = $probe
             $out = Join-Path $env:RUNNER_TEMP "diag-$i.out"
             $p = Start-Process -FilePath cargo `
-              -ArgumentList @('test','--','--nocapture') `
-              -RedirectStandardError $err -RedirectStandardOutput $out `
+              -ArgumentList @('test','--quiet') `
+              -RedirectStandardError "$out.err" -RedirectStandardOutput $out `
               -NoNewWindow -PassThru
             if (-not $p.WaitForExit(90000)) {
               Write-Host "attempt $i TIMED OUT after 90s — the hang reproduced"
               $hung = $true
-              Write-Host "=== last 50 [diag] probes from the wedged run ==="
-              (Get-Content $err -ErrorAction SilentlyContinue |
-                 Select-String '\[diag\]') | Select-Object -Last 50 |
-                 ForEach-Object { $_.Line }
-              Write-Host "=== tail of cargo's own stdout (progress) ==="
-              Get-Content $out -Tail 15 -ErrorAction SilentlyContinue
+              Write-Host "=== last 40 probes from the wedged run ==="
+              Get-Content $probe -Tail 40 -ErrorAction SilentlyContinue
               try { $p.Kill($true) } catch { $p.Kill() }
               break
             } else {
               Write-Host "attempt $i finished, exit=$($p.ExitCode)"
               if ($p.ExitCode -ne 0) {
-                Write-Host "=== it failed rather than hung; last [diag] probes ==="
-                (Get-Content $err -ErrorAction SilentlyContinue |
-                   Select-String '\[diag\]') | Select-Object -Last 50 |
-                   ForEach-Object { $_.Line }
+                Write-Host "=== it failed rather than hung; cargo stderr tail ==="
+                Get-Content "$out.err" -Tail 20 -ErrorAction SilentlyContinue
+                Write-Host "=== last 40 probes ==="
+                Get-Content $probe -Tail 40 -ErrorAction SilentlyContinue
                 $hung = $true
                 break
               }
             }
           }
           if (-not $hung) {
-            Write-Host "did not reproduce in 20 attempts"
+            Write-Host "did not reproduce in 30 attempts"
           }

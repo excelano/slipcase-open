@@ -180,7 +180,20 @@ impl Lingering {
 // `.github/workflows/win-diag.yml` once the hang is located.
 #[doc(hidden)]
 pub fn diag(msg: &str) {
-    if std::env::var_os("SLPC_DIAG").is_some() {
+    // To a file when `SLPC_DIAG_FILE` names one, which survives libtest's
+    // stdout/stderr capture so the phase is visible on a hang under the real
+    // `cargo test` conditions. To stderr under `SLPC_DIAG` otherwise, for a
+    // local `--nocapture` run.
+    if let Some(path) = std::env::var_os("SLPC_DIAG_FILE") {
+        use std::io::Write as _;
+        if let Ok(mut f) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+        {
+            let _ = writeln!(f, "[diag] {msg}");
+        }
+    } else if std::env::var_os("SLPC_DIAG").is_some() {
         eprintln!("[diag] {msg}");
     }
 }
