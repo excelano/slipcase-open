@@ -1,0 +1,73 @@
+# TEMPORARY. Locate the Windows hang in
+# `flow::tests::a_save_reaches_the_container_without_anybody_closing_the_session`.
+# The env-gated probes in `src/flow.rs` print the phase the test is in; this runs
+# the whole suite under load, as the real step does, until one attempt wedges,
+# then kills it and prints that attempt's last probes. Delete this file and the
+# probes once the phase is known.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+
+name: Windows diag
+
+on:
+  push:
+    branches: [macos]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  win-diag:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: What is installed
+        run: rustc -V; cargo -V
+
+      # Build once, so the per-attempt timeout below measures test time and not
+      # a cold compile.
+      - name: Build the tests
+        run: cargo test --no-run
+
+      - name: Reproduce and probe
+        env:
+          SLPC_DIAG: "1"
+          RUST_BACKTRACE: "1"
+        run: |
+          $hung = $false
+          foreach ($i in 1..20) {
+            Write-Host "=== attempt $i ==="
+            $err = Join-Path $env:RUNNER_TEMP "diag-$i.err"
+            $out = Join-Path $env:RUNNER_TEMP "diag-$i.out"
+            $p = Start-Process -FilePath cargo `
+              -ArgumentList @('test','--','--nocapture') `
+              -RedirectStandardError $err -RedirectStandardOutput $out `
+              -NoNewWindow -PassThru
+            if (-not $p.WaitForExit(90000)) {
+              Write-Host "attempt $i TIMED OUT after 90s — the hang reproduced"
+              $hung = $true
+              Write-Host "=== last 50 [diag] probes from the wedged run ==="
+              (Get-Content $err -ErrorAction SilentlyContinue |
+                 Select-String '\[diag\]') | Select-Object -Last 50 |
+                 ForEach-Object { $_.Line }
+              Write-Host "=== tail of cargo's own stdout (progress) ==="
+              Get-Content $out -Tail 15 -ErrorAction SilentlyContinue
+              try { $p.Kill($true) } catch { $p.Kill() }
+              break
+            } else {
+              Write-Host "attempt $i finished, exit=$($p.ExitCode)"
+              if ($p.ExitCode -ne 0) {
+                Write-Host "=== it failed rather than hung; last [diag] probes ==="
+                (Get-Content $err -ErrorAction SilentlyContinue |
+                   Select-String '\[diag\]') | Select-Object -Last 50 |
+                   ForEach-Object { $_.Line }
+                $hung = $true
+                break
+              }
+            }
+          }
+          if (-not $hung) {
+            Write-Host "did not reproduce in 20 attempts"
+          }
