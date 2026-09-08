@@ -21,21 +21,29 @@ person has to be able to tell them apart.
 ## The order
 
 1. **Preflight**, which is local and refuses.
-2. **Linux**, which needs no other machine.
-3. **Windows**, including the certification kit.
-4. **macOS**, which needs a Mac and a notary ticket.
-5. **The readiness review**, which is the listing read against the artefact.
-6. **Submit.**
+2. **Debian first.** Linux needs no other machine, and apt is our own
+   repository: publishing is one command, unpublishing is a prune, and
+   nothing sits in anybody's review queue. The release is cut here: the tag,
+   the GitHub release, the crate, and apt.
+3. **Then each platform when its lane is ready**, in whichever order:
+   Windows, including the certification kit, then its readiness review, which
+   is the listing read against the artefact, then the Store submission; macOS,
+   which needs a Mac and a notary ticket, then its review, then the cask.
+   Neither waits on the other, and apt waits on neither.
 
-**Nothing is submitted until step 5.** A Store submission is an event with a
-queue behind it, and the point of the review is that the thing in the queue is
-one somebody looked at.
+**Nothing is submitted to the Store until its review.** A Store submission is
+an event with a queue behind it, and the point of the review is that the
+thing in the queue is one somebody looked at. The cask is our own, publishing
+is a commit and unpublishing a revert, and notarization is a queue of a kind
+but minutes, automated, and about the signature rather than the product; the
+review before it is the same reading, for the same reason.
 
-**apt and the cask are the exceptions, taken deliberately.** Both are our own:
-publishing is one command and unpublishing is a prune or a revert, and nothing
-sits in anybody's review queue meanwhile. Notarization is a queue of a kind,
-but it is minutes and automated, and its verdict is about the signature rather
-than the product.
+**Amended 2026-09-08**, with the fleet: the order used to end with one
+readiness review across every platform before anything was submitted, apt and
+the cask being exceptions taken deliberately. Debian first is the rule now and
+apt is not an exception to anything; slipcase-desktop's `RELEASE.md` records
+why. What changes here is that apt may be ahead of the Store or the cask for a
+while, which is a stated fact.
 
 ---
 
@@ -74,8 +82,8 @@ It refuses and does not repair. It runs `check.sh` rather than reimplementing
 it, and takes the status from it — two gates that could disagree would be worse
 than one, and the one that disagreed quietly would be the new one.
 
-**What it cannot check is the listing**, which is step 4 below and a person's
-job.
+**What it cannot check is the listing**, which is the readiness review below
+and a person's job.
 
 ---
 
