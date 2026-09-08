@@ -430,6 +430,14 @@ impl Opened {
                 quiet_since: Instant::now(),
             })));
         }
+        // **The watch goes before the directory does, and the order is load
+        // bearing.** `Watch::drop` waits for the platform to finish stopping
+        // it, so by the line below there is no watcher left to collide with the
+        // removal. Removing first, which is what this used to do, is what a
+        // 300-second hang was caught doing; `docs/windows-save-test-hang.md`
+        // has the stack.
+        drop(self.watch);
+
         // A failure to remove leaves a session recovery will pick up, which is
         // the same outcome by another road and not worth a second error type.
         let _ = self.session.remove();

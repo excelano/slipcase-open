@@ -119,9 +119,27 @@ impl EventKind {
 ///
 /// Holds the platform watcher, which stops when this is dropped.
 pub struct Watch {
-    _watcher: RecommendedWatcher,
+    /// `Option` so [`Drop`] can drop the watcher and *then* wait for the
+    /// platform to finish stopping it.
+    watcher: Option<RecommendedWatcher>,
     changes: Receiver<Change>,
+    /// Where Windows reports that a watch has finished stopping.
+    ///
+    /// `notify`'s own constructor throws this receiver away, which is why the
+    /// stop is unobservable through the ordinary API and why this builds the
+    /// watcher the long way round. [`Drop`] says what it is for.
+    #[cfg(windows)]
+    stopped: Receiver<notify::windows::MetaEvent>,
 }
+
+/// How long [`Watch::drop`] will wait for a stop to finish.
+///
+/// A stop that has gone wrong should not become a hang of its own, which is
+/// the defect this is here to avoid rather than to relocate. A stop that is
+/// working takes microseconds, so a wait this long is only ever paid by one
+/// that is not.
+#[cfg(windows)]
+const STOP_WAIT: Duration = Duration::from_secs(5);
 
 impl Watch {
     /// Watch `dir` for changes to `payload` and to anything beside it.
@@ -136,31 +154,49 @@ impl Watch {
     pub fn on(dir: &Path, payload: &str) -> notify::Result<Self> {
         let (tx, changes) = mpsc::channel();
         let payload = payload.to_string();
-        let mut watcher =
-            notify::recommended_watcher(move |event: notify::Result<notify::Event>| {
-                let Ok(event) = event else {
-                    // A dropped or errored event is not a reason to tear down the
-                    // watch. Concept 6.2 exists because detection is unreliable,
-                    // and the session close is the backstop for everything this
-                    // misses.
+        let handler = move |event: notify::Result<notify::Event>| {
+            let Ok(event) = event else {
+                // A dropped or errored event is not a reason to tear down the
+                // watch. Concept 6.2 exists because detection is unreliable,
+                // and the session close is the backstop for everything this
+                // misses.
+                return;
+            };
+            let Some(kind) = EventKind::of(event.kind) else {
+                return;
+            };
+            let paths: Vec<&Path> = event.paths.iter().map(AsRef::as_ref).collect();
+            for change in classify(&payload, &paths, kind) {
+                // A closed receiver means the session is gone and there is
+                // nobody to tell.
+                if tx.send(change).is_err() {
                     return;
-                };
-                let Some(kind) = EventKind::of(event.kind) else {
-                    return;
-                };
-                let paths: Vec<&Path> = event.paths.iter().map(AsRef::as_ref).collect();
-                for change in classify(&payload, &paths, kind) {
-                    // A closed receiver means the session is gone and there is
-                    // nobody to tell.
-                    if tx.send(change).is_err() {
-                        return;
-                    }
                 }
-            })?;
+            }
+        };
+
+        // On Windows the watcher is built through `create` rather than
+        // `recommended_watcher`, for the one thing `recommended_watcher` throws
+        // away: the channel the backend reports `SingleWatchComplete` on.
+        // Without it a stop cannot be waited for, and `Drop` has to be able to
+        // wait. Everywhere else the ordinary constructor is right.
+        #[cfg(windows)]
+        let (mut watcher, stopped) = {
+            let (meta_tx, stopped) = mpsc::channel();
+            let handler: std::sync::Arc<std::sync::Mutex<dyn notify::EventHandler>> =
+                std::sync::Arc::new(std::sync::Mutex::new(handler));
+            let watcher = notify::windows::ReadDirectoryChangesWatcher::create(handler, meta_tx)?;
+            (watcher, stopped)
+        };
+        #[cfg(not(windows))]
+        let mut watcher = notify::recommended_watcher(handler)?;
+
         watcher.watch(dir, RecursiveMode::NonRecursive)?;
         Ok(Self {
-            _watcher: watcher,
+            watcher: Some(watcher),
             changes,
+            #[cfg(windows)]
+            stopped,
         })
     }
 
@@ -193,6 +229,50 @@ pub fn siblings_present(dir: &Path, payload: &str) -> std::io::Result<bool> {
         }
     }
     Ok(false)
+}
+
+/// **The stop is waited for, and this is the fix for a measured hang.**
+///
+/// `notify`'s watcher drop is fire-and-forget: it posts `Action::Stop`, wakes
+/// its server thread and returns, leaving that thread inside `stop_watch`.
+/// Whatever removes the watched directory next therefore races a watch that is
+/// still stopping, and on Windows that pair deadlocks — `stop_watch` waits
+/// `INFINITE` for a semaphore its own completion routine does not post when it
+/// re-arms `ReadDirectoryChangesW`, and the re-armed read does not return while
+/// a `remove_dir_all` is walking the same directory.
+///
+/// Measured 2026-09-07 before this existed: a diagnostic that drops a watch and
+/// then removes the directory wedged 9 runs in 20, one instance parked with
+/// zero CPU for over ten minutes; `Opened::close`, which removes first and
+/// drops after, wedged past a 300-second timeout with the same two stacks.
+/// `docs/windows-save-test-hang.md` has both, and the ordering alone was never
+/// the cure: the 9-in-20 case already dropped the watch first.
+///
+/// So the watcher goes, and then this waits for the backend to say the watch
+/// has actually stopped, which is the guarantee the caller needs before
+/// removing anything. [`STOP_WAIT`] bounds the wait so that a stop which never
+/// finishes is a delay rather than a second hang.
+impl Drop for Watch {
+    fn drop(&mut self) {
+        drop(self.watcher.take());
+
+        #[cfg(windows)]
+        {
+            // The same channel carries `WatcherAwakened`, so this reads until
+            // the completion it wants, the sender goes, or the clock runs out.
+            let deadline = std::time::Instant::now() + STOP_WAIT;
+            loop {
+                let left = deadline.saturating_duration_since(std::time::Instant::now());
+                if left.is_zero() {
+                    break;
+                }
+                match self.stopped.recv_timeout(left) {
+                    Ok(notify::windows::MetaEvent::SingleWatchComplete) | Err(_) => break,
+                    Ok(_) => {}
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
