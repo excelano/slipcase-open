@@ -852,4 +852,295 @@ mod tests {
         assert!(matches!(o.close().unwrap(), Closed::Cleared));
         assert!(crate::session::scan(&root).unwrap().is_empty());
     }
+
+    /// How wide and how long the two stress diagnostics below run.
+    ///
+    /// Threads, because the first single-threaded attempt at these was too
+    /// gentle to wedge anything: 40,000 rounds of the exact shape that wedges
+    /// in the suite produced nothing, while the suite itself wedges at roughly
+    /// one run in twenty-seven. The suite runs its tests across threads and
+    /// this did not, which makes concurrent watchers the first difference to
+    /// put back.
+    fn stress_shape() -> (usize, usize) {
+        let total: usize = std::env::var("SLPC_CLOSE_ROUNDS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(500);
+        let threads: usize = std::env::var("SLPC_CLOSE_THREADS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or_else(|| {
+                std::thread::available_parallelism().map_or(8, std::num::NonZero::get)
+            });
+        (total.div_ceil(threads), threads)
+    }
+
+    /// **A diagnostic, not part of the gate**, which is why it is `ignore`d.
+    ///
+    /// `docs/windows-save-test-hang.md` caught a wedge in `TempDir::drop`:
+    /// `remove_dir_all` on a watched directory against the watcher re-arming
+    /// `ReadDirectoryChangesW` on it. `close` does that collision by
+    /// construction rather than by luck — `session.remove()` removes the
+    /// watched directory while `self.watch` is still alive, and the watch is
+    /// dropped only afterwards. This loops the shipping close path so the
+    /// question can be answered by measurement instead of by reading.
+    ///
+    /// Run it explicitly, under an external timeout, and read the stack of
+    /// anything that stops:
+    ///
+    /// ```text
+    /// cargo test --lib -- --ignored --exact flow::tests::close_alone_under_repetition
+    /// ```
+    ///
+    /// A wedge whose stack shows `remove_dir_all` under `session::remove` is
+    /// the product hanging on close. One under `tempfile` is the teardown
+    /// already written up, and says nothing new.
+    #[test]
+    #[ignore = "diagnostic; run explicitly under an external timeout"]
+    fn close_alone_under_repetition() {
+        let (rounds, threads) = stress_shape();
+        std::thread::scope(|s| {
+            for t in 0..threads {
+                s.spawn(move || {
+                    for i in 0..rounds {
+                        let tmp = tempfile::tempdir().unwrap();
+                        let root = tmp.path().join("sessions");
+                        let c = container(tmp.path(), "report.pdf", b"first");
+                        let o = open(
+                            &root,
+                            &c,
+                            &Outside::new(&Default_, &Recording::default(), &Silent),
+                        )
+                        .unwrap();
+
+                        // A save immediately before the close, so the watcher
+                        // has a completed notification in flight when the
+                        // directory goes. That is the state the captured stack
+                        // was in.
+                        fs::write(o.payload_path(), b"edited").unwrap();
+
+                        assert!(matches!(o.close().unwrap(), Closed::Cleared));
+
+                        // Sparse on purpose: instrumentation is what hid this.
+                        if t == 0 && i % 50 == 0 {
+                            eprintln!("round {i}");
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    /// **The positive control for [`close_alone_under_repetition`].** Same
+    /// loop, minus the close: `o` and `tmp` both go at the end of the scope,
+    /// so the watch is stopped while `remove_dir_all` walks the directory it
+    /// was watching. That is the shape of the stack in
+    /// `docs/windows-save-test-hang.md`, and this is the run that says whether
+    /// the harness can catch it at all.
+    ///
+    /// Without this, "no wedge in N closes" is not evidence about `close`; it
+    /// is only evidence that the loop is too gentle to wedge anything — which
+    /// is exactly what the single-threaded version of both turned out to be.
+    #[test]
+    #[ignore = "diagnostic; run explicitly under an external timeout"]
+    fn teardown_alone_under_repetition() {
+        let (rounds, threads) = stress_shape();
+        std::thread::scope(|s| {
+            for t in 0..threads {
+                s.spawn(move || {
+                    for i in 0..rounds {
+                        let tmp = tempfile::tempdir().unwrap();
+                        let root = tmp.path().join("sessions");
+                        let c = container(tmp.path(), "report.pdf", b"first");
+                        let mut o = open(
+                            &root,
+                            &c,
+                            &Outside::new(&Default_, &Recording::default(), &Silent),
+                        )
+                        .unwrap();
+
+                        // Mirrors the test that wedged: a save, then the save
+                        // that finds nothing to do, then the scope ends. No
+                        // close.
+                        fs::write(o.payload_path(), b"edited").unwrap();
+                        assert!(o.save_if_changed().unwrap());
+                        assert!(!o.save_if_changed().unwrap());
+
+                        if t == 0 && i % 50 == 0 {
+                            eprintln!("round {i}");
+                        }
+                        // `o` drops here, then `tmp`: stop_watch against
+                        // remove_dir_all.
+                    }
+                });
+            }
+        });
+    }
+
+    /// **Does the collision cross directories?** The close capture could not
+    /// say: eight workers and several watchers were alive, so the watch that
+    /// collided with the close might have been the closing session's own or a
+    /// neighbour's. This separates them.
+    ///
+    /// One worker runs the shipping close path on its own directory. One
+    /// neighbour churns watches on a directory it **never removes** — so the
+    /// neighbour can never wedge on a teardown of its own, and every
+    /// `stop_watch` in flight belongs to it rather than to the worker, whose
+    /// own watch is not stopping during its `remove` (`close` drops it after).
+    ///
+    /// So a wedge here is a `remove_dir_all` on one directory against a
+    /// `stop_watch` on a *different* one, and the fix has to be wider than
+    /// ordering a session's own teardown. Its control is
+    /// [`close_alone_under_repetition`] run with `SLPC_CLOSE_THREADS=1`, which
+    /// is the same worker with no neighbour at all.
+    #[test]
+    #[ignore = "diagnostic; run explicitly under an external timeout"]
+    fn close_with_a_neighbouring_watch() {
+        let rounds: usize = std::env::var("SLPC_CLOSE_ROUNDS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(400);
+
+        let stop = std::sync::atomic::AtomicBool::new(false);
+        std::thread::scope(|s| {
+            s.spawn(|| {
+                let ntmp = tempfile::tempdir().unwrap();
+                let payload = ntmp.path().join("neighbour.pdf");
+                fs::write(&payload, b"x").unwrap();
+                while !stop.load(std::sync::atomic::Ordering::Relaxed) {
+                    let w = crate::watch::Watch::on(ntmp.path(), "neighbour.pdf").unwrap();
+                    fs::write(&payload, b"y").unwrap();
+                    drop(w);
+                }
+            });
+
+            for i in 0..rounds {
+                let tmp = tempfile::tempdir().unwrap();
+                let root = tmp.path().join("sessions");
+                let c = container(tmp.path(), "report.pdf", b"first");
+                let o = open(
+                    &root,
+                    &c,
+                    &Outside::new(&Default_, &Recording::default(), &Silent),
+                )
+                .unwrap();
+                fs::write(o.payload_path(), b"edited").unwrap();
+                assert!(matches!(o.close().unwrap(), Closed::Cleared));
+                if i % 50 == 0 {
+                    eprintln!("round {i}");
+                }
+            }
+            stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        });
+    }
+
+    /// **A `close` diagnostic that cannot wedge in its own teardown**, so what
+    /// it counts is `close` and not the harness.
+    ///
+    /// [`close_alone_under_repetition`] drops a `TempDir` every round, and
+    /// three of its four captured wedges were in that drop rather than in
+    /// `close` — which is why its numbers say `close` can wedge but not how
+    /// often. Here `TempDir::keep` hands the directory over undeleted, so the
+    /// only `remove_dir_all` this process performs is the one inside
+    /// `Session::remove` under `Opened::close`. A wedge is the product path by
+    /// construction rather than by attribution.
+    ///
+    /// It leaves `slpc-leak-*` directories under the system temp directory on
+    /// purpose. Removing them is the loop's job, between runs, when the
+    /// process is gone and no watch is alive to collide with the removal.
+    #[test]
+    #[ignore = "diagnostic; run explicitly under an external timeout; leaks temp dirs by design"]
+    fn close_alone_leaving_the_directory_behind() {
+        let (rounds, threads) = stress_shape();
+        std::thread::scope(|s| {
+            for t in 0..threads {
+                s.spawn(move || {
+                    for i in 0..rounds {
+                        let dir = tempfile::Builder::new()
+                            .prefix("slpc-leak-")
+                            .tempdir()
+                            .unwrap()
+                            .keep();
+                        let root = dir.join("sessions");
+                        let c = container(&dir, "report.pdf", b"first");
+                        let o = open(
+                            &root,
+                            &c,
+                            &Outside::new(&Default_, &Recording::default(), &Silent),
+                        )
+                        .unwrap();
+                        fs::write(o.payload_path(), b"edited").unwrap();
+
+                        // The only removal in the process.
+                        assert!(matches!(o.close().unwrap(), Closed::Cleared));
+
+                        if t == 0 && i % 50 == 0 {
+                            eprintln!("round {i}");
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+    /// **The product's actual shape**, which none of the diagnostics above
+    /// have. `Resident` serves every request on one thread: the accepting
+    /// thread only forwards streams down a channel, and `handle`, `turn` and
+    /// every `close` run in the single main loop. So the product never closes
+    /// two sessions at once, and the eight concurrent closers the other
+    /// diagnostics use correspond to nothing it does.
+    ///
+    /// What it *does* do is `stand_down`: several sessions open together, each
+    /// holding a live watch, then closed one after another on that one thread.
+    /// The exposure there was never two removals racing — it was one close's
+    /// watch still stopping when the next close's removal began, because the
+    /// stop used to be asynchronous. `Watch::drop` waiting is meant to close
+    /// exactly that window, and this is the test of whether it does.
+    ///
+    /// `SLPC_SESSIONS` is how many are open at once. Directories are leaked
+    /// with `TempDir::keep`, so the only removal in the process is `close`'s.
+    #[test]
+    #[ignore = "diagnostic; run explicitly under an external timeout; leaks temp dirs by design"]
+    fn a_stand_down_shaped_close() {
+        let rounds: usize = std::env::var("SLPC_CLOSE_ROUNDS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(400);
+        let at_once: usize = std::env::var("SLPC_SESSIONS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(8);
+
+        for i in 0..rounds {
+            // Several sessions live at the same time, as an instance holds
+            // them, each with its own watch on its own directory.
+            let mut open_now = Vec::with_capacity(at_once);
+            for _ in 0..at_once {
+                let dir = tempfile::Builder::new()
+                    .prefix("slpc-leak-")
+                    .tempdir()
+                    .unwrap()
+                    .keep();
+                let root = dir.join("sessions");
+                let c = container(&dir, "report.pdf", b"first");
+                let o = open(
+                    &root,
+                    &c,
+                    &Outside::new(&Default_, &Recording::default(), &Silent),
+                )
+                .unwrap();
+                fs::write(o.payload_path(), b"edited").unwrap();
+                open_now.push(o);
+            }
+
+            // `stand_down`: one thread, one after another, no concurrency.
+            for o in open_now {
+                assert!(matches!(o.close().unwrap(), Closed::Cleared));
+            }
+
+            if i % 25 == 0 {
+                eprintln!("round {i}");
+            }
+        }
+    }
 }
