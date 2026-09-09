@@ -70,6 +70,10 @@
 [CmdletBinding()]
 param(
     [switch] $SelfSign,
+    # Where the packages are written. `dist` unless asked otherwise; the store
+    # submission asks for `dist\submit`, which is where fenster's submit.ps1
+    # looks for the package it uploads.
+    [string] $OutDir,
     [ValidateSet('release', 'debug')]
     [string] $Configuration = 'release',
     [switch] $NoBuild,
@@ -226,14 +230,39 @@ if ($identity.Publisher -notmatch '^(CN|O|OU|L|S|C|E)=') {
     Refuse "Publisher is '$($identity.Publisher)', which is not an X.500 string. It is the Package/Identity/Publisher value, not the display name."
 }
 
-# --- the version, in the spelling the Store requires -----------------------
-$cargo = Get-Content -LiteralPath (Join-Path $root 'Cargo.toml') -Raw
-if ($cargo -notmatch '(?m)^version\s*=\s*"([0-9]+\.[0-9]+\.[0-9]+)"') {
-    Refuse 'could not read version from Cargo.toml'
+# --- the version, from the one parser ---------------------------------------
+
+# `packaging/version.sh` is the only thing that reads Cargo.toml's version, and
+# it is asked here rather than copied. This script used to carry its own regex
+# over Cargo.toml, which was a second parser of the same number and disagreed
+# with the fleet about how to spell it.
+#
+# It is POSIX sh, so it needs a shell, and Git for Windows ships one. Not
+# `bash` off PATH: on a machine with WSL that name resolves to
+# C:\Windows\System32\bash.exe, which runs inside a Linux distribution where
+# this checkout is at a different path, so version.sh would read a Cargo.toml
+# that is not this one - or nothing at all.
+$git = Get-Command git -ErrorAction SilentlyContinue
+if (-not $git) { Refuse 'git is not on PATH, and version.sh needs the shell Git for Windows ships' }
+$gitRoot = Split-Path -Parent (Split-Path -Parent $git.Source)
+$sh = Join-Path $gitRoot 'bin\bash.exe'
+if (-not (Test-Path $sh)) { $sh = Join-Path $gitRoot 'usr\bin\sh.exe' }
+if (-not (Test-Path $sh)) {
+    Refuse "no shell found beside $($git.Source) - version.sh is POSIX sh and needs the one Git for Windows installs"
 }
-$version = $Matches[1]
-# Four parts, and the Store requires the fourth to be 0.
-$versionAppx = "$version.0"
+$versionScript = (Join-Path $here '..\version.sh').Replace('\', '/')
+$version = & $sh $versionScript
+if ($LASTEXITCODE -ne 0 -or -not $version) { Refuse 'version.sh would not answer' }
+$version = ($version | Select-Object -First 1).Trim()
+$versionAppx = & $sh $versionScript --appx
+if ($LASTEXITCODE -ne 0 -or -not $versionAppx) { Refuse 'version.sh --appx would not answer' }
+$versionAppx = ($versionAppx | Select-Object -First 1).Trim()
+# The Store requires four parts with the fourth 0, and version.sh says so too.
+# This is the check that shelling out produced what was asked for rather than a
+# message on standard output.
+if ($versionAppx -notmatch '^\d+\.\d+\.\d+\.0$') {
+    Refuse "version.sh --appx said '$versionAppx', which is not four parts ending in 0"
+}
 Step "version $version -> $versionAppx"
 
 # --- the binary ------------------------------------------------------------
@@ -263,7 +292,9 @@ $global:LASTEXITCODE = 0
 if ($LASTEXITCODE -ne 0) { Refuse 'the import check refused this binary' }
 
 # --- stage -----------------------------------------------------------------
-$dist = Join-Path $root 'dist'
+if (-not $OutDir) { $OutDir = Join-Path $root 'dist' }
+$dist = $OutDir
+New-Item -ItemType Directory -Force -Path $dist | Out-Null
 $stage = Join-Path $dist 'stage'
 if (Test-Path -LiteralPath $stage) { Remove-Item -Recurse -Force -LiteralPath $stage }
 New-Item -ItemType Directory -Force -Path $stage | Out-Null
@@ -308,7 +339,11 @@ if (-not $kit) { Refuse 'makeappx.exe not found. Install the Windows SDK.' }
 $makeappx = $kit.FullName
 $signtool = Join-Path (Split-Path -Parent $makeappx) 'signtool.exe'
 
-$unsigned = Join-Path $dist "slipcase-open-$version.msix"
+# `Excelano.SlipcaseOpen` names the package `SlipcaseOpen-<four-part>-x64.msix`,
+# which is what every build-msix.ps1 in the fleet writes and what fenster's
+# submit.ps1 builds from the identity name when it goes looking for the upload.
+$product = ($identity.Name -split '\.')[-1]
+$unsigned = Join-Path $dist "$product-$versionAppx-x64.msix"
 Step "packing $unsigned"
 & $makeappx pack /d $stage /p $unsigned /o | Out-Host
 if ($LASTEXITCODE -ne 0) { Refuse 'makeappx refused the package' }
@@ -318,7 +353,7 @@ Write-Host "  $unsigned"
 if (-not $SelfSign) { exit 0 }
 
 # --- a throwaway signature, for installing here ----------------------------
-$signed = Join-Path $dist "slipcase-open-$version-selfsigned.msix"
+$signed = Join-Path $dist "$product-$versionAppx-x64-selfsigned.msix"
 Copy-Item -LiteralPath $unsigned -Destination $signed -Force
 
 # The subject is built from the manifest's Publisher rather than typed a second
