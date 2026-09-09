@@ -23,6 +23,8 @@
 
 use std::fmt;
 
+use crate::i18n::t;
+
 pub mod terminal;
 
 #[cfg(target_os = "linux")]
@@ -267,6 +269,10 @@ impl Choice {
     /// the label. Stable, because a running notification service may hold a
     /// question across an upgrade of this binary.
     #[must_use]
+    /// **Never translated.** This is what the notification service is handed
+    /// and what it echoes back when a button is pressed, and [`Self::from_key`]
+    /// matches on it: a German key would be a button whose press this build
+    /// cannot recognise. [`Self::label`] beside it is the half a person reads.
     pub fn key(self) -> &'static str {
         match self {
             Self::WriteBack => "write-back",
@@ -279,9 +285,9 @@ impl Choice {
     #[must_use]
     pub fn label(self) -> &'static str {
         match self {
-            Self::WriteBack => "Write it back",
-            Self::Discard => "Discard it",
-            Self::Reveal => "Show me",
+            Self::WriteBack => t("Write it back"),
+            Self::Discard => t("Discard it"),
+            Self::Reveal => t("Show me"),
         }
     }
 

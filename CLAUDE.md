@@ -58,6 +58,29 @@ and watch a test fail. If it does not fail, say what was measured and stop
 there. An unproven claim in a doc comment is worse than no comment, because the
 next reader has no way to tell it apart from a proven one.
 
+## The language it speaks
+
+German since 2026-09-09, through `potext`, with the catalogues in `po/`.
+`po/update-po.sh` is the only way they move; `po/pseudo.sh` writes the
+pseudolocale, and running the tool under `POTEXT_LANG=en-x-pseudo` is what finds
+a sentence that never went through `t` — it found two on the day it was written.
+
+**The catalogue is declared in the engine, not in `main`.** `resident` composes
+every report and every question and hands them to a `Channel` that only carries
+them, so concept 9's boundary holds for language too: a second presenter would
+show these sentences without knowing they had been translated.
+
+**What is translated is what the tool says about your files** — a notification,
+a question, the button on one, a line of `sessions`, the clause `recover::State`
+renders. There is no machine-readable output mode to protect. **What is not is
+what it says about itself**: `--help` is clap's, and the `policy` report prints
+paths and a fixed-width table built to the width of English, is read beside the
+documentation, and is what somebody pastes into a bug report.
+
+**`Choice::key` is never translated and `Choice::label` always is.** The key is
+what the notification service is handed and echoes back, and `from_key` matches
+on it; a German key is a button whose press this build cannot recognise.
+
 ## Where things sit
 
 `PLAN.md` has the phases and what is done. `slpc` comes from crates.io as of

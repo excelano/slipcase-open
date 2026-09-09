@@ -1,0 +1,211 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the slipcase-open package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: slipcase-open\n"
+"Report-Msgid-Bugs-To: https://github.com/excelano/slipcase-open/issues\n"
+"POT-Creation-Date: 2026-09-09 13:36-0500\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/main.rs:369
+msgid "Watching. Interrupt to leave the sessions recoverable, or:"
+msgstr ""
+
+#: src/main.rs:441
+msgid "No sessions."
+msgstr ""
+
+#: src/main.rs:455
+msgid "from {container}"
+msgstr ""
+
+#: src/main.rs:470
+msgid "goes back when its container is next opened, or:"
+msgstr ""
+
+#: src/main.rs:509
+msgid "Discarded."
+msgstr ""
+
+#: src/main.rs:517
+msgid "Pass --write-back or --discard to act on it."
+msgstr ""
+
+#: src/main.rs:524
+msgid "Written back to {container}."
+msgstr ""
+
+#: src/present/mod.rs:288
+msgid "Write it back"
+msgstr ""
+
+#: src/present/mod.rs:289
+msgid "Discard it"
+msgstr ""
+
+#: src/present/mod.rs:290
+msgid "Show me"
+msgstr ""
+
+#: src/recover.rs:115
+msgid "nothing was extracted"
+msgstr ""
+
+#: src/recover.rs:116
+msgid "unchanged since it came out of the container"
+msgstr ""
+
+#: src/recover.rs:120
+msgid "edited, and the edit never reached the container"
+msgstr ""
+
+#: src/recover.rs:125
+msgid ""
+"edited, and the container changed too, so both hold work the other does not"
+msgstr ""
+
+#: src/recover.rs:128
+msgid "the container is no longer where it was"
+msgstr ""
+
+#: src/recover.rs:134
+msgid "the container now holds {found} rather than {recorded}"
+msgstr ""
+
+#: src/recover.rs:141
+msgid "cannot be read: {reason}"
+msgstr ""
+
+#: src/resident.rs:188
+msgid "{name} was recovered and written back."
+msgstr ""
+
+#: src/resident.rs:191 src/resident.rs:725
+msgid "Into {container}."
+msgstr ""
+
+#: src/resident.rs:193
+msgid "It had been edited after the session holding it stopped."
+msgstr ""
+
+#: src/resident.rs:204 src/resident.rs:645 src/resident.rs:826
+msgid "{name} could not be written back."
+msgstr ""
+
+#: src/resident.rs:296
+msgid "{name} is already open; brought forward."
+msgstr ""
+
+#: src/resident.rs:307
+msgid "could not bring it forward: {reason}"
+msgstr ""
+
+#: src/resident.rs:346
+msgid "{name} was not opened."
+msgstr ""
+
+#: src/resident.rs:351
+msgid "That is the shape of a phishing attachment."
+msgstr ""
+
+#: src/resident.rs:352
+msgid "Nothing was extracted and nothing was run."
+msgstr ""
+
+#: src/resident.rs:381
+msgid "{name} is open."
+msgstr ""
+
+#: src/resident.rs:382
+msgid "Session {id}"
+msgstr ""
+
+#: src/resident.rs:384
+msgid "It came from somewhere else, and the copy says so."
+msgstr ""
+
+#: src/resident.rs:442
+msgid "{name} was left behind."
+msgstr ""
+
+#: src/resident.rs:450 src/resident.rs:723
+msgid "It is {state}."
+msgstr ""
+
+#: src/resident.rs:452
+msgid "From {container}."
+msgstr ""
+
+#: src/resident.rs:455
+msgid "It will open once you have decided."
+msgstr ""
+
+#: src/resident.rs:627
+msgid "{name} written back."
+msgstr ""
+
+#: src/resident.rs:630
+msgid "Saves from here on are written back quietly."
+msgstr ""
+
+#: src/resident.rs:719
+msgid "{name} was saved after you closed the session."
+msgstr ""
+
+#: src/resident.rs:758
+msgid "{name} has already been dealt with."
+msgstr ""
+
+#: src/resident.rs:775
+msgid "{name} is still waiting."
+msgstr ""
+
+#: src/resident.rs:782
+msgid "The payload is in {folder}"
+msgstr ""
+
+#: src/resident.rs:789
+msgid "{folder} could not be shown: {reason}"
+msgstr ""
+
+#: src/resident.rs:808
+msgid "{name} written back to {container}."
+msgstr ""
+
+#: src/resident.rs:839
+msgid "{name} discarded."
+msgstr ""
+
+#: src/resident.rs:850
+msgid "{name} did not open: {reason}"
+msgstr ""
+
+#: src/resident.rs:876
+msgid "{name} is still undecided."
+msgstr ""
+
+#: src/resident.rs:905
+msgid "a session did not close: {reason}"
+msgstr ""
+
+#: src/resident.rs:918
+msgid "{name} was closed while its application was still working."
+msgstr ""
+
+#: src/resident.rs:921
+msgid "It is left for recovery: run `slipcase-open sessions`."
+msgstr ""
+
+#: src/resident.rs:959
+msgid "Not opened."
+msgstr ""

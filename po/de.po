@@ -1,0 +1,216 @@
+# German translation for Slipcase Open.
+# Copyright (C) 2026 David M. Anderson
+# This file is distributed under the same licence as the slipcase-open package.
+# David M. Anderson <david.anderson@excelano.com>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: slipcase-open\n"
+"Report-Msgid-Bugs-To: https://github.com/excelano/slipcase-open/issues\n"
+"POT-Creation-Date: 2026-09-09 13:36-0500\n"
+"PO-Revision-Date: 2026-09-09 13:31-0500\n"
+"Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
+"Language-Team: German\n"
+"Language: de\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: src/main.rs:369
+msgid "Watching. Interrupt to leave the sessions recoverable, or:"
+msgstr ""
+"Wird überwacht. Unterbrechen, um die Sitzungen wiederherstellbar zu lassen, "
+"oder:"
+
+#: src/main.rs:441
+msgid "No sessions."
+msgstr "Keine Sitzungen."
+
+#: src/main.rs:455
+msgid "from {container}"
+msgstr "aus {container}"
+
+#: src/main.rs:470
+msgid "goes back when its container is next opened, or:"
+msgstr "geht zurück, wenn sein Container das nächste Mal geöffnet wird, oder:"
+
+#: src/main.rs:509
+msgid "Discarded."
+msgstr "Verworfen."
+
+#: src/main.rs:517
+msgid "Pass --write-back or --discard to act on it."
+msgstr "--write-back oder --discard übergeben, um zu handeln."
+
+#: src/main.rs:524
+msgid "Written back to {container}."
+msgstr "Zurückgeschrieben nach {container}."
+
+#: src/present/mod.rs:288
+msgid "Write it back"
+msgstr "Zurückschreiben"
+
+#: src/present/mod.rs:289
+msgid "Discard it"
+msgstr "Verwerfen"
+
+#: src/present/mod.rs:290
+msgid "Show me"
+msgstr "Zeig es mir"
+
+#: src/recover.rs:115
+msgid "nothing was extracted"
+msgstr "nichts wurde entpackt"
+
+#: src/recover.rs:116
+msgid "unchanged since it came out of the container"
+msgstr "unverändert, seit es aus dem Container kam"
+
+#: src/recover.rs:120
+msgid "edited, and the edit never reached the container"
+msgstr "bearbeitet, und die Änderung erreichte den Container nie"
+
+#: src/recover.rs:125
+msgid ""
+"edited, and the container changed too, so both hold work the other does not"
+msgstr ""
+"bearbeitet, und der Container änderte sich ebenfalls, sodass beide Arbeit "
+"halten, die der andere nicht hat"
+
+#: src/recover.rs:128
+msgid "the container is no longer where it was"
+msgstr "der Container ist nicht mehr, wo er war"
+
+#: src/recover.rs:134
+msgid "the container now holds {found} rather than {recorded}"
+msgstr "der Container hält jetzt {found} statt {recorded}"
+
+#: src/recover.rs:141
+msgid "cannot be read: {reason}"
+msgstr "kann nicht gelesen werden: {reason}"
+
+#: src/resident.rs:188
+msgid "{name} was recovered and written back."
+msgstr "{name} wurde wiederhergestellt und zurückgeschrieben."
+
+#: src/resident.rs:191 src/resident.rs:725
+msgid "Into {container}."
+msgstr "In {container}."
+
+#: src/resident.rs:193
+msgid "It had been edited after the session holding it stopped."
+msgstr "Es wurde bearbeitet, nachdem die Sitzung, die es hielt, beendet war."
+
+#: src/resident.rs:204 src/resident.rs:645 src/resident.rs:826
+msgid "{name} could not be written back."
+msgstr "{name} konnte nicht zurückgeschrieben werden."
+
+#: src/resident.rs:296
+msgid "{name} is already open; brought forward."
+msgstr "{name} ist bereits geöffnet; nach vorn geholt."
+
+#: src/resident.rs:307
+msgid "could not bring it forward: {reason}"
+msgstr "konnte es nicht nach vorn holen: {reason}"
+
+#: src/resident.rs:346
+msgid "{name} was not opened."
+msgstr "{name} wurde nicht geöffnet."
+
+#: src/resident.rs:351
+msgid "That is the shape of a phishing attachment."
+msgstr "Das ist die Form eines Phishing-Anhangs."
+
+#: src/resident.rs:352
+msgid "Nothing was extracted and nothing was run."
+msgstr "Es wurde nichts entpackt und nichts ausgeführt."
+
+#: src/resident.rs:381
+msgid "{name} is open."
+msgstr "{name} ist geöffnet."
+
+#: src/resident.rs:382
+msgid "Session {id}"
+msgstr "Sitzung {id}"
+
+#: src/resident.rs:384
+msgid "It came from somewhere else, and the copy says so."
+msgstr "Es kam von anderswo, und die Kopie sagt das auch."
+
+#: src/resident.rs:442
+msgid "{name} was left behind."
+msgstr "{name} wurde zurückgelassen."
+
+#: src/resident.rs:450 src/resident.rs:723
+msgid "It is {state}."
+msgstr "Es ist {state}."
+
+#: src/resident.rs:452
+msgid "From {container}."
+msgstr "Aus {container}."
+
+#: src/resident.rs:455
+msgid "It will open once you have decided."
+msgstr "Es wird geöffnet, sobald Sie entschieden haben."
+
+#: src/resident.rs:627
+msgid "{name} written back."
+msgstr "{name} zurückgeschrieben."
+
+#: src/resident.rs:630
+msgid "Saves from here on are written back quietly."
+msgstr "Weitere Speicherungen werden von nun an still zurückgeschrieben."
+
+#: src/resident.rs:719
+msgid "{name} was saved after you closed the session."
+msgstr "{name} wurde gespeichert, nachdem Sie die Sitzung geschlossen hatten."
+
+#: src/resident.rs:758
+msgid "{name} has already been dealt with."
+msgstr "{name} wurde bereits erledigt."
+
+#: src/resident.rs:775
+msgid "{name} is still waiting."
+msgstr "{name} wartet noch."
+
+#: src/resident.rs:782
+msgid "The payload is in {folder}"
+msgstr "Die Nutzlast liegt in {folder}"
+
+#: src/resident.rs:789
+msgid "{folder} could not be shown: {reason}"
+msgstr "{folder} konnte nicht gezeigt werden: {reason}"
+
+#: src/resident.rs:808
+msgid "{name} written back to {container}."
+msgstr "{name} zurückgeschrieben nach {container}."
+
+#: src/resident.rs:839
+msgid "{name} discarded."
+msgstr "{name} verworfen."
+
+#: src/resident.rs:850
+msgid "{name} did not open: {reason}"
+msgstr "{name} wurde nicht geöffnet: {reason}"
+
+#: src/resident.rs:876
+msgid "{name} is still undecided."
+msgstr "{name} ist noch unentschieden."
+
+#: src/resident.rs:905
+msgid "a session did not close: {reason}"
+msgstr "eine Sitzung wurde nicht geschlossen: {reason}"
+
+#: src/resident.rs:918
+msgid "{name} was closed while its application was still working."
+msgstr "{name} wurde geschlossen, während seine Anwendung noch arbeitete."
+
+#: src/resident.rs:921
+msgid "It is left for recovery: run `slipcase-open sessions`."
+msgstr ""
+"Es bleibt zur Wiederherstellung liegen: `slipcase-open sessions` ausführen."
+
+#: src/resident.rs:959
+msgid "Not opened."
+msgstr "Nicht geöffnet."

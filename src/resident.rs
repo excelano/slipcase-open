@@ -25,6 +25,7 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use crate::flow::{self, Lingering, Opened};
+use crate::i18n::{fill, t};
 use crate::ipc::{Request, Response, Voice};
 use crate::outside::Outside;
 use crate::present::{Answer, Choice, Question, Report};
@@ -183,9 +184,14 @@ impl Resident {
         match crate::writeback::write_back(&mut session) {
             Ok(()) => {
                 outside.report(
-                    &Report::ordinary(format!("{name} was recovered and written back."))
-                        .and(format!("Into {into}."))
-                        .and("It had been edited after the session holding it stopped."),
+                    &Report::ordinary(fill(
+                        t("{name} was recovered and written back."),
+                        &[("name", &name)],
+                    ))
+                    .and(fill(t("Into {container}."), &[("container", &into)]))
+                    .and(t(
+                        "It had been edited after the session holding it stopped.",
+                    )),
                 );
                 let _ = session.remove();
             }
@@ -194,8 +200,11 @@ impl Resident {
                 // possible, and the icon carries it: an edit that is nowhere
                 // but a session directory is exactly what orange is for.
                 outside.report(
-                    &Report::interrupt(format!("{name} could not be written back."))
-                        .and(e.to_string()),
+                    &Report::interrupt(fill(
+                        t("{name} could not be written back."),
+                        &[("name", &name)],
+                    ))
+                    .and(e.to_string()),
                 );
                 self.note(
                     crate::present::Mood::AtRisk,
@@ -283,12 +292,22 @@ impl Resident {
                 Ok(()) => say(
                     voice,
                     outside,
-                    Report::ordinary(format!(
-                        "{} is already open; brought forward.",
-                        slpc::display_name(&open.session().record().payload)
+                    Report::ordinary(fill(
+                        t("{name} is already open; brought forward."),
+                        &[(
+                            "name",
+                            &slpc::display_name(&open.session().record().payload),
+                        )],
                     )),
                 ),
-                Err(e) => refuse(voice, outside, format!("could not bring it forward: {e}")),
+                Err(e) => refuse(
+                    voice,
+                    outside,
+                    fill(
+                        t("could not bring it forward: {reason}"),
+                        &[("reason", &e.to_string())],
+                    ),
+                ),
             };
         }
 
@@ -324,13 +343,13 @@ impl Resident {
                 // and the icon goes red, which is the only thing red is for.
                 if let flow::Error::Misrepresented(what) = &e {
                     outside.channel.insist(
-                        &Report::interrupt(format!("{named} was not opened."))
+                        &Report::interrupt(fill(t("{name} was not opened."), &[("name", &named)]))
                             .and(format!(
                                 "Its payload is {}, not a document.",
                                 what.describes()
                             ))
-                            .and("That is the shape of a phishing attachment.")
-                            .and("Nothing was extracted and nothing was run."),
+                            .and(t("That is the shape of a phishing attachment."))
+                            .and(t("Nothing was extracted and nothing was run.")),
                     );
                     self.note(
                         crate::present::Mood::Danger,
@@ -358,10 +377,11 @@ impl Resident {
             }
             Ok(opened) => {
                 let name = slpc::display_name(&opened.session().record().payload).into_owned();
-                let mut report = Report::routine(format!("{name} is open."))
-                    .and(format!("Session {}", id_of(opened.session())));
+                let session_id = id_of(opened.session());
+                let mut report = Report::routine(fill(t("{name} is open."), &[("name", &name)]))
+                    .and(fill(t("Session {id}"), &[("id", &session_id)]));
                 if opened.mark != slpc::provenance::Mark::Silent {
-                    report = report.and("It came from somewhere else, and the copy says so.");
+                    report = report.and(t("It came from somewhere else, and the copy says so."));
                 }
                 if let Err(e) = self.sessions.insert(container, opened) {
                     return refuse(
@@ -418,18 +438,21 @@ impl Resident {
             }
             outside.channel.ask(&Question {
                 about: about.clone(),
-                summary: format!(
-                    "{} was left behind.",
-                    slpc::display_name(&left.record().payload)
+                summary: fill(
+                    t("{name} was left behind."),
+                    &[("name", &slpc::display_name(&left.record().payload))],
                 ),
                 // Short, because a notification body is one paragraph however
                 // it is written. The container is named because that is what
                 // the decision is about; the session directory is not, because
                 // `Reveal` is the button that opens it.
                 detail: vec![
-                    format!("It is {state}."),
-                    format!("From {}.", slpc::display_path(&left.record().container)),
-                    "It will open once you have decided.".into(),
+                    fill(t("It is {state}."), &[("state", &state.to_string())]),
+                    fill(
+                        t("From {container}."),
+                        &[("container", &slpc::display_path(&left.record().container))],
+                    ),
+                    t("It will open once you have decided.").into(),
                 ],
                 choices: vec![Choice::WriteBack, Choice::Discard, Choice::Reveal],
             });
@@ -600,11 +623,11 @@ impl Resident {
                     // `sessions` answers that better than a stream of banners.
                     if s.record().write_backs <= 1 {
                         outside.report(
-                            &Report::routine(format!(
-                                "{} written back.",
-                                slpc::display_name(&s.record().payload)
+                            &Report::routine(fill(
+                                t("{name} written back."),
+                                &[("name", &slpc::display_name(&s.record().payload))],
                             ))
-                            .and("Saves from here on are written back quietly."),
+                            .and(t("Saves from here on are written back quietly.")),
                         );
                     }
                     landed.push(id_of(s));
@@ -618,8 +641,11 @@ impl Resident {
                 Err(e) => {
                     let name = slpc::display_name(&open.session().record().payload).into_owned();
                     outside.report(
-                        &Report::interrupt(format!("{name} could not be written back."))
-                            .and(e.to_string()),
+                        &Report::interrupt(fill(
+                            t("{name} could not be written back."),
+                            &[("name", &name)],
+                        ))
+                        .and(e.to_string()),
                     );
                     failed.push((id_of(open.session()), name));
                 }
@@ -689,10 +715,19 @@ impl Resident {
             }
             outside.channel.ask(&Question {
                 about: about.clone(),
-                summary: format!("{name} was saved after you closed the session."),
+                summary: fill(
+                    t("{name} was saved after you closed the session."),
+                    &[("name", &name)],
+                ),
                 detail: vec![
-                    format!("It is {state}."),
-                    format!("Into {}.", slpc::display_path(&session.record().container)),
+                    fill(t("It is {state}."), &[("state", &state.to_string())]),
+                    fill(
+                        t("Into {container}."),
+                        &[(
+                            "container",
+                            &slpc::display_path(&session.record().container),
+                        )],
+                    ),
                 ],
                 choices: vec![Choice::WriteBack, Choice::Discard, Choice::Reveal],
             });
@@ -719,9 +754,9 @@ impl Resident {
             // same decision taken at the command line in the meantime, or a
             // notification that outlived the process that asked. Saying so
             // beats a click that appears to do nothing.
-            outside.report(&Report::ordinary(format!(
-                "{} has already been dealt with.",
-                answer.about
+            outside.report(&Report::ordinary(fill(
+                t("{name} has already been dealt with."),
+                &[("name", &answer.about)],
             )));
             return;
         };
@@ -736,17 +771,26 @@ impl Resident {
             let dir = pending.session.payload_dir();
             let question = Question {
                 about: pending.about.clone(),
-                summary: format!(
-                    "{} is still waiting.",
-                    slpc::display_name(&pending.session.record().payload)
+                summary: fill(
+                    t("{name} is still waiting."),
+                    &[(
+                        "name",
+                        &slpc::display_name(&pending.session.record().payload),
+                    )],
                 ),
-                detail: vec![format!("The payload is in {}", dir.display())],
+                detail: vec![fill(
+                    t("The payload is in {folder}"),
+                    &[("folder", &dir.display().to_string())],
+                )],
                 choices: vec![Choice::WriteBack, Choice::Discard, Choice::Reveal],
             };
             if let Err(e) = outside.launcher.launch(&dir) {
-                outside.report(&Report::ordinary(format!(
-                    "{} could not be shown: {e}",
-                    dir.display()
+                outside.report(&Report::ordinary(fill(
+                    t("{folder} could not be shown: {reason}"),
+                    &[
+                        ("folder", &dir.display().to_string()),
+                        ("reason", &e.to_string()),
+                    ],
                 )));
             }
             outside.channel.ask(&question);
@@ -760,9 +804,15 @@ impl Resident {
         match answer.choice {
             Choice::WriteBack => match crate::writeback::write_back(&mut pending.session) {
                 Ok(()) => {
-                    outside.report(&Report::ordinary(format!(
-                        "{name} written back to {}.",
-                        slpc::display_path(&pending.session.record().container)
+                    outside.report(&Report::ordinary(fill(
+                        t("{name} written back to {container}."),
+                        &[
+                            ("name", &name),
+                            (
+                                "container",
+                                &slpc::display_path(&pending.session.record().container),
+                            ),
+                        ],
                     )));
                     let _ = pending.session.remove();
                 }
@@ -772,8 +822,11 @@ impl Resident {
                     // the question goes back so there is something to make it
                     // with.
                     outside.report(
-                        &Report::interrupt(format!("{name} could not be written back."))
-                            .and(e.to_string()),
+                        &Report::interrupt(fill(
+                            t("{name} could not be written back."),
+                            &[("name", &name)],
+                        ))
+                        .and(e.to_string()),
                     );
                     pending.asked = Instant::now();
                     self.pending.push(pending);
@@ -782,7 +835,10 @@ impl Resident {
             },
             Choice::Discard => {
                 let _ = pending.session.remove();
-                outside.report(&Report::ordinary(format!("{name} discarded.")));
+                outside.report(&Report::ordinary(fill(
+                    t("{name} discarded."),
+                    &[("name", &name)],
+                )));
             }
             Choice::Reveal => unreachable!("answered above"),
         }
@@ -790,7 +846,10 @@ impl Resident {
         // Concept 8: the new session follows the answer.
         if let Some(container) = pending.then_open {
             if let Response::Err(why) = self.open(&container, Voice::Instance, outside) {
-                outside.report(&Report::interrupt(format!("{name} did not open: {why}")));
+                outside.report(&Report::interrupt(fill(
+                    t("{name} did not open: {reason}"),
+                    &[("name", &name), ("reason", &why)],
+                )));
             }
         }
     }
@@ -813,9 +872,12 @@ impl Resident {
     fn stop_asking(pending: &Pending, outside: &Outside<'_>) {
         outside.channel.withdraw(&pending.about);
         outside.report(
-            &Report::ordinary(format!(
-                "{} is still undecided.",
-                slpc::display_name(&pending.session.record().payload)
+            &Report::ordinary(fill(
+                t("{name} is still undecided."),
+                &[(
+                    "name",
+                    &slpc::display_name(&pending.session.record().payload),
+                )],
             ))
             .and(format!(
                 "slipcase-open recover {} --write-back",
@@ -839,7 +901,10 @@ impl Resident {
                 Ok(flow::Closed::Cleared) => {}
                 Ok(flow::Closed::LeftForRecovery(lingering)) => self.lingering.push(*lingering),
                 Err(e) => {
-                    outside.report(&Report::interrupt(format!("a session did not close: {e}")));
+                    outside.report(&Report::interrupt(fill(
+                        t("a session did not close: {reason}"),
+                        &[("reason", &e.to_string())],
+                    )));
                 }
             }
         }
@@ -849,11 +914,11 @@ impl Resident {
                 let _ = session.remove();
             } else {
                 outside.report(
-                    &Report::ordinary(format!(
-                        "{} was closed while its application was still working.",
-                        slpc::display_name(&session.record().payload)
+                    &Report::ordinary(fill(
+                        t("{name} was closed while its application was still working."),
+                        &[("name", &slpc::display_name(&session.record().payload))],
                     ))
-                    .and("It is left for recovery: run `slipcase-open sessions`."),
+                    .and(t("It is left for recovery: run `slipcase-open sessions`.")),
                 );
             }
         }
@@ -891,7 +956,7 @@ fn say(voice: Voice, outside: &Outside<'_>, report: Report) -> Response {
 /// opening.
 fn refuse(voice: Voice, outside: &Outside<'_>, why: String) -> Response {
     if voice == Voice::Instance {
-        outside.report(&Report::interrupt("Not opened.").and(why.clone()));
+        outside.report(&Report::interrupt(t("Not opened.")).and(why.clone()));
     }
     Response::Err(why)
 }

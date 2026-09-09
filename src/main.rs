@@ -42,6 +42,7 @@ use std::process::ExitCode;
 use clap::{Args, CommandFactory as _, Parser, Subcommand};
 
 use slipcase_open::endpoint;
+use slipcase_open::i18n::{fill, t};
 use slipcase_open::ipc::{self, Request, Response, Voice};
 use slipcase_open::outside::Outside;
 use slipcase_open::platform::Host;
@@ -150,6 +151,28 @@ impl std::error::Error for AlreadySaid {}
 fn main() -> ExitCode {
     #[cfg(windows)]
     attach_console();
+
+    // The one call in the application, and everything said from here is in
+    // this language.
+    //
+    // **What is translated is what the tool says about your files** — a
+    // notification, a question, a button on one, a line of `sessions`. There is
+    // no machine-readable output mode to protect: concept 9 makes the command
+    // line the floor beneath the notifications, which is a person reading
+    // prose, not a script parsing columns.
+    //
+    // **What is not is what it says about itself.** `--help` is clap's and
+    // stays as the fleet's other command-line tools have it, and so does the
+    // `policy` report: it prints paths, precedence and a fixed-width table
+    // built to the width of English words, it is read beside the
+    // documentation, and it is what somebody pastes into a bug report.
+    slipcase_open::i18n::activate(&[
+        ("de", include_str!("../po/de.po")),
+        // Debug builds alone; `po/pseudo.sh` says what it finds.
+        #[cfg(debug_assertions)]
+        ("en-x-pseudo", include_str!("../po/en-x-pseudo.po")),
+    ]);
+
     let cli = Cli::parse();
     // A verb, or a bare path meaning `open`, or neither — and neither is what
     // clap used to refuse for us, so it is refused here in the same shape.
@@ -341,7 +364,10 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
         // Only where somebody is looking at it. As a notification this would be
         // the tool announcing that it had started, which is what the document
         // opening already said.
-        eprintln!("Watching. Interrupt to leave the sessions recoverable, or:");
+        eprintln!(
+            "{}",
+            t("Watching. Interrupt to leave the sessions recoverable, or:")
+        );
         eprintln!("  slipcase-open close <session>");
     }
 
@@ -412,7 +438,7 @@ fn sessions(root: &Path, door: &Path) -> Fallible {
     }
     let found = session::scan(root)?;
     if found.is_empty() {
-        println!("No sessions.");
+        println!("{}", t("No sessions."));
         return Ok(());
     }
     for s in &found {
@@ -423,7 +449,13 @@ fn sessions(root: &Path, door: &Path) -> Fallible {
             slpc::display_name(&s.record().payload),
             state
         );
-        println!("    from {}", slpc::display_path(&s.record().container));
+        println!(
+            "    {}",
+            fill(
+                t("from {container}"),
+                &[("container", &slpc::display_path(&s.record().container))],
+            )
+        );
         // Anything that is not quiet, which is a wider set than the ones
         // needing a decision. Concept 6.3 as amended writes an edit back when
         // its container is next opened, and this is concept 9's floor: what it
@@ -431,9 +463,11 @@ fn sessions(root: &Path, door: &Path) -> Fallible {
         // whether or not the tool would eventually get there by itself.
         match state.course() {
             recover::Course::Sweep => {}
+            // The command itself is a command and stays as it is typed; the
+            // sentence in front of it is not.
             recover::Course::WriteBack => println!(
-                "    goes back when its container is next opened, or: \
-                 slipcase-open recover {} --write-back",
+                "    {} slipcase-open recover {} --write-back",
+                t("goes back when its container is next opened, or:"),
                 id_of(s)
             ),
             recover::Course::Ask => println!(
@@ -472,7 +506,7 @@ fn recover_one(root: &Path, door: &Path, a: &Recover) -> Fallible {
     let mut s = session::find(root, &a.id)?;
     if a.discard {
         s.remove()?;
-        println!("Discarded.");
+        println!("{}", t("Discarded."));
         return Ok(());
     }
     if !a.write_back {
@@ -480,13 +514,16 @@ fn recover_one(root: &Path, door: &Path, a: &Recover) -> Fallible {
         // without saying what to do with it is a question, so this answers it
         // rather than choosing.
         println!("{}: {}", a.id, recover::state(&s));
-        println!("Pass --write-back or --discard to act on it.");
+        println!("{}", t("Pass --write-back or --discard to act on it."));
         return Ok(());
     }
     slipcase_open::writeback::write_back(&mut s)?;
     println!(
-        "Written back to {}.",
-        slpc::display_path(&s.record().container)
+        "{}",
+        fill(
+            t("Written back to {container}."),
+            &[("container", &slpc::display_path(&s.record().container))],
+        )
     );
     s.remove()?;
     Ok(())

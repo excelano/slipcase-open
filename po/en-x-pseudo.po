@@ -1,0 +1,225 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the slipcase-open package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: slipcase-open\n"
+"Report-Msgid-Bugs-To: https://github.com/excelano/slipcase-open/issues\n"
+"POT-Creation-Date: 2026-09-09 13:36-0500\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: none\n"
+"Language: en-x-pseudo\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/main.rs:369
+msgid "Watching. Interrupt to leave the sessions recoverable, or:"
+msgstr ""
+"[Wätchíñg. Îñtérrüpt tö léävé thé šéššíöñš récövéräblé, ör: "
+"························]"
+
+#: src/main.rs:441
+msgid "No sessions."
+msgstr "[Nö šéššíöñš. ·····]"
+
+#: src/main.rs:455
+msgid "from {container}"
+msgstr "[fröm {container} ·······]"
+
+#: src/main.rs:470
+msgid "goes back when its container is next opened, or:"
+msgstr ""
+"[göéš bäck whéñ ítš cöñtäíñér íš ñéxt öpéñéd, ör: ····················]"
+
+#: src/main.rs:509
+msgid "Discarded."
+msgstr "[Díšcärdéd. ·····]"
+
+#: src/main.rs:517
+msgid "Pass --write-back or --discard to act on it."
+msgstr "[Päšš --wríté-bäck ör --díšcärd tö äct öñ ít. ··················]"
+
+#: src/main.rs:524
+msgid "Written back to {container}."
+msgstr "[Wríttéñ bäck tö {container}. ············]"
+
+#: src/present/mod.rs:288
+msgid "Write it back"
+msgstr "[Wríté ít bäck ······]"
+
+#: src/present/mod.rs:289
+msgid "Discard it"
+msgstr "[Díšcärd ít ·····]"
+
+#: src/present/mod.rs:290
+msgid "Show me"
+msgstr "[Shöw mé ···]"
+
+#: src/recover.rs:115
+msgid "nothing was extracted"
+msgstr "[ñöthíñg wäš éxträctéd ·········]"
+
+#: src/recover.rs:116
+msgid "unchanged since it came out of the container"
+msgstr "[üñchäñgéd šíñcé ít cämé öüt öf thé cöñtäíñér ··················]"
+
+#: src/recover.rs:120
+msgid "edited, and the edit never reached the container"
+msgstr ""
+"[édítéd, äñd thé édít ñévér réächéd thé cöñtäíñér ····················]"
+
+#: src/recover.rs:125
+msgid ""
+"edited, and the container changed too, so both hold work the other does not"
+msgstr ""
+"[édítéd, äñd thé cöñtäíñér chäñgéd töö, šö böth höld wörk thé öthér döéš ñöt "
+"·······························]"
+
+#: src/recover.rs:128
+msgid "the container is no longer where it was"
+msgstr "[thé cöñtäíñér íš ñö löñgér whéré ít wäš ················]"
+
+#: src/recover.rs:134
+msgid "the container now holds {found} rather than {recorded}"
+msgstr ""
+"[thé cöñtäíñér ñöw höldš {found} räthér thäñ {recorded} "
+"······················]"
+
+#: src/recover.rs:141
+msgid "cannot be read: {reason}"
+msgstr "[cäññöt bé réäd: {reason} ··········]"
+
+#: src/resident.rs:188
+msgid "{name} was recovered and written back."
+msgstr "[{name} wäš récövéréd äñd wríttéñ bäck. ················]"
+
+#: src/resident.rs:191 src/resident.rs:725
+msgid "Into {container}."
+msgstr "[Îñtö {container}. ·······]"
+
+#: src/resident.rs:193
+msgid "It had been edited after the session holding it stopped."
+msgstr ""
+"[Ît häd bééñ édítéd äftér thé šéššíöñ höldíñg ít štöppéd. "
+"·······················]"
+
+#: src/resident.rs:204 src/resident.rs:645 src/resident.rs:826
+msgid "{name} could not be written back."
+msgstr "[{name} cöüld ñöt bé wríttéñ bäck. ··············]"
+
+#: src/resident.rs:296
+msgid "{name} is already open; brought forward."
+msgstr "[{name} íš älréädy öpéñ; bröüght förwärd. ·················]"
+
+#: src/resident.rs:307
+msgid "could not bring it forward: {reason}"
+msgstr "[cöüld ñöt bríñg ít förwärd: {reason} ···············]"
+
+#: src/resident.rs:346
+msgid "{name} was not opened."
+msgstr "[{name} wäš ñöt öpéñéd. ·········]"
+
+#: src/resident.rs:351
+msgid "That is the shape of a phishing attachment."
+msgstr "[Thät íš thé šhäpé öf ä phíšhíñg ättächméñt. ··················]"
+
+#: src/resident.rs:352
+msgid "Nothing was extracted and nothing was run."
+msgstr "[Nöthíñg wäš éxträctéd äñd ñöthíñg wäš rüñ. ·················]"
+
+#: src/resident.rs:381
+msgid "{name} is open."
+msgstr "[{name} íš öpéñ. ·······]"
+
+#: src/resident.rs:382
+msgid "Session {id}"
+msgstr "[Séššíöñ {id} ·····]"
+
+#: src/resident.rs:384
+msgid "It came from somewhere else, and the copy says so."
+msgstr ""
+"[Ît cämé fröm šöméwhéré élšé, äñd thé cöpy šäyš šö. ·····················]"
+
+#: src/resident.rs:442
+msgid "{name} was left behind."
+msgstr "[{name} wäš léft béhíñd. ··········]"
+
+#: src/resident.rs:450 src/resident.rs:723
+msgid "It is {state}."
+msgstr "[Ît íš {state}. ······]"
+
+#: src/resident.rs:452
+msgid "From {container}."
+msgstr "[Fröm {container}. ·······]"
+
+#: src/resident.rs:455
+msgid "It will open once you have decided."
+msgstr "[Ît wíll öpéñ öñcé yöü hävé décídéd. ···············]"
+
+#: src/resident.rs:627
+msgid "{name} written back."
+msgstr "[{name} wríttéñ bäck. ·········]"
+
+#: src/resident.rs:630
+msgid "Saves from here on are written back quietly."
+msgstr "[Sävéš fröm héré öñ äré wríttéñ bäck qüíétly. ··················]"
+
+#: src/resident.rs:719
+msgid "{name} was saved after you closed the session."
+msgstr "[{name} wäš šävéd äftér yöü clöšéd thé šéššíöñ. ···················]"
+
+#: src/resident.rs:758
+msgid "{name} has already been dealt with."
+msgstr "[{name} häš älréädy bééñ déält wíth. ···············]"
+
+#: src/resident.rs:775
+msgid "{name} is still waiting."
+msgstr "[{name} íš štíll wäítíñg. ··········]"
+
+#: src/resident.rs:782
+msgid "The payload is in {folder}"
+msgstr "[Thé päylöäd íš íñ {folder} ···········]"
+
+#: src/resident.rs:789
+msgid "{folder} could not be shown: {reason}"
+msgstr "[{folder} cöüld ñöt bé šhöwñ: {reason} ···············]"
+
+#: src/resident.rs:808
+msgid "{name} written back to {container}."
+msgstr "[{name} wríttéñ bäck tö {container}. ···············]"
+
+#: src/resident.rs:839
+msgid "{name} discarded."
+msgstr "[{name} díšcärdéd. ·······]"
+
+#: src/resident.rs:850
+msgid "{name} did not open: {reason}"
+msgstr "[{name} díd ñöt öpéñ: {reason} ············]"
+
+#: src/resident.rs:876
+msgid "{name} is still undecided."
+msgstr "[{name} íš štíll üñdécídéd. ···········]"
+
+#: src/resident.rs:905
+msgid "a session did not close: {reason}"
+msgstr "[ä šéššíöñ díd ñöt clöšé: {reason} ··············]"
+
+#: src/resident.rs:918
+msgid "{name} was closed while its application was still working."
+msgstr ""
+"[{name} wäš clöšéd whílé ítš äpplícätíöñ wäš štíll wörkíñg. "
+"························]"
+
+#: src/resident.rs:921
+msgid "It is left for recovery: run `slipcase-open sessions`."
+msgstr ""
+"[Ît íš léft för récövéry: rüñ `šlípcäšé-öpéñ šéššíöñš`. "
+"······················]"
+
+#: src/resident.rs:959
+msgid "Not opened."
+msgstr "[Nöt öpéñéd. ·····]"

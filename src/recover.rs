@@ -57,6 +57,7 @@ use std::fs::File;
 use std::io::{self, Read};
 use std::path::Path;
 
+use crate::i18n::{fill, t};
 use crate::session::Session;
 
 /// What a session left behind turned out to be.
@@ -104,19 +105,41 @@ pub enum State {
 
 impl fmt::Display for State {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Translated, because this clause is spliced into sentences a person
+        // reads — *It is {state}* in a notification, and the third column of
+        // `sessions` — and an English clause inside a German sentence is worse
+        // than either language alone. It is prose about somebody's file rather
+        // than a state name anything matches on: `Course` is what the code
+        // decides from, and it is a separate method.
         match self {
-            Self::NothingExtracted => write!(f, "nothing was extracted"),
-            Self::Unchanged => write!(f, "unchanged since it came out of the container"),
-            Self::Edited => write!(f, "edited, and the edit never reached the container"),
+            Self::NothingExtracted => write!(f, "{}", t("nothing was extracted")),
+            Self::Unchanged => write!(f, "{}", t("unchanged since it came out of the container")),
+            Self::Edited => write!(
+                f,
+                "{}",
+                t("edited, and the edit never reached the container")
+            ),
             Self::Diverged => write!(
                 f,
-                "edited, and the container changed too, so both hold work the other does not"
+                "{}",
+                t("edited, and the container changed too, so both hold work the other does not")
             ),
-            Self::ContainerGone => write!(f, "the container is no longer where it was"),
-            Self::ContainerChanged { recorded, found } => {
-                write!(f, "the container now holds {found} rather than {recorded}")
+            Self::ContainerGone => {
+                write!(f, "{}", t("the container is no longer where it was"))
             }
-            Self::Unreadable(e) => write!(f, "cannot be read: {e}"),
+            Self::ContainerChanged { recorded, found } => write!(
+                f,
+                "{}",
+                fill(
+                    t("the container now holds {found} rather than {recorded}"),
+                    &[("found", found), ("recorded", recorded)],
+                )
+            ),
+            Self::Unreadable(e) => write!(
+                f,
+                "{}",
+                fill(t("cannot be read: {reason}"), &[("reason", e)])
+            ),
         }
     }
 }

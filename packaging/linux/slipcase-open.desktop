@@ -2,12 +2,16 @@
 Type=Application
 Version=1.0
 Name=Open payload
+Name[de]=Nutzlast öffnen
 GenericName=Slipcase payload opener
+GenericName[de]=Slipcase-Nutzlastöffner
 Comment=Open the payload of a Slipcase container in the application that normally handles it
+Comment[de]=Die Nutzlast eines Slipcase-Containers in der Anwendung öffnen, die sie normalerweise verarbeitet
 Exec=slipcase-open open %f
 Icon=document-open
 Terminal=false
 MimeType=application/x.slipcase+zip;
 Categories=Utility;
 Keywords=slipcase;slpc;payload;container;open;
+Keywords[de]=slipcase;slpc;Nutzlast;Container;öffnen;
 StartupNotify=false

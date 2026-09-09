@@ -35,6 +35,14 @@ categories = ["gui", "filesystem"]
 rust-version = "1.88"
 
 [dependencies]
+# The language this tool speaks, and the reader for the `.po` catalogues in
+# `po/`. Pure Rust, no build script; its two dependencies are platform-gated
+# and are the operating system's own answer to which language a person reads.
+#
+# It is a dependency of the engine rather than of `main`, because the engine is
+# what narrates: `resident` composes every notification and every question, and
+# `present` only carries them. Concept 9's boundary, holding for language.
+potext = "0.1"
 # From crates.io as of 0.3.11, which is the release carrying `payload_crc`.
 # It was a path dependency until then (PLAN.md Phase 0), and switching off it is
 # what finally exercises `slpc` as a published crate — an argument nothing in
