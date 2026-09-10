@@ -58,6 +58,16 @@ generic document rather than as an archive; and the icon has to be named as the
 generic icon as well as the icon, because GTK4 searches theme-major and Adwaita
 answers `application-x-generic` before hicolor is reached.
 
+**The desktop entry names six types, not one.** `slipcase-common` declares a
+payload family per icon — `application/x.slipcase-pdf+zip` against `*.pdf.slpc`,
+and four more — so that a container named for its payload can be drawn with a
+mark for it. Each is a `sub-class-of application/x.slipcase+zip`, and that
+inheritance carries the default application but not the *recommended* list,
+which is matched on the exact type. A family missing from `MimeType=` therefore
+still opens on a double-click and still drops out of the top of Open With. The
+list is the one part of the arrangement that could not stay in `slipcase-common`,
+and adding a family there means adding it here.
+
 `install.sh` therefore installs the desktop entry and not the type, and says so
 when the machine does not have the type declared — asked of `share/mime/types`,
 the file `update-mime-database` writes, rather than of the filenames in
