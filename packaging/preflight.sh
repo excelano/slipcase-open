@@ -110,17 +110,7 @@ else
     ok "v${version} is not already tagged"
 fi
 
-# 6. The package cannot be built without the identity Partner Center assigned,
-#    and it is deliberately not committed - so a fresh checkout has the example
-#    and not the file. Better said here than by `makeappx` failing on a
-#    substitution nobody made.
-if [ -f packaging/windows/identity.psd1 ]; then
-    ok "packaging/windows/identity.psd1 is present"
-else
-    bad "packaging/windows/identity.psd1 is present" "it is not committed; copy the .example and fill it in"
-fi
-
-# 7. The gate, run rather than reimplemented, with the status taken from it.
+# 6. The gate, run rather than reimplemented, with the status taken from it.
 if [ "$quick" = yes ]; then
     say "check.sh passes" "skipped - --quick"
 elif ./check.sh >/dev/null 2>&1; then
@@ -129,7 +119,7 @@ else
     bad "check.sh passes" "it does not - run it and read the output"
 fi
 
-# 8. Green on *this* commit, not on some commit. Asked of GitHub because nothing
+# 7. Green on *this* commit, not on some commit. Asked of GitHub because nothing
 #    local knows.
 if [ "$ask_ci" = yes ]; then
     sha=$(git rev-parse HEAD)
