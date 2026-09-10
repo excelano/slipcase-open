@@ -1,3 +1,21 @@
+slipcase-open (0.1.6-1) unstable; urgency=low
+
+  * German. On a machine set to German the notifications, the buttons on them,
+    the standing list, and what sessions and recover print are in German. There
+    is nothing to choose: it reads the language the desktop is already set to,
+    and falls back to English for every other one.
+  * What the tool says about your files is translated; what it says about
+    itself is not. --help is clap's, and the policy report prints paths in a
+    table built to the width of English words and is what somebody pastes into
+    a bug report.
+  * A container named for its payload, report.pdf.slpc, is offered at the top
+    of Open With rather than under Other applications. slipcase-common declares
+    a type for each payload family and this package now lists all five beside
+    the general one.
+  * No change in behaviour on macOS.
+
+ -- David M. Anderson <david.anderson@excelano.com>  Wed, 09 Sep 2026 21:51:57 -0500
+
 slipcase-open (0.1.5-1) unstable; urgency=low
 
   * macOS: built, and shipped as a notarized application bundle through the

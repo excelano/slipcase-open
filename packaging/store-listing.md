@@ -164,8 +164,19 @@ extension, and that is concept §2's audience arriving.
 *What's new in this version* on the Microsoft Store, one version's text, kept
 latest first under a `### x.y.z` heading. There is none for 0.1.5: it was the
 macOS release and changed nothing a Windows user of this application would
-notice, so there is nothing to tell them. The next Windows-visible change gets
-an entry here, written the way the rest of this file is.
+notice, so there was nothing to tell them.
+
+### 0.1.6
+
+German. On a machine set to German the notifications, the buttons on them and
+the standing list come up in German, and so does what `sessions` and `recover`
+print. There is nothing to choose: Slipcase Open reads the language Windows is
+already set to, and falls back to English for every other one.
+
+**What the tool says about your files is translated; what it says about itself
+is not.** `--help` and the settings report stay in English, the second because
+it prints paths in a table built to the width of English words and is what you
+would paste into a bug report.
 
 ---
 
