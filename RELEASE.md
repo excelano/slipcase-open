@@ -56,15 +56,21 @@ while, which is a stated fact.
 | Cargo, Debian | `0.1.4` | `cargo deb`, `debian/changelog` by hand |
 | `AppxManifest` | `0.1.4.0` | `build-msix.ps1`, appending `.0` |
 
-**There is no `version.sh` here, and that is a decision.** The sibling has one
-because three artefacts wanted three spellings and two build scripts had each
-grown their own `sed`. Here there is one script that needs the number —
-`build-msix.ps1`, which reads `Cargo.toml` directly — so a shared parser would
-mean teaching PowerShell to call POSIX `sh`, which is machinery the sibling
-needed and this does not. `preflight.sh` reads the same line with the same
-shape, and its checks 3 and 4 are what keep the two from drifting apart in
-silence: the changelog must name Cargo's version, and the version must have a
-spelling `build-msix.ps1` can use.
+**`packaging/version.sh` is where that number is parsed**, and it was not
+always. This paragraph used to argue against having one: the sibling grew a
+`sed` in each of two build scripts, while this repository had a single reader
+in `build-msix.ps1` that went to `Cargo.toml` itself, and a shared parser would
+have meant teaching PowerShell to call POSIX `sh`. What changed the answer is
+`excelano/fenster`, the store-facing half of a release for the whole fleet: its
+`submit.ps1` shells out to `version.sh` for the version and the four-part Appx
+spelling, so a repository without one is a repository it cannot ask.
+`build-msix.ps1` asks it now rather than carrying the regex, which makes it the
+second reader the old argument said did not exist.
+
+`preflight.sh` still reads the line itself, and its checks 3 and 4 are what
+keep the readers from drifting apart in silence: the changelog must name
+Cargo's version, and the version must have a spelling `build-msix.ps1` can
+use.
 
 **The third component moves for everything at 0.x**, which is this family's
 convention and not semver's. What the rule rules out is reusing a number:
