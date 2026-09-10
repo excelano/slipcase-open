@@ -76,14 +76,19 @@
   </Dependencies>
 
   <Resources>
-    <!-- The package's language. `en-us` because the application is written
+    <!-- The package's languages. `en-us` because the application is written
          in US English; it said `en-gb` until 2026-09-06, inherited from
-         slipcase-desktop's manifest and argued for nowhere. It shows in
-         Partner Center's Packages panel. Unlike the other lanes there is no
-         makepri step in `build-msix.ps1`, so this element is the whole
-         declaration. The Store *listing* language is a separate choice, made
-         on the Store listings page; this line does not control it. -->
+         slipcase-desktop's manifest and argued for nowhere. `de-de` beside it
+         since 2026-09-10, because the tool speaks German through `po/de.po`.
+         Both show in Partner Center's Packages panel. Unlike the other lanes
+         there is no makepri step in `build-msix.ps1`, so this element is the
+         whole declaration. A declared language does add a Store listing in
+         that language - measured on duckling 2026-09-09, and this comment
+         claimed the opposite until then. It adds rather than renames, so the
+         German listing arrives empty and has to be filled by hand.
+         `~/fenster/LIMITS.md` is the long-form record. -->
     <Resource Language="en-us" />
+    <Resource Language="de-de" />
   </Resources>
 
   <Applications>
