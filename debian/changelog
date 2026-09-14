@@ -1,3 +1,15 @@
+slipcase-open (0.1.7-1) unstable; urgency=low
+
+  * The macOS bundle says the application is offered in German. The catalogue
+    has carried German since 0.1.6 and the bundle went on claiming English, so
+    macOS built its per-app language picker with nothing in it for a German
+    speaker to choose. No change on Linux or Windows.
+  * The Mac delivery is described as a cask and nothing else. ship.conf also
+    said a Homebrew formula was bumped from the release, which listed one
+    delivery as two channels.
+
+ -- David M. Anderson <david.anderson@excelano.com>  Mon, 14 Sep 2026 18:16:22 -0500
+
 slipcase-open (0.1.6-1) unstable; urgency=low
 
   * German. On a machine set to German the notifications, the buttons on them,

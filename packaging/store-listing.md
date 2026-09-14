@@ -162,9 +162,9 @@ extension, and that is concept §2's audience arriving.
 ## Release notes
 
 *What's new in this version* on the Microsoft Store, one version's text, kept
-latest first under a `### x.y.z` heading. There is none for 0.1.5: it was the
-macOS release and changed nothing a Windows user of this application would
-notice, so there was nothing to tell them.
+latest first under a `### x.y.z` heading. There is none for 0.1.5 or 0.1.7:
+both were macOS releases and changed nothing a Windows user of this
+application would notice, so there was nothing to tell them.
 
 ### 0.1.6
 
