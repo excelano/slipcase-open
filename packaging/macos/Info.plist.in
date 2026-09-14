@@ -37,6 +37,22 @@
 <dict>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
+	<!--
+	  The languages the package claims. macOS builds the per-application
+	  entry in System Settings, General, Language & Region from this key,
+	  so without it there is no way to set this application to German
+	  while the rest of the machine stays English. Translating the
+	  application does not reach it: `po/de.po` is the window's words and
+	  this is the package's claim about them.
+
+	  The array is the catalogues `main` hands `i18n::activate`, minus
+	  `en-x-pseudo`. That one is a debug build's and ships nowhere.
+	-->
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>de</string>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>Slipcase Open</string>
 	<key>CFBundleIdentifier</key>
