@@ -170,34 +170,13 @@ jobs:
           }
 
       # The Store takes the package unsigned, and the runner assembles the one that
-      # is uploaded. `identity.psd1` is committed beside the build script; the
-      # publisher is the organisation secret, being the one value in the identity
-      # that is an account's rather than this product's. Without it a release
-      # refuses and a push packages under a throwaway, so the packaging is still
-      # proved on every commit.
-      - name: Package for the Store, unsigned
-        shell: pwsh
-        env:
-          STORE_PUBLISHER: ${{ secrets.STORE_PUBLISHER }}
-        run: |
-          if (-not $env:STORE_PUBLISHER) {
-            if ('${{ github.event_name }}' -eq 'release') {
-              throw 'a release package needs the real publisher: set the excelano organisation secret STORE_PUBLISHER to Partner Center''s Package/Identity/Publisher'
-            }
-            $env:STORE_PUBLISHER = 'CN=00000000-0000-0000-0000-000000000000'
-          }
-          powershell -ExecutionPolicy Bypass -File packaging\windows\build-msix.ps1 -OutDir dist
-          Get-ChildItem dist\*.msix | ForEach-Object { "$($_.Name) $([math]::Round($_.Length/1MB,1)) MB" }
-
-      - name: Keep the package
-        uses: actions/upload-artifact@v6
+      # is uploaded. The steps are excelano/.github's, because they were the same in
+      # every repository that has this target; the publisher is the organisation
+      # secret, being the one value in the identity that is an account's rather than
+      # this product's.
+      - name: The Store package
+        uses: excelano/.github/.github/actions/store-package@main
         with:
-          name: msix
-          path: dist/*.msix
-
-      - name: Attach the package to the release
-        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ github.event.release.tag_name || inputs.tag }}" (Get-ChildItem dist\*.msix).FullName
+          publisher: ${{ secrets.STORE_PUBLISHER }}
+          tag: ${{ github.event.release.tag_name || inputs.tag }}
+          token: ${{ secrets.GITHUB_TOKEN }}
