@@ -169,6 +169,18 @@ jobs:
             throw 'the state directory was not the one the environment named'
           }
 
+      # slipcase-desktop 0.1.1 was packaged, certified, submitted and failed
+      # Store policy 10.2.4.1 for importing VCRUNTIME140.dll from the Visual
+      # C++ Redistributable, which every build machine has and a tester's clean
+      # one does not. `.cargo/config.toml` is the fix and this is the guard on
+      # it, against the release binary because that is what ships. It runs
+      # before the package rather than inside it, so a refusal names the import
+      # rather than arriving as a failed packaging step.
+      - name: Every DLL the shipped binary imports comes with Windows
+        run: |
+          cargo build --release
+          powershell -ExecutionPolicy Bypass -File packaging/windows/check-imports.ps1
+
       # The Store takes the package unsigned, and the runner assembles the one that
       # is uploaded. The steps are excelano/.github's, because they were the same in
       # every repository that has this target; the publisher is the organisation
