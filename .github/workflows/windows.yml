@@ -58,9 +58,22 @@ name: Windows
 on:
   push:
   pull_request:
+  # The release event is what attaches the package. A person's token creates
+  # the release, so the event fires.
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to package for (e.g. v0.1.9)'
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
+
+permissions:
+  contents: write
 
 jobs:
   windows:
@@ -68,6 +81,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
 
       - name: What is installed
         run: |
@@ -153,3 +168,35 @@ jobs:
           if (-not $said.Contains($world)) {
             throw 'the state directory was not the one the environment named'
           }
+
+      # The Store takes the package unsigned and signs what it distributes, so
+      # the package the runner assembles is the package that is uploaded. The
+      # identity comes from the repository variable STORE_IDENTITY_PSD1, the
+      # contents of identity.psd1, and from the example file until that is set.
+      - name: Package for the Store, unsigned
+        shell: pwsh
+        env:
+          STORE_IDENTITY_PSD1: ${{ vars.STORE_IDENTITY_PSD1 }}
+        run: |
+          if ($env:STORE_IDENTITY_PSD1) {
+            Set-Content -Path packaging\windows\identity.psd1 -Value $env:STORE_IDENTITY_PSD1
+          } elseif ('${{ github.event_name }}' -eq 'release') {
+            throw 'a release package needs the real identity: set the repository variable STORE_IDENTITY_PSD1 to the contents of identity.psd1'
+          } else {
+            Copy-Item packaging\windows\identity.psd1.example packaging\windows\identity.psd1
+          }
+          powershell -ExecutionPolicy Bypass -File packaging\windows\build-msix.ps1 -OutDir dist
+          Get-ChildItem dist\*.msix | ForEach-Object { "$($_.Name) $([math]::Round($_.Length/1MB,1)) MB" }
+
+      - name: Keep the package
+        uses: actions/upload-artifact@v6
+        with:
+          name: msix
+          path: dist/*.msix
+
+      - name: Attach the package to the release
+        if: github.event_name == 'release' || github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${{ github.event.release.tag_name || inputs.tag }}" (Get-ChildItem dist\*.msix).FullName
