@@ -159,7 +159,7 @@ windows = { version = "0.62", features = [
 # thing the note above about `windows-sys` was written to watch for. Measured
 # 2026-09-05. A later version of this crate is published and is not taken,
 # because that one is what pulls a second copy in.
-windows-registry = "0.6"
+windows-registry = "0.100"
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_Security",
