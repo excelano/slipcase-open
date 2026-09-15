@@ -99,7 +99,7 @@ fi
 target_dir=$(cd "$root" && cargo metadata --format-version 1 --no-deps |
     sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p')
 
-# The same line `preflight.sh` reads, with the same shape.
+# The same line `ship` reads, with the same shape.
 version=$(sed -n 's/^version *= *"\([0-9][^"]*\)".*/\1/p' "${root}/Cargo.toml" | head -1)
 [ -n "$version" ] || {
     echo "build-app.sh: could not read a version out of Cargo.toml" >&2
