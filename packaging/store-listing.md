@@ -3,9 +3,9 @@
 The words that go in the Microsoft Store form, kept here so they can be reviewed
 and diffed rather than retyped into a web page and forgotten.
 
-**Every claim below has to be true of the built artefact**, and that is the check
-The release record's readiness review runs. It is the error this family has caught most
-often — a sentence written before anybody looked. Where a sentence describes
+**Every claim below has to be true of the built artefact**, checked against it
+rather than against memory. A sentence written before anybody looked is the
+error this family has caught most often. Where a sentence describes
 behaviour, `debian/changelog` is where that behaviour was first written down
 against a run; if the two disagree, the changelog is right and this is stale.
 
@@ -252,8 +252,7 @@ by title, after a title match found a terminal that merely had the word
 *Slipcase* in it.
 
 **Taken against the packaged build**, which is what a person installs. Note that
-they cannot be of the exact artefact uploaded, for the reason the release record gives
-about rebuilds differing.
+they cannot be of the exact artefact uploaded, because a rebuild differs.
 
 ---
 
@@ -281,7 +280,7 @@ is not a thing to discover after two listings are live. This repository has no
 script of its own for it: a second script writing a second file to one URL is
 exactly the failure that one was written to prevent. Its payload is a PDF, which
 exercises the path this product is for — extract, hand to the registered reader,
-write back on save. The release record carries this.
+write back on save.
 
 **`runFullTrust` is the only capability**, and the justification field has a
 500-character limit which counts newlines and truncates silently at the paste:

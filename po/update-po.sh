@@ -31,7 +31,7 @@
 # sets matched exactly — measured in slipcase-desktop, where this script was
 # written, and again here. The warnings cost nothing, but
 # they are also where a genuine miss would hide, so the way a dropped string is
-# found is not by reading them — it is the pseudolocale in `CHECKLIST.md`,
+# found is not by reading them — it is `pseudo.sh` beside this,
 # where anything still in English stands out on sight.
 set -eu
 

@@ -105,8 +105,8 @@ function Step([string] $what) { Write-Host "build-msix: $what" -ForegroundColor 
 # that `-Certify` can be quiet about those and loud about anything else.
 #
 # **This is a record of what is known, not a claim that it is acceptable.**
-# Recording a finding here does not take the decision to ship with it;
-# The release record carries that, with the tracing behind it.
+# Recording a finding here does not take the decision to ship with it. That is
+# David's.
 #
 # It started empty on purpose -- a baseline written before the first run is a
 # list of things somebody assumed -- and the first run, 2026-09-06, refused with
@@ -124,8 +124,7 @@ function Step([string] $what) { Write-Host "build-msix: $what" -ForegroundColor 
 #                         `APP_TYPE="Centennial"`, and the kit marks this task
 #                         optional for Centennial packages -- which is why
 #                         `OVERALL_RESULT` reads WARNING over a test reading
-#                         FAIL. The release record carries the decision to submit with
-#                         it outstanding.
+#                         FAIL. Submitted with it outstanding, deliberately.
 #
 # `DPIAwarenessValidation` was the second finding on that run. It never entered
 # this list: it was fixed instead -- there was no PE application manifest for the
