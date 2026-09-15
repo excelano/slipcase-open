@@ -217,7 +217,7 @@ if ($ReadReport) {
 # string Partner Center assigns per account, the same for every Excelano
 # product, and it comes from the environment so that a public repository does
 # not carry an account identifier: `windows.yml` passes the organisation
-# variable STORE_PUBLISHER, and a Windows machine sets STORE_PUBLISHER in its
+# secret STORE_PUBLISHER, and a Windows machine sets STORE_PUBLISHER in its
 # own environment before running this.
 $identityFile = Join-Path $here 'identity.psd1'
 if (-not (Test-Path -LiteralPath $identityFile)) {
@@ -231,7 +231,7 @@ foreach ($k in 'Name', 'PublisherDisplayName') {
 }
 $publisher = $env:STORE_PUBLISHER
 if (-not $publisher) {
-    Refuse 'no STORE_PUBLISHER in the environment - it is the X.500 string Partner Center shows under Product management, Product identity, as Package/Identity/Publisher, and it is the excelano organisation variable of that name'
+    Refuse 'no STORE_PUBLISHER in the environment - it is the X.500 string Partner Center shows under Product management, Product identity, as Package/Identity/Publisher, and it is the excelano organisation secret of that name'
 }
 # The value most often copied wrong is the one signtool is strictest about: it
 # refuses to sign a package whose manifest Publisher and whose certificate

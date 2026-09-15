@@ -171,18 +171,18 @@ jobs:
 
       # The Store takes the package unsigned, and the runner assembles the one that
       # is uploaded. `identity.psd1` is committed beside the build script; the
-      # publisher is the organisation variable, being the one value in the identity
+      # publisher is the organisation secret, being the one value in the identity
       # that is an account's rather than this product's. Without it a release
       # refuses and a push packages under a throwaway, so the packaging is still
       # proved on every commit.
       - name: Package for the Store, unsigned
         shell: pwsh
         env:
-          STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER }}
+          STORE_PUBLISHER: ${{ secrets.STORE_PUBLISHER }}
         run: |
           if (-not $env:STORE_PUBLISHER) {
             if ('${{ github.event_name }}' -eq 'release') {
-              throw 'a release package needs the real publisher: set the excelano organisation variable STORE_PUBLISHER to Partner Center''s Package/Identity/Publisher'
+              throw 'a release package needs the real publisher: set the excelano organisation secret STORE_PUBLISHER to Partner Center''s Package/Identity/Publisher'
             }
             $env:STORE_PUBLISHER = 'CN=00000000-0000-0000-0000-000000000000'
           }
