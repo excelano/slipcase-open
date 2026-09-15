@@ -169,21 +169,22 @@ jobs:
             throw 'the state directory was not the one the environment named'
           }
 
-      # The Store takes the package unsigned and signs what it distributes, so
-      # the package the runner assembles is the package that is uploaded. The
-      # identity comes from the repository variable STORE_IDENTITY_PSD1, the
-      # contents of identity.psd1, and from the example file until that is set.
+      # The Store takes the package unsigned, and the runner assembles the one that
+      # is uploaded. `identity.psd1` is committed beside the build script; the
+      # publisher is the organisation variable, being the one value in the identity
+      # that is an account's rather than this product's. Without it a release
+      # refuses and a push packages under a throwaway, so the packaging is still
+      # proved on every commit.
       - name: Package for the Store, unsigned
         shell: pwsh
         env:
-          STORE_IDENTITY_PSD1: ${{ vars.STORE_IDENTITY_PSD1 }}
+          STORE_PUBLISHER: ${{ vars.STORE_PUBLISHER }}
         run: |
-          if ($env:STORE_IDENTITY_PSD1) {
-            Set-Content -Path packaging\windows\identity.psd1 -Value $env:STORE_IDENTITY_PSD1
-          } elseif ('${{ github.event_name }}' -eq 'release') {
-            throw 'a release package needs the real identity: set the repository variable STORE_IDENTITY_PSD1 to the contents of identity.psd1'
-          } else {
-            Copy-Item packaging\windows\identity.psd1.example packaging\windows\identity.psd1
+          if (-not $env:STORE_PUBLISHER) {
+            if ('${{ github.event_name }}' -eq 'release') {
+              throw 'a release package needs the real publisher: set the excelano organisation variable STORE_PUBLISHER to Partner Center''s Package/Identity/Publisher'
+            }
+            $env:STORE_PUBLISHER = 'CN=00000000-0000-0000-0000-000000000000'
           }
           powershell -ExecutionPolicy Bypass -File packaging\windows\build-msix.ps1 -OutDir dist
           Get-ChildItem dist\*.msix | ForEach-Object { "$($_.Name) $([math]::Round($_.Length/1MB,1)) MB" }

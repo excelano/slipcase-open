@@ -8,8 +8,8 @@ needs to know.
     build-msix.ps1         builds the binary, stages, packages, optionally signs
     check-imports.ps1      refuses a DLL that does not ship with Windows
     make-ico.ps1           renders the five tray icons from the one drawing
-    identity.psd1          what Partner Center assigned. NOT COMMITTED
-    identity.psd1.example  the template, which says what goes in it
+    identity.psd1          the reserved name and the calculated forms;
+                           the publisher is STORE_PUBLISHER in the environment
     assets/                tile and file-type logos, every scale
     listing/               the Store logo, which is not in the package
     policy/                the ADMX and ADML pair, which is not in the package

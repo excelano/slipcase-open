@@ -212,21 +212,32 @@ if ($ReadReport) {
 }
 
 # --- the identity, which cannot be guessed ---------------------------------
+# `identity.psd1` beside this holds what is public: the reserved name, the
+# publisher display name, and the calculated forms. `Publisher` is the X.500
+# string Partner Center assigns per account, the same for every Excelano
+# product, and it comes from the environment so that a public repository does
+# not carry an account identifier: `windows.yml` passes the organisation
+# variable STORE_PUBLISHER, and a Windows machine sets STORE_PUBLISHER in its
+# own environment before running this.
 $identityFile = Join-Path $here 'identity.psd1'
 if (-not (Test-Path -LiteralPath $identityFile)) {
-    Refuse "no identity.psd1. Copy identity.psd1.example beside it and put in the values Partner Center shows under Product management -> Product identity."
+    Refuse "no identity at $identityFile - it is committed beside this script and should not be missing"
 }
 $identity = Import-PowerShellDataFile -LiteralPath $identityFile
-foreach ($k in 'Name', 'Publisher', 'PublisherDisplayName') {
+foreach ($k in 'Name', 'PublisherDisplayName') {
     if (-not $identity.ContainsKey($k) -or -not $identity[$k]) {
         Refuse "identity.psd1 has no $k"
     }
 }
+$publisher = $env:STORE_PUBLISHER
+if (-not $publisher) {
+    Refuse 'no STORE_PUBLISHER in the environment - it is the X.500 string Partner Center shows under Product management, Product identity, as Package/Identity/Publisher, and it is the excelano organisation variable of that name'
+}
 # The value most often copied wrong is the one signtool is strictest about: it
 # refuses to sign a package whose manifest Publisher and whose certificate
 # subject differ, and the display name is not the X.500 string.
-if ($identity.Publisher -notmatch '^(CN|O|OU|L|S|C|E)=') {
-    Refuse "Publisher is '$($identity.Publisher)', which is not an X.500 string. It is the Package/Identity/Publisher value, not the display name."
+if ($publisher -notmatch '^(CN|O|OU|L|S|C|E)=') {
+    Refuse "STORE_PUBLISHER is '$publisher', which is not an X.500 string. It is the Package/Identity/Publisher value, not the display name."
 }
 
 # --- the version, from the one parser ---------------------------------------
@@ -320,7 +331,7 @@ foreach ($state in @('', '-working', '-yellow', '-orange', '-red')) {
 
 $manifest = Get-Content -LiteralPath (Join-Path $here 'AppxManifest.xml.in') -Raw
 $manifest = $manifest.Replace('@IDENTITY_NAME@', $identity.Name)
-$manifest = $manifest.Replace('@PUBLISHER@', $identity.Publisher)
+$manifest = $manifest.Replace('@PUBLISHER@', $publisher)
 $manifest = $manifest.Replace('@PUBLISHER_DISPLAY_NAME@', $identity.PublisherDisplayName)
 $manifest = $manifest.Replace('@VERSION_APPX@', $versionAppx)
 # A placeholder that survived substitution is a package that will be rejected at
@@ -358,13 +369,13 @@ Copy-Item -LiteralPath $unsigned -Destination $signed -Force
 # The subject is built from the manifest's Publisher rather than typed a second
 # time, because the two differing is exactly what signtool refuses on.
 $existing = Get-ChildItem Cert:\CurrentUser\My -ErrorAction SilentlyContinue |
-            Where-Object { $_.Subject -eq $identity.Publisher } | Select-Object -First 1
+            Where-Object { $_.Subject -eq $publisher } | Select-Object -First 1
 if ($existing) {
     Step "reusing certificate $($existing.Thumbprint)"
     $cert = $existing
 } else {
-    Step "making a throwaway certificate for $($identity.Publisher)"
-    $cert = New-SelfSignedCertificate -Type Custom -Subject $identity.Publisher `
+    Step "making a throwaway certificate for $($publisher)"
+    $cert = New-SelfSignedCertificate -Type Custom -Subject $publisher `
         -KeyUsage DigitalSignature -FriendlyName 'Slipcase Open test signing' `
         -CertStoreLocation 'Cert:\CurrentUser\My' `
         -TextExtension @('2.5.29.37={text}1.3.6.1.5.5.7.3.3', '2.5.29.19={text}')
