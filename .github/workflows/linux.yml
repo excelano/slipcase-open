@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: What is installed
         run: rustc -V && cargo -V && dpkg-deb --version | head -1
