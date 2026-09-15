@@ -58,7 +58,7 @@ format library exposing a checksum invites the reading it declined to license.
 0.3.11 waits. Nothing published consumes the accessor;
 `slipcase-open` is on a path dependency through Phase 2 by design; `slpc` and
 `slipcase` version in lockstep, so a release is the full cycle in
-`RELEASING.md` including the apt push that document flags as the step a release
+The release record including the apt push that document flags as the step a release
 loses; and the design work so far has turned up three separate places where the
 answer was *`slpc` already does that, or should*, which makes a second release a
 fortnight later the likely outcome of cutting one now.
@@ -166,7 +166,7 @@ media type, `slipcase-desktop` 0.1.4 onto it, and then this.
 The tool is complete and shipped on two platforms. Phase 4 put 0.1.4 on the
 Microsoft Store on 2026-09-06, and apt caught up the same day: it had been
 serving 0.1.3, without the refusal that 0.1.4's changelog leads with, because
-`RELEASE.md` puts Linux ahead of Windows in the order and that step was skipped.
+The release record puts Linux ahead of Windows in the order and that step was skipped.
 The package on apt is built from `main` after the Store branch was merged into
 it, so the two channels carry the same code.
 
@@ -212,14 +212,14 @@ named pipe, a gate that runs on a Windows machine, the launcher, the toast, the
 ProgID and its secondary verb, MSIX and the Store identity, the tray, the
 registry policy source with its ADMX/ADML pair, and the two behaviour changes
 below. Not in: a winget manifest of its own. The listing is reachable through
-winget's `msstore` source meanwhile, which is how `RELEASE.md` reads it back.
+winget's `msstore` source meanwhile, which is how the release record reads it back.
 
 **What the submission needed was assembled and went in.** The certification-kit
-run, with its one accepted finding traced in `RELEASE.md`; the screenshots,
+run, with its one accepted finding traced in the release record; the screenshots,
 which are a pair — the payoff and the refusal, one tray icon in two colours —
 rather than the three first planned, and `store-listing.md` says why; `packaging/windows/README.md`; the demo container,
 which is the sibling's and served from the site; the support and privacy URLs;
-and the age ratings. `RELEASE.md` holds the order and the readiness review. Its
+and the age ratings. The release record holds the order and the readiness review. Its
 two hand checks — the zone warning seen on screen, and the ADMX rendered in
 `gpedit.msc` — stand as it left them: outstanding until somebody has watched
 them.

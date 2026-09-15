@@ -106,7 +106,7 @@ function Step([string] $what) { Write-Host "build-msix: $what" -ForegroundColor 
 #
 # **This is a record of what is known, not a claim that it is acceptable.**
 # Recording a finding here does not take the decision to ship with it;
-# `RELEASE.md` carries that, with the tracing behind it.
+# The release record carries that, with the tracing behind it.
 #
 # It started empty on purpose -- a baseline written before the first run is a
 # list of things somebody assumed -- and the first run, 2026-09-06, refused with
@@ -124,7 +124,7 @@ function Step([string] $what) { Write-Host "build-msix: $what" -ForegroundColor 
 #                         `APP_TYPE="Centennial"`, and the kit marks this task
 #                         optional for Centennial packages -- which is why
 #                         `OVERALL_RESULT` reads WARNING over a test reading
-#                         FAIL. `RELEASE.md` carries the decision to submit with
+#                         FAIL. The release record carries the decision to submit with
 #                         it outstanding.
 #
 # `DPIAwarenessValidation` was the second finding on that run. It never entered
@@ -167,7 +167,7 @@ function Test-CertificationReport([string] $report) {
         # ContainsKey rather than indexing: `Set-StrictMode -Version Latest` is
         # on in this script, and a missing key is the ordinary case here.
         if ($KNOWN_FINDINGS.ContainsKey($name) -and $KNOWN_FINDINGS[$name] -eq $verdict) {
-            Write-Host "$verdict  $name  (known - see RELEASE.md)"
+            Write-Host "$verdict  $name  (known - baselined)"
         } else {
             $unexpected += "$verdict $name"
             Write-Host "$verdict  $name  ** NOT IN THE KNOWN LIST **" -ForegroundColor Yellow

@@ -16,7 +16,7 @@
 # **Nothing here is signed.** A signing identity is not a thing a runner has,
 # so the bundle is assembled unsigned and Gatekeeper never sees it: a bundle
 # built on the machine that opens it carries no quarantine mark and is not
-# assessed. Notarization is a release step and `RELEASE.md` holds it.
+# assessed. Notarization is a release step, done on the Mac lane.
 #
 # **The runner is Apple silicon**, which is the architecture no machine this
 # was developed on has, so the arm64 slice of a released bundle is code that

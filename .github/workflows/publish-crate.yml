@@ -1,6 +1,6 @@
 name: Publish to crates.io
 
-# Fires on the version tag the hand-cut release loop pushes (RELEASE.md), and
+# Fires on the version tag `ship` pushes, and
 # can be run by hand. `cargo publish` compiles and uploads from source, so it
 # is independent of the .deb and the store packages and runs beside them; the
 # tag is pushed before the GitHub release exists, so the crate lands first.

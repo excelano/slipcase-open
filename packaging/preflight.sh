@@ -17,7 +17,7 @@
 # **What this cannot check is the listing.** `packaging/store-listing.md` makes
 # claims about behaviour, and every one has to be true of the artefact being
 # uploaded. Nothing here can read a sentence and decide whether it is true, so
-# that is a person's job and `RELEASE.md` carries the list.
+# that is a person's job.
 #
 # Author: David M. Anderson
 # Built with AI assistance (Claude, Anthropic)
@@ -153,7 +153,7 @@ echo
 if [ "$failed" -eq 0 ]; then
     echo "Nothing local is stopping a release of ${version}."
     echo "The listing's claims and the certification kit are still a person's job;"
-    echo "RELEASE.md has both."
+    echo "run the readiness review before submitting."
 else
     echo "${failed} check(s) failed. Nothing was changed."
     exit 1

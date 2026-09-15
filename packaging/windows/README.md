@@ -48,7 +48,7 @@ refused with two findings:
 
 | Finding | Verdict | What happened |
 | --- | --- | --- |
-| `Blocked executables` | FAIL | `ShellExecuteExW`, which is what this product does. Baselined; `RELEASE.md` carries the tracing and the decision. |
+| `Blocked executables` | FAIL | `ShellExecuteExW`, which is what this product does. Baselined; the release record carries the tracing and the decision. |
 | `DPIAwarenessValidation` | WARNING | No PE application manifest to read. **Fixed rather than baselined** — `build.rs` embeds one now. |
 
 Each finding earns its place in that list only after somebody traces it.
