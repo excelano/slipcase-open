@@ -1,0 +1,44 @@
+# What this release tells the stores it changed, in every language the
+# listing is in. One file, both languages, because a translation is reviewed
+# beside its source.
+#
+# The version is checked against the release being cut: notes left from last
+# time stop the release rather than reaching a listing. A language the listing
+# has and this file does not is also a refusal - a German listing saying
+# something nobody wrote is worse than a release that stops.
+#
+# Nothing else reads this. The GitHub release, the Debian changelog and the
+# AppStream entry take commit subjects.
+
+version = "0.1.6"
+
+[locales."de-de"]
+whats-new = """
+Deutsch. Auf einem deutsch eingestellten Rechner erscheinen die
+Benachrichtigungen, die Schaltflächen darauf und die stehende Liste auf
+Deutsch, und ebenso das, was `sessions` und `recover` ausgeben. Es gibt nichts
+auszuwählen: Slipcase Open übernimmt die Sprache, auf die Windows bereits
+eingestellt ist, und fällt für jede andere auf Englisch zurück.
+
+**Was das Werkzeug über Ihre Dateien sagt, ist übersetzt; was es über sich
+selbst sagt, nicht.** `--help` und der Einstellungsbericht bleiben englisch,
+letzterer, weil er Pfade in einer Tabelle druckt, die auf die Breite englischer
+Wörter gebaut ist, und weil er das ist, was man in einen Fehlerbericht einfügt.
+"""
+
+[locales."en-us"]
+whats-new = """
+On a machine set to German the notifications, the buttons on them and
+the standing list come up in German, and so does what `sessions` and `recover`
+print. There is nothing to choose: Slipcase Open reads the language Windows is
+already set to, and falls back to English for every other one.
+
+
+**What the tool says about your files is translated; what it says about itself
+is not.** `--help` and the settings report stay in English, the second because
+it prints paths in a table built to the width of English words and is what you
+would paste into a bug report.
+
+---
+"""
+
