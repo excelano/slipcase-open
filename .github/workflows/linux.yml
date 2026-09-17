@@ -33,9 +33,34 @@ name: Linux
 on:
   push:
   pull_request:
+  # What attaches the package. A person's token creates the release, so the
+  # event fires; a release created by a workflow using the default
+  # GITHUB_TOKEN fires nothing, which is what the dispatch below is for. A
+  # release event resolves this file at the tag rather than on the default
+  # branch.
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      # Optional. With a tag the package is attached to that release; without
+      # one it is built, checked and kept as an artefact, which is how
+      # everything above the attach is exercised without a release to spend.
+      tag:
+        description: 'Tag to package for (e.g. v0.1.8)'
+        required: false
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
+
+permissions:
+  contents: read
+
+concurrency:
+  # Keyed by the tag when this is releasing and by the ref when it is checking,
+  # so a push cannot cancel a run that is building a release's package.
+  group: linux-${{ github.event.release.tag_name || inputs.tag || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
 
 jobs:
   linux:
@@ -43,6 +68,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name || inputs.tag || github.ref }}
 
       - name: What is installed
         run: rustc -V && cargo -V && dpkg-deb --version | head -1
@@ -84,6 +111,7 @@ jobs:
           cargo check --all-targets --target x86_64-apple-darwin
 
       - name: Build the package
+        id: package
         run: |
           cargo install cargo-deb --locked
           cargo build --release
@@ -91,6 +119,9 @@ jobs:
           # to find it: `[build] target-dir` moves the target directory and no
           # environment variable then says so.
           cargo deb --no-build | tee /tmp/deb-path
+          # The same path as an output, because `upload-artifact` takes a glob
+          # rather than a command and cannot read the file above.
+          echo "path=$(cat /tmp/deb-path)" >> "$GITHUB_OUTPUT"
 
       # Two things worth reading every time. `/etc/slipcase/open.toml` must be a
       # conffile or dpkg overwrites an administrator's policy on the next
@@ -191,3 +222,42 @@ jobs:
           gio mime application/x.slipcase+zip | grep -q 'slipcase-open.desktop' ||
               { echo "this tool is not registered against the type" >&2; exit 1; }
           gio mime application/x.slipcase+zip
+
+      # The package leaves this job, which until now it did not: it was built
+      # on every push, checked by everything above, and thrown away at the end
+      # of the job. A release that carries no `.deb` is a release the apt step
+      # refuses.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: deb
+          path: ${{ steps.package.outputs.path }}
+          if-no-files-found: error
+
+  # Only where there is a release to attach to. A push builds the package to
+  # check it and keeps it as an artefact, which is the point of building it on
+  # a push; a dispatch with no tag does the same, so everything above can be
+  # exercised without spending a release.
+  attach:
+    needs: linux
+    if: github.event.release.tag_name || inputs.tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: deb
+          path: packages
+
+      - name: Attach the package to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name || inputs.tag }}
+        run: |
+          set -eu
+          ls -l packages
+          # The tag goes through the environment rather than into the command's
+          # text: GitHub substitutes an expression before the shell parses the
+          # line, and a dispatch input is free text.
+          gh release upload "$TAG" packages/*.deb
