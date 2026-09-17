@@ -217,7 +217,7 @@ winget's `msstore` source meanwhile, which is how `ship` reads it back.
 **What the submission needed was assembled and went in.** The certification-kit
 run, with its one accepted finding traced; the screenshots,
 which are a pair — the payoff and the refusal, one tray icon in two colours —
-rather than the three first planned, and `store-listing.md` says why; `packaging/windows/README.md`; the demo container,
+rather than the three first planned, and `submission-notes.md` says why; `packaging/windows/README.md`; the demo container,
 which is the sibling's and served from the site; the support and privacy URLs;
 and the age ratings. Its two hand checks — the zone warning seen on screen, and the ADMX rendered in
 `gpedit.msc` — stand as it left them: outstanding until somebody has watched

@@ -1,0 +1,202 @@
+# The copy both store listings are filled in from.
+#
+# Every line of this is a claim about the code, and a claim like that goes
+# stale silently in a web form nobody diffs. So it lives here, is reviewed and
+# committed like anything else, and `ship` pushes it to both stores on every
+# release. Edit here; do not edit a listing in a browser.
+#
+# The fields both stores take sit at the top of a language. The rest sit under
+# the store that takes them, because the two do not take the same fields and do
+# not count them the same way. The name is under each store because the two can
+# disagree about it.
+#
+# Limits, which ship checks before the tag and counts in characters rather than
+# bytes: apple.name and apple.subtitle 30, apple.promotional-text 170,
+# apple.keywords 100 including the commas, description 4,000 - the Microsoft
+# Store allows 10,000 and this is written to Apple's - microsoft.short-description
+# 500, microsoft.features 20 of 200, microsoft.keywords 7 of 30.
+#
+# What is *not* here is what changed in this release. That is
+# release-notes.toml, which is rewritten every time; this changes when the
+# product does.
+#
+# No URLs reach the Microsoft Store from here. Its submission document has no
+# field for them: Partner Center keeps the website, the privacy policy and the
+# support contact against the product. Measured 2026-09-16.
+#
+# THE GERMAN HALF
+#
+# Terminology is the application's own, out of the catalogue at `po/de.po`. A
+# listing that calls a thing something the window does not teaches a reader a
+# word the product has no use for, so where the catalogue has a term it wins.
+#
+# German runs longer than English, which is what the limits above are for:
+# `ship` counts every field before the tag, in characters rather than bytes,
+# and a release stops rather than a submission failing.
+
+[locales."de-de"]
+description = """
+Ein Slipcase-Container ist eine `.slpc`-Datei: eine einzelne Datei, die ein
+Dokument zusammen mit einem Datensatz hält, der es beschreibt. Slipcase Open
+ist das, was geschieht, wenn Sie darauf doppelklicken.
+
+Das Dokument darin öffnet sich in der Anwendung, die Sie für diesen Dateityp
+ohnehin benutzen — Ihrem PDF-Betrachter, Ihrer Tabellenkalkulation, Ihrem
+Texteditor. Bearbeiten Sie es dort und speichern Sie wie sonst auch, und die
+Änderung wird in den Container zurückgeschrieben. Es gibt keinen zusätzlichen
+Schritt zu merken und nichts zu exportieren und wieder einzulesen.
+
+**Es gibt kein Fenster zu erlernen.** Slipcase Open setzt ein Symbol neben die
+Uhr, solange es ein Dokument offen hält, und die Farbe dieses Symbols ist die
+ganze Oberfläche: sie beantwortet fortwährend eine einzige Frage, nämlich ob
+Ihre Arbeit dort ist, wo sie hingehört. Sein Menü nennt die Dateien, die es
+offen hält, und erklärt die Farbe, wenn es etwas zu erklären gibt.
+
+**Ihre Arbeit geht nicht verloren, wenn etwas schiefgeht.** Endet eine
+Anwendung oder der Rechner, während ein Dokument offen ist, liegt die Änderung
+weiterhin auf der Platte, und Slipcase Open schreibt sie beim nächsten Lauf in
+ihren Container zurück. Gefragt werden Sie nur in dem einen Fall, in dem Fragen
+redlich ist — wenn der Container sich ebenfalls geändert hat, sodass nur Sie sagen können,
+welche Fassung gemeint war.
+
+**Es ist vorsichtig damit, was es öffnet.** Kam ein Container aus dem Internet,
+sagt die entpackte Kopie das auch, damit die Anwendung, die sie öffnet, die
+Datei mit der Vorsicht behandelt, die sie allem von außen entgegenbringt. Eine
+Nutzlast, deren Inhalt ein Programm ist, während ihr Name ein Dokument
+verspricht, wird rundheraus abgelehnt, bevor etwas auf die Platte gelangt, und Sie erfahren,
+warum. Und
+geöffnet werden überhaupt nur gewöhnliche Dokument- und Bildtypen.
+
+**Für Administratoren.** Welche Dateitypen geöffnet werden dürfen, ist per
+Gruppenrichtlinie einstellbar und festsetzbar; eine ADMX-Vorlage ist separat
+erhältlich. Computerrichtlinie hat Vorrang vor Benutzerrichtlinie, diese vor
+den eigenen Einstellungen eines Benutzers, und eine Sperrliste schlägt alles.
+Die Anwendung sagt das in ihrer eigenen Oberfläche, wenn Einstellungen
+verwaltet werden, damit eine Ablehnung sich als Entscheidung liest, die jemand
+getroffen hat, und nicht als Software, die sich unvorhersehbar verhält.
+
+Slipcase Open stellt keinerlei Netzwerkverbindung her. Es sammelt nichts und
+sendet nichts irgendwohin.
+
+Eine Befehlszeile gehört dazu und ist eine unterstützte Schnittstelle, kein
+Debug-Hilfsmittel: `slipcase-open` öffnet einen Container, listet auf, was
+offen ist, und stellt wieder her, was zurückgelassen wurde.
+
+Das Slipcase-Containerformat ist eine offene Spezifikation, veröffentlicht auf
+slipcaseformat.org. Ein Container ist ein gewöhnliches ZIP-Archiv, sodass
+nichts, was Sie hineinlegen, an diese Anwendung gebunden ist.
+"""
+
+[locales."de-de".microsoft]
+name = "Slipcase Open"
+short-description = """
+Die Nutzlast eines Slipcase-Containers in der Anwendung öffnen, die diesen
+Dateityp ohnehin schon öffnet — und beim Speichern wird Ihre Änderung in den
+Container zurückgeschrieben.
+"""
+features = [
+  "Doppelklick auf einen .slpc-Container, und das Dokument darin öffnet sich in der Anwendung, die Sie für diesen Dateityp ohnehin benutzen.",
+  "Bearbeiten und speichern wie sonst auch. Die Änderung wird in den Container zurückgeschrieben; nichts muss exportiert und wieder eingelesen werden.",
+  "Kein Fenster zu erlernen: ein Symbol neben der Uhr beantwortet, ob Ihre Arbeit dort ist, wo sie hingehört, und sein Menü nennt die offen gehaltenen Dateien.",
+  "Endet eine Anwendung oder der Rechner, während ein Dokument offen ist, liegt die Änderung weiter auf der Platte und geht beim nächsten Mal in ihren Container zurück.",
+  "Gefragt werden Sie nur, wenn der Container sich ebenfalls änderte — der eine Fall, in dem nur Sie antworten können.",
+  "Kam ein Container aus dem Internet, trägt auch die entpackte Kopie diese Markierung, damit die öffnende Anwendung vorsichtig bleibt.",
+  "Eine Nutzlast, deren Inhalt ein Programm ist, während ihr Name ein Dokument verspricht, wird abgelehnt, bevor etwas auf die Platte gelangt, und Sie erfahren warum.",
+  "Geöffnet werden überhaupt nur gewöhnliche Dokument- und Bildtypen.",
+  "Welche Dateitypen geöffnet werden dürfen, ist per Gruppenrichtlinie einstellbar und festsetzbar; eine ADMX-Vorlage ist separat erhältlich.",
+  "Computerrichtlinie schlägt Benutzerrichtlinie, Benutzerrichtlinie schlägt die eigenen Einstellungen, und eine Sperrliste schlägt alles.",
+  "Keinerlei Netzwerkverbindung. Es sammelt nichts und sendet nichts irgendwohin.",
+  "Eine unterstützte Befehlszeile, kein Debug-Hilfsmittel: einen Container öffnen, auflisten was offen ist, und Zurückgelassenes wiederherstellen.",
+  "Das Containerformat ist eine offene Spezifikation, veröffentlicht auf slipcaseformat.org, und ein Container ist ein gewöhnliches ZIP-Archiv.",
+]
+keywords = [
+  "slpc",
+  "Slipcase",
+  "Container",
+  "Nutzlast",
+  "öffnen",
+  "bearbeiten",
+  "Archiv",
+]
+
+[locales."en-us"]
+description = """
+A Slipcase container is a `.slpc` file: a single file holding a document
+together with a record describing it. Slipcase Open is what happens when you
+double-click one.
+
+The document inside opens in whatever application you already use for that kind
+of file — your PDF reader, your spreadsheet, your text editor. Edit it there and
+save as you normally would, and the edit is written back into the container.
+There is no separate step to remember and nothing to export and re-import.
+
+**There is no window to learn.** Slipcase Open puts an icon by the clock while
+it is holding a document open, and the icon's colour is the whole interface: it
+answers one question continuously, which is whether your work is where it
+should be. Its menu names the files it is holding and explains the colour when
+there is something to explain.
+
+**Your work is not lost if something goes wrong.** If an application or the
+machine stops while a document is open, the edit is still on disk, and Slipcase
+Open puts it back into its container the next time it runs. You are only asked
+about it in the one case where asking is the honest thing to do — when the
+container changed as well, so that only you can say which version was meant.
+
+**It is careful about what it opens.** A container that arrived from the
+internet keeps that marking when its document is extracted, so the application
+that opens it treats the file with the caution it gives anything from outside.
+A payload whose contents are a program while its name claims to be a document
+is refused outright, before anything reaches the disk, and you are told why. And
+only ordinary document and image types are opened at all.
+
+**For administrators.** The set of file types that may be opened is
+configurable and lockable through Group Policy, with an ADMX template available
+separately. Machine policy takes precedence over user policy, which takes
+precedence over a user's own settings, and a deny list wins over everything. The
+application says so in its own interface when settings are being administered,
+so that a refusal reads as a decision somebody made rather than as software
+behaving unpredictably.
+
+Slipcase Open makes no network connection of any kind. It collects nothing and
+sends nothing anywhere.
+
+A command line is included and is a supported interface, not a debugging aid:
+`slipcase-open` will open a container, list what is open, and recover what was
+left behind.
+
+The Slipcase container format is an open specification, published at
+slipcaseformat.org. A container is an ordinary ZIP archive, so nothing you put
+in one is locked to this application.
+"""
+
+[locales."en-us".microsoft]
+name = "Slipcase Open"
+short-description = """
+Open the payload of a Slipcase container in whatever application already
+handles that kind of file, and have your edits written back into the container
+when you save.
+"""
+features = [
+  "Double-click a .slpc container and the document inside opens in the application you already use for that kind of file.",
+  "Edit and save as you normally would. The edit is written back into the container, with nothing to export and re-import.",
+  "No window to learn: an icon by the clock answers whether your work is where it should be, and its menu names the files being held open.",
+  "If an application or the machine stops while a document is open, the edit is still on disk and goes back into its container next time.",
+  "You are asked which version was meant only when the container changed as well, which is the one case where only you can answer.",
+  "A container that arrived from the internet keeps that marking when its document is extracted, so the opening application stays cautious.",
+  "A payload whose contents are a program while its name claims a document is refused before anything reaches the disk, and you are told why.",
+  "Only ordinary document and image types are opened at all.",
+  "The file types that may be opened are configurable and lockable through Group Policy, with an ADMX template available separately.",
+  "Machine policy beats user policy, user policy beats a user's own settings, and a deny list wins over everything.",
+  "Makes no network connection of any kind. Collects nothing and sends nothing anywhere.",
+  "A supported command line, not a debugging aid: open a container, list what is open, and recover what was left behind.",
+  "The container format is an open specification published at slipcaseformat.org, and a container is an ordinary ZIP archive.",
+]
+keywords = [
+  "slpc",
+  "slipcase",
+  "container",
+  "payload",
+  "open",
+  "edit",
+  "archive",
+]

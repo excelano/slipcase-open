@@ -4,7 +4,7 @@
 # window. This product has no window, which is the whole design: what a person
 # meets is an entry in Explorer's context menu, an icon by the clock with a
 # menu, and — when something is wrong — a message box. Those are the three
-# things `packaging/store-listing.md` lists, and they are three different
+# things `packaging/store-listing.toml` lists, and they are three different
 # capture problems.
 #
 #   -Window <title>   a real window, sized and captured by its frame. The
@@ -27,7 +27,7 @@
 #
 # Decide whether a screenshot is any good, or choose the container. Which
 # container appears in a listing is an editorial decision and is recorded in
-# `packaging/store-listing.md` rather than here.
+# `packaging/submission-notes.md` rather than here.
 #
 # TWO THINGS MEASURED IN THE SIBLING AND INHERITED HERE, BOTH OF THEM PIXELS
 #
