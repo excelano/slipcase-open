@@ -20,6 +20,11 @@ policy=""
 binary=""
 found_binary=""
 
+# SPEC 4's, and the one place this script spells it: the guard below and the
+# advice it prints have to agree, and a rename that reaches one and not the
+# other leaves a check passing while the instructions beside it are wrong.
+media_type='application/vnd.excelano.slipcase+zip'
+
 usage() {
     cat <<'USAGE'
 usage: install.sh [--prefix DIR] [--policy DIR] [--binary PATH] [--no-binary]
@@ -112,26 +117,29 @@ echo "installed the payload entry under ${prefix}"
 # `types` is what `update-mime-database` writes and it answers the question that
 # matters, which is whether this machine knows the type at all.
 #
-# The string is the registered media type, which slipcase-common declares from
-# 1.1.2. An earlier version declares the provisional name and nothing else, so
-# this fails there, and it should: the alias in 1.1.2 runs from the old name to
-# the new one and there is nothing in the older database pointing the other way.
-# The entry below names the registered type, so an older slipcase-common leaves
-# a container typing as one string and this entry claiming another.
-if ! grep -qsx 'application/vnd.excelano.slipcase+zip' \
-        "${prefix}/share/mime/types" \
-        /usr/local/share/mime/types \
-        /usr/share/mime/types
+# Two questions, not one: whether this machine knows the type at all, and
+# whether what it knows is the registered name or the provisional one it
+# supersedes. A slipcase-common old enough to declare only the provisional name
+# leaves a container typing as one string while the entry below claims another,
+# and the alias runs from the old name to the new one, so nothing in the older
+# database points the way this needs. Asked rather than stated as a version,
+# because the version that fixed it is another repository's to change.
+types="${prefix}/share/mime/types /usr/local/share/mime/types /usr/share/mime/types"
+if ! grep -qsx "$media_type" $types
 then
     echo
-    echo "The registered Slipcase media type is not declared on this machine."
-    echo "Install slipcase-common 1.1.2 or later, or run its install.sh, or"
-    echo "nothing will associate a .slpc with this entry. A version before"
-    echo "1.1.2 declares the superseded name and is what this looks like"
-    echo "from here."
+    if grep -qsx 'application/x.slipcase+zip' $types; then
+        echo "This machine declares the Slipcase media type under the name the"
+        echo "registration superseded. Upgrade slipcase-common, or run its"
+        echo "install.sh, or nothing will associate a .slpc with this entry."
+    else
+        echo "The Slipcase media type is not declared on this machine."
+        echo "Install slipcase-common, or run its install.sh, or nothing will"
+        echo "associate a .slpc with this entry."
+    fi
 fi
 
 echo
 echo "check it with:"
-echo "  xdg-mime query filetype SOME.slpc     # application/vnd.excelano.slipcase+zip"
-echo "  xdg-mime query default application/vnd.excelano.slipcase+zip"
+echo "  xdg-mime query filetype SOME.slpc     # ${media_type}"
+echo "  xdg-mime query default ${media_type}"
