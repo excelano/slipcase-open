@@ -195,7 +195,7 @@ jobs:
       # it — the first version of this line was a real short hash with the rest
       # invented, which clones fine and fails the checkout with exit 128.
       #
-      # COMMON-PIN: 2d20438f1216c45b2b931ba40c0c2997f7b07671
+      # COMMON-PIN: bfde6bec075e3811932907bdfec62a0cc2e1822f
       - name: The type and the entry are ours
         run: |
           sudo apt-get install -y -qq shared-mime-info desktop-file-utils libglib2.0-bin
@@ -203,7 +203,7 @@ jobs:
           git clone --filter=blob:none --no-checkout \
               https://github.com/excelano/slipcase-common.git "${RUNNER_TEMP}/common"
           git -C "${RUNNER_TEMP}/common" checkout --detach \
-              2d20438f1216c45b2b931ba40c0c2997f7b07671
+              bfde6bec075e3811932907bdfec62a0cc2e1822f
           "${RUNNER_TEMP}/common/install.sh"
           ./packaging/linux/install.sh
 
