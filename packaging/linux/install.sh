@@ -111,18 +111,27 @@ echo "installed the payload entry under ${prefix}"
 # product's declaration is a differently named file and a fourth could arrive;
 # `types` is what `update-mime-database` writes and it answers the question that
 # matters, which is whether this machine knows the type at all.
-if ! grep -qsx 'application/x.slipcase+zip' \
+#
+# The string is the registered media type, which slipcase-common declares from
+# 1.2.0. An earlier version declares the provisional name and nothing else, so
+# this fails there, and it should: the alias in 1.2.0 runs from the old name to
+# the new one and there is nothing in the older database pointing the other way.
+# The entry below names the registered type, so an older slipcase-common leaves
+# a container typing as one string and this entry claiming another.
+if ! grep -qsx 'application/vnd.excelano.slipcase+zip' \
         "${prefix}/share/mime/types" \
         /usr/local/share/mime/types \
         /usr/share/mime/types
 then
     echo
-    echo "The Slipcase media type is not declared on this machine."
-    echo "Install slipcase-common, or run its install.sh, or nothing will"
-    echo "associate a .slpc with this entry."
+    echo "The registered Slipcase media type is not declared on this machine."
+    echo "Install slipcase-common 1.2.0 or later, or run its install.sh, or"
+    echo "nothing will associate a .slpc with this entry. A version before"
+    echo "1.2.0 declares the superseded name and is what this looks like"
+    echo "from here."
 fi
 
 echo
 echo "check it with:"
-echo "  xdg-mime query filetype SOME.slpc     # application/x.slipcase+zip"
-echo "  xdg-mime query default application/x.slipcase+zip"
+echo "  xdg-mime query filetype SOME.slpc     # application/vnd.excelano.slipcase+zip"
+echo "  xdg-mime query default application/vnd.excelano.slipcase+zip"

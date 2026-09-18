@@ -24,8 +24,9 @@ control an administrator did not put there and cannot see.
 
 Check that it took:
 
-    xdg-mime query filetype some.slpc                    # application/x.slipcase+zip
-    xdg-mime query default application/x.slipcase+zip
+    type=application/vnd.excelano.slipcase+zip
+    xdg-mime query filetype some.slpc   # $type
+    xdg-mime query default "$type"      # slipcase-open.desktop
 
 An empty file answers `application/x-zerosize` whatever the glob says, so check
 against a real container.
@@ -47,8 +48,14 @@ usage and exits.
 
 ### The media type is not here
 
-`slipcase-common` declares `application/x.slipcase+zip` and ships the icon a
-container is drawn with, and both products depend on it. Two packages cannot
+`slipcase-common` declares `application/vnd.excelano.slipcase+zip`, which IANA
+registered on 2026-09-16, keeps the provisional `application/x.slipcase+zip` as
+an alias, and ships the icon a container is drawn with; both products depend on
+it. The alias is why nothing had to be reinstalled in step: a container types as
+the registered name and GIO unaliases when it looks for an application, so an
+entry naming only the old string went on opening one until this entry was
+changed. It needs slipcase-common 1.2.0 or later, which `install.sh` says when
+it is missing. Two packages cannot
 ship one path — dpkg refuses the second install — so the type and the icon
 belong to neither product and are declared once.
 
@@ -58,11 +65,20 @@ generic document rather than as an archive; and the icon has to be named as the
 generic icon as well as the icon, because GTK4 searches theme-major and Adwaita
 answers `application-x-generic` before hicolor is reached.
 
+**macOS and Windows keep no alias, and this repository does not decide that.**
+`<alias>` is a shared-mime-info element with no counterpart in a
+`public.mime-type` array or in the Windows MIME database, where a second name
+would be a second claim rather than a pointer to the first. The registered name
+alone is tagged in `macos/Info.plist.in` and named in
+`windows/AppxManifest.xml.in`. `DESIGN.md` §8 in `slipcase-desktop` holds the
+reasoning, taken once for both products because both make the same claim on the
+same extension.
+
 **The desktop entry names six types, not one.** `slipcase-common` declares a
 payload family per icon — `application/x.slipcase-pdf+zip` against `*.pdf.slpc`,
 and four more — so that a container named for its payload can be drawn with a
-mark for it. Each is a `sub-class-of application/x.slipcase+zip`, and that
-inheritance carries the default application but not the *recommended* list,
+mark for it. Each is a `sub-class-of application/vnd.excelano.slipcase+zip`, and
+that inheritance carries the default application but not the *recommended* list,
 which is matched on the exact type. A family missing from `MimeType=` therefore
 still opens on a double-click and still drops out of the top of Open With. The
 list is the one part of the arrangement that could not stay in `slipcase-common`,

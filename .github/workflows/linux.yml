@@ -216,12 +216,12 @@ jobs:
           type=$(gio info -a standard::content-type "${RUNNER_TEMP}/sample.slpc" |
               sed -n 's/.*standard::content-type: //p')
           echo "content type: ${type}"
-          [ "$type" = "application/x.slipcase+zip" ] ||
+          [ "$type" = "application/vnd.excelano.slipcase+zip" ] ||
               { echo "the type is not ours" >&2; exit 1; }
 
-          gio mime application/x.slipcase+zip | grep -q 'slipcase-open.desktop' ||
+          gio mime application/vnd.excelano.slipcase+zip | grep -q 'slipcase-open.desktop' ||
               { echo "this tool is not registered against the type" >&2; exit 1; }
-          gio mime application/x.slipcase+zip
+          gio mime application/vnd.excelano.slipcase+zip
 
       # The package leaves this job, which until now it did not: it was built
       # on every push, checked by everything above, and thrown away at the end

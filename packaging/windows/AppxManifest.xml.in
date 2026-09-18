@@ -110,7 +110,7 @@
         <uap:Extension Category="windows.fileTypeAssociation">
           <uap3:FileTypeAssociation Name="slpc">
             <uap:SupportedFileTypes>
-              <uap:FileType ContentType="application/x.slipcase+zip">.slpc</uap:FileType>
+              <uap:FileType ContentType="application/vnd.excelano.slipcase+zip">.slpc</uap:FileType>
             </uap:SupportedFileTypes>
             <uap:DisplayName>Slipcase Container</uap:DisplayName>
             <uap:Logo>Assets\slipcase.png</uap:Logo>
