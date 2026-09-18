@@ -43,7 +43,7 @@ command line where it does not (§9).
 ## 4. How it is invoked
 
 Double-click, the same as any other document. The tool registers as a handler
-for `.slpc` and `application/x.slipcase+zip` through the platform's ordinary
+for `.slpc` and `application/vnd.excelano.slipcase+zip` through the platform's ordinary
 mechanism: a ProgID on Windows, an exported UTI on macOS, a shared-mime-info
 type and a desktop entry on Linux.
 
