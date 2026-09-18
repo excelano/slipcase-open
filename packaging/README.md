@@ -54,7 +54,7 @@ an alias, and ships the icon a container is drawn with; both products depend on
 it. The alias is why nothing had to be reinstalled in step: a container types as
 the registered name and GIO unaliases when it looks for an application, so an
 entry naming only the old string went on opening one until this entry was
-changed. It needs slipcase-common 1.2.0 or later, which `install.sh` says when
+changed. It needs slipcase-common 1.1.2 or later, which `install.sh` says when
 it is missing. Two packages cannot
 ship one path — dpkg refuses the second install — so the type and the icon
 belong to neither product and are declared once.

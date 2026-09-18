@@ -113,8 +113,8 @@ echo "installed the payload entry under ${prefix}"
 # matters, which is whether this machine knows the type at all.
 #
 # The string is the registered media type, which slipcase-common declares from
-# 1.2.0. An earlier version declares the provisional name and nothing else, so
-# this fails there, and it should: the alias in 1.2.0 runs from the old name to
+# 1.1.2. An earlier version declares the provisional name and nothing else, so
+# this fails there, and it should: the alias in 1.1.2 runs from the old name to
 # the new one and there is nothing in the older database pointing the other way.
 # The entry below names the registered type, so an older slipcase-common leaves
 # a container typing as one string and this entry claiming another.
@@ -125,9 +125,9 @@ if ! grep -qsx 'application/vnd.excelano.slipcase+zip' \
 then
     echo
     echo "The registered Slipcase media type is not declared on this machine."
-    echo "Install slipcase-common 1.2.0 or later, or run its install.sh, or"
+    echo "Install slipcase-common 1.1.2 or later, or run its install.sh, or"
     echo "nothing will associate a .slpc with this entry. A version before"
-    echo "1.2.0 declares the superseded name and is what this looks like"
+    echo "1.1.2 declares the superseded name and is what this looks like"
     echo "from here."
 fi
 
