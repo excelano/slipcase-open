@@ -1,3 +1,30 @@
+slipcase-open (0.1.8) unstable; urgency=low
+
+  * The notes are 0.1.8's, and the profile says which tap
+  * Say the media type once per script, and ask rather than name a version
+  * Name the version of slipcase-common that carries the type
+  * Package versions stop coming from Dependabot
+  * Name the registered media type in packaging and docs
+  * deps: bump the cargo group with 4 updates (#9)
+  * windows-registry is held at the 0.6 line here too
+  * Dependabot merges move to the organisation's sweep
+  * The release carries the package the Linux lane built
+  * The listing copy is a file both lanes push
+  * What a release tells the stores, in both languages
+  * Check what the shipped binary imports, as every sibling does
+  * The Store packaging comes from excelano/.github
+  * The publisher is a secret, so the log does not carry it
+  * The identity splits on what is actually an account's
+  * Prose to present tense
+  * Say what is true rather than pointing at a deleted document
+  * The profile is targets and names
+  * Dependabot: monthly, grouped, merged when every run on the commit is green
+  * Assemble the Store package on the runner, and attach it on the release
+  * Delete the changelog and the preflight script: ship does both
+  * Delete the release document: ship is the procedure
+
+ -- David M. Anderson <david.anderson@excelano.com>  Fri, 18 Sep 2026 12:39:06 -0500
+
 slipcase-open (0.1.7-1) unstable; urgency=low
 
   * The macOS bundle says the application is offered in German. The catalogue
