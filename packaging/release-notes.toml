@@ -10,35 +10,35 @@
 # Nothing else reads this. The GitHub release, the Debian changelog and the
 # AppStream entry take commit subjects.
 
-version = "0.1.6"
+version = "0.1.8"
 
 [locales."de-de"]
 whats-new = """
-Deutsch. Auf einem deutsch eingestellten Rechner erscheinen die
-Benachrichtigungen, die Schaltflächen darauf und die stehende Liste auf
-Deutsch, und ebenso das, was `sessions` und `recover` ausgeben. Es gibt nichts
-auszuwählen: Slipcase Open übernimmt die Sprache, auf die Windows bereits
-eingestellt ist, und fällt für jede andere auf Englisch zurück.
+Der Containertyp ist registriert. Die IANA hat am 16. September 2026
+`application/vnd.excelano.slipcase+zip` vergeben, und Slipcase Open meldet
+diesen Namen bei der Installation bei Windows an. Der vorläufige Name davor
+gehörte in einen Bereich für geschlossene Umgebungen, und dort gehört ein
+Format nicht hin, das in einem Store erscheint.
 
-**Was das Werkzeug über Ihre Dateien sagt, ist übersetzt; was es über sich
-selbst sagt, nicht.** `--help` und der Einstellungsbericht bleiben englisch,
-letzterer, weil er Pfade in einer Tabelle druckt, die auf die Breite englischer
-Wörter gebaut ist, und weil er das ist, was man in einen Fehlerbericht einfügt.
+**An den Containern ändert sich nichts.** Der Typ stand noch nie in einem
+Container, deshalb ist eine `.slpc` aus einer früheren Version dieselbe Datei
+und öffnet sich wie bisher. Anders ist nur der Name, unter dem Windows sie
+führt. Die Installation ersetzt die alte Anmeldung, statt sie neben der neuen
+stehen zu lassen: Windows kennt keinen Weg, einen Namen als Alias eines
+anderen zu hinterlegen.
 """
 
 [locales."en-us"]
 whats-new = """
-On a machine set to German the notifications, the buttons on them and
-the standing list come up in German, and so does what `sessions` and `recover`
-print. There is nothing to choose: Slipcase Open reads the language Windows is
-already set to, and falls back to English for every other one.
+The container type is registered. IANA assigned
+`application/vnd.excelano.slipcase+zip` on 16 September 2026, and Slipcase Open
+declares that name to Windows when it installs. The provisional name it
+replaces belonged to a tree meant for closed settings, which is not where a
+format that ships in a store belongs.
 
-
-**What the tool says about your files is translated; what it says about itself
-is not.** `--help` and the settings report stay in English, the second because
-it prints paths in a table built to the width of English words and is what you
-would paste into a bug report.
-
----
+**Nothing about a container changes.** The type has never been written inside
+one, so a `.slpc` made by any earlier version is the same file and opens the
+same way. What differs is the name Windows files it under. Installing replaces
+the old registration rather than leaving it beside the new one: Windows has no
+way to record one name as an alias of another.
 """
-
