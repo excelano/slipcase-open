@@ -39,7 +39,7 @@ jobs:
     runs-on: macos-15
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: What is installed
         run: rustc -V && cargo -V && swiftc --version | head -1 && uname -m
