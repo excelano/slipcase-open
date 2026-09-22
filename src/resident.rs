@@ -36,7 +36,7 @@ use crate::table::Table;
 /// How long the loop waits for a request before going round to pump.
 const TICK: Duration = Duration::from_millis(250);
 
-/// How long a closed session's payload directory must go untouched before the
+/// How long a closed session's content directory must go untouched before the
 /// application is taken to have finished with it (concept 8).
 ///
 /// Short, because it is the second of two conditions rather than the whole
@@ -179,7 +179,7 @@ impl Resident {
     /// in front of them. So the report is `ordinary` rather than `routine`: no
     /// setting drops it.
     fn put_it_back(&mut self, mut session: Session, outside: &Outside<'_>) {
-        let name = slpc::display_name(&session.record().payload).into_owned();
+        let name = slpc::display_name(&session.record().content_name).into_owned();
         let into = slpc::display_path(&session.record().container);
         match crate::writeback::write_back(&mut session) {
             Ok(()) => {
@@ -288,7 +288,7 @@ impl Resident {
         // would overwrite the first with nothing said. Re-launching is what a
         // second double-click on an open document does everywhere else.
         if let Some(open) = self.sessions.find_mut(container) {
-            return match outside.launcher.launch(&open.payload_path()) {
+            return match outside.launcher.launch(&open.content_path()) {
                 Ok(()) => say(
                     voice,
                     outside,
@@ -296,7 +296,7 @@ impl Resident {
                         t("{name} is already open; brought forward."),
                         &[(
                             "name",
-                            &slpc::display_name(&open.session().record().payload),
+                            &slpc::display_name(&open.session().record().content_name),
                         )],
                     )),
                 ),
@@ -313,7 +313,7 @@ impl Resident {
 
         // Concept 8: a pending recovery item is resolved first. A session left
         // by a crash is not in the live table, so nothing refuses it — but
-        // opening a fresh one would extract the container's current payload and
+        // opening a fresh one would extract the container's current content
         // leave the recovered edit with nowhere to go.
         match self.ask_about_what_was_left(container, outside) {
             Err(e) => return refuse(voice, outside, e),
@@ -345,7 +345,7 @@ impl Resident {
                     outside.channel.insist(
                         &Report::interrupt(fill(t("{name} was not opened."), &[("name", &named)]))
                             .and(format!(
-                                "Its payload is {}, not a document.",
+                                "Its content file is {}, not a document.",
                                 what.describes()
                             ))
                             .and(t("That is the shape of a phishing attachment."))
@@ -376,7 +376,7 @@ impl Resident {
                 refuse(voice, outside, e.to_string())
             }
             Ok(opened) => {
-                let name = slpc::display_name(&opened.session().record().payload).into_owned();
+                let name = slpc::display_name(&opened.session().record().content_name).into_owned();
                 let session_id = id_of(opened.session());
                 let mut report = Report::routine(fill(t("{name} is open."), &[("name", &name)]))
                     .and(fill(t("Session {id}"), &[("id", &session_id)]));
@@ -440,7 +440,7 @@ impl Resident {
                 about: about.clone(),
                 summary: fill(
                     t("{name} was left behind."),
-                    &[("name", &slpc::display_name(&left.record().payload))],
+                    &[("name", &slpc::display_name(&left.record().content_name))],
                 ),
                 // Short, because a notification body is one paragraph however
                 // it is written. The container is named because that is what
@@ -478,10 +478,10 @@ impl Resident {
             .iter()
             .map(|o| crate::present::Listed {
                 id: id_of(o.session()),
-                payload: slpc::display_name(&o.session().record().payload).into_owned(),
+                content_name: slpc::display_name(&o.session().record().content_name).into_owned(),
                 label: format!(
                     "{}  open, {} write-back(s)",
-                    slpc::display_name(&o.session().record().payload),
+                    slpc::display_name(&o.session().record().content_name),
                     o.session().record().write_backs
                 ),
                 live: true,
@@ -491,10 +491,10 @@ impl Resident {
             .collect();
         out.extend(self.lingering.iter().map(|l| crate::present::Listed {
             id: id_of(l.session()),
-            payload: slpc::display_name(&l.session().record().payload).into_owned(),
+            content_name: slpc::display_name(&l.session().record().content_name).into_owned(),
             label: format!(
                 "{}  closed, waiting for the application to finish",
-                slpc::display_name(&l.session().record().payload)
+                slpc::display_name(&l.session().record().content_name)
             ),
             live: true,
             needs_a_person: false,
@@ -502,10 +502,10 @@ impl Resident {
         }));
         out.extend(self.pending.iter().map(|p| crate::present::Listed {
             id: p.about.clone(),
-            payload: slpc::display_name(&p.session.record().payload).into_owned(),
+            content_name: slpc::display_name(&p.session.record().content_name).into_owned(),
             label: format!(
                 "{}  {}, waiting for you",
-                slpc::display_name(&p.session.record().payload),
+                slpc::display_name(&p.session.record().content_name),
                 recover::state(&p.session)
             ),
             live: false,
@@ -523,10 +523,10 @@ impl Resident {
             {
                 out.push(crate::present::Listed {
                     id: id_of(s),
-                    payload: slpc::display_name(&s.record().payload).into_owned(),
+                    content_name: slpc::display_name(&s.record().content_name).into_owned(),
                     label: format!(
                         "{}  {}",
-                        slpc::display_name(&s.record().payload),
+                        slpc::display_name(&s.record().content_name),
                         recover::state(s)
                     ),
                     live: false,
@@ -587,7 +587,7 @@ impl Resident {
             Ok(flow::Closed::LeftForRecovery(lingering)) => {
                 self.lingering.push(*lingering);
                 Response::Ok(vec![
-                    "Session closed, and the application still has the payload open.".into(),
+                    "Session closed, and the application still has the content file open.".into(),
                     "It is being watched until the application finishes.".into(),
                 ])
             }
@@ -625,7 +625,7 @@ impl Resident {
                         outside.report(
                             &Report::routine(fill(
                                 t("{name} written back."),
-                                &[("name", &slpc::display_name(&s.record().payload))],
+                                &[("name", &slpc::display_name(&s.record().content_name))],
                             ))
                             .and(t("Saves from here on are written back quietly.")),
                         );
@@ -639,7 +639,8 @@ impl Resident {
                 // close at the user's hand, and a save that did not land is the
                 // thing they most need to know did not.
                 Err(e) => {
-                    let name = slpc::display_name(&open.session().record().payload).into_owned();
+                    let name =
+                        slpc::display_name(&open.session().record().content_name).into_owned();
                     outside.report(
                         &Report::interrupt(fill(
                             t("{name} could not be written back."),
@@ -692,7 +693,7 @@ impl Resident {
             let about = id_of(lingering.session());
             let session = lingering.into_session();
             let state = recover::state(&session);
-            let name = slpc::display_name(&session.record().payload).into_owned();
+            let name = slpc::display_name(&session.record().content_name).into_owned();
             // Concept 6.3: equal to what the container holds means nothing was
             // lost, so clean up and say nothing. This is that case arriving
             // while the process is still alive to see it, which is what concept
@@ -768,18 +769,18 @@ impl Resident {
         if answer.choice == Choice::Reveal {
             let pending = &mut self.pending[at];
             pending.asked = Instant::now();
-            let dir = pending.session.payload_dir();
+            let dir = pending.session.content_dir();
             let question = Question {
                 about: pending.about.clone(),
                 summary: fill(
                     t("{name} is still waiting."),
                     &[(
                         "name",
-                        &slpc::display_name(&pending.session.record().payload),
+                        &slpc::display_name(&pending.session.record().content_name),
                     )],
                 ),
                 detail: vec![fill(
-                    t("The payload is in {folder}"),
+                    t("The content file is in {folder}"),
                     &[("folder", &dir.display().to_string())],
                 )],
                 choices: vec![Choice::WriteBack, Choice::Discard, Choice::Reveal],
@@ -800,7 +801,7 @@ impl Resident {
         let mut pending = self.pending.remove(at);
         outside.channel.withdraw(&pending.about);
         // Owned, because what follows moves the session out from under it.
-        let name = slpc::display_name(&pending.session.record().payload).into_owned();
+        let name = slpc::display_name(&pending.session.record().content_name).into_owned();
         match answer.choice {
             Choice::WriteBack => match crate::writeback::write_back(&mut pending.session) {
                 Ok(()) => {
@@ -876,7 +877,7 @@ impl Resident {
                 t("{name} is still undecided."),
                 &[(
                     "name",
-                    &slpc::display_name(&pending.session.record().payload),
+                    &slpc::display_name(&pending.session.record().content_name),
                 )],
             ))
             .and(format!(
@@ -916,7 +917,7 @@ impl Resident {
                 outside.report(
                     &Report::ordinary(fill(
                         t("{name} was closed while its application was still working."),
-                        &[("name", &slpc::display_name(&session.record().payload))],
+                        &[("name", &slpc::display_name(&session.record().content_name))],
                     ))
                     .and(t("It is left for recovery: run `slipcase-open sessions`.")),
                 );
@@ -963,7 +964,7 @@ fn refuse(voice: Voice, outside: &Outside<'_>, why: String) -> Response {
 
 /// Remove the sessions left behind that have nothing to say.
 ///
-/// Concept 6.3: a recovered payload matching its container means nothing was
+/// Concept 6.3: a recovered content file matching its container means nothing was
 /// lost, so clean up and say nothing.
 ///
 /// **This could not be done before Phase 2 and that is why it was not.** A
@@ -1161,13 +1162,13 @@ mod tests {
         }
     }
 
-    fn container(at: &Path, name: &str, payload: &[u8]) -> PathBuf {
+    fn container(at: &Path, name: &str, content_bytes: &[u8]) -> PathBuf {
         let doc: slpc::toml_edit::DocumentMut =
-            format!("slipcase_version = \"1.0\"\n\n[payload]\nfile = \"{name}\"\n")
+            format!("slipcase_version = \"1.1\"\n\n[content]\nfile = \"{name}\"\n")
                 .parse()
                 .unwrap();
         let path = at.join(format!("{name}.slpc"));
-        slpc::pack_reader(name, payload, doc, fs::File::create(&path).unwrap()).unwrap();
+        slpc::pack_reader(name, content_bytes, doc, fs::File::create(&path).unwrap()).unwrap();
         path
     }
 
@@ -1202,7 +1203,7 @@ mod tests {
     fn a_crashed_session(root: &Path, c: &Path, name: &str, edit: &[u8]) -> session::Session {
         let mut left = session::create(root, c, name).unwrap();
         extract::extract(&mut slpc::Container::open(c).unwrap(), &mut left).unwrap();
-        fs::write(left.payload_path(), edit).unwrap();
+        fs::write(left.content_path(), edit).unwrap();
         left
     }
 
@@ -1291,8 +1292,8 @@ mod tests {
         let mut r = Resident::new(&root);
 
         ok(r.handle(opening(c.clone()), &w.outside()));
-        let payload = session::scan(&root).unwrap()[0].payload_path();
-        fs::write(&payload, b"edited").unwrap();
+        let content_path = session::scan(&root).unwrap()[0].content_path();
+        fs::write(&content_path, b"edited").unwrap();
 
         // Watched through the record rather than through what was said. The
         // write-back count is what `pump` guarantees; a notification is a
@@ -1312,7 +1313,7 @@ mod tests {
     #[test]
     fn a_recovery_item_on_the_same_container_is_asked_about_first() {
         // Concept 8. Opening a fresh session would extract the container's
-        // current payload and leave the recovered edit with nowhere to go.
+        // current content file and leave the recovered edit with nowhere to go.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
@@ -1380,7 +1381,7 @@ mod tests {
         // the session that was waiting on the answer is open.
         let mut held = slpc::Container::open(&c).unwrap();
         let mut bytes = Vec::new();
-        std::io::Read::read_to_end(&mut held.payload().unwrap(), &mut bytes).unwrap();
+        std::io::Read::read_to_end(&mut held.content().unwrap(), &mut bytes).unwrap();
         assert_eq!(bytes, b"the edit that never landed");
         assert_eq!(w.channel.withdrawn(), vec![about]);
         assert_eq!(w.launcher.launched().len(), 1);
@@ -1405,13 +1406,13 @@ mod tests {
         // Not asserted by the directory being gone: a session is named for the
         // second it started in, so the one that follows the answer takes the
         // same name back. What says the edit was discarded is that the session
-        // now on disk holds the container's payload rather than the edit.
+        // now on disk holds the container's content file rather than the edit.
         let now = session::scan(&root).unwrap();
         assert_eq!(now.len(), 1);
-        assert_eq!(fs::read(now[0].payload_path()).unwrap(), SOMEBODY_ELSE);
+        assert_eq!(fs::read(now[0].content_path()).unwrap(), SOMEBODY_ELSE);
         let mut held = slpc::Container::open(&c).unwrap();
         let mut bytes = Vec::new();
-        std::io::Read::read_to_end(&mut held.payload().unwrap(), &mut bytes).unwrap();
+        std::io::Read::read_to_end(&mut held.content().unwrap(), &mut bytes).unwrap();
         assert_eq!(bytes, SOMEBODY_ELSE, "discard must not touch the container");
         assert_eq!(w.launcher.launched().len(), 1);
     }
@@ -1434,7 +1435,7 @@ mod tests {
         w.channel.answer(&about, Choice::Reveal);
         r.turn(&w.outside());
 
-        assert_eq!(w.launcher.launched(), vec![left.payload_dir()]);
+        assert_eq!(w.launcher.launched(), vec![left.content_dir()]);
         assert_eq!(w.channel.questions().len(), 2);
         assert!(w.channel.withdrawn().is_empty());
         assert!(left.dir().exists());
@@ -1556,14 +1557,14 @@ mod tests {
         // gone rather than left to be listed as needing a decision.
         let mut held = slpc::Container::open(&c).unwrap();
         let mut bytes = Vec::new();
-        std::io::Read::read_to_end(&mut held.payload().unwrap(), &mut bytes).unwrap();
+        std::io::Read::read_to_end(&mut held.content().unwrap(), &mut bytes).unwrap();
         assert_eq!(bytes, b"the edit that never landed");
         assert!(w.channel.said().contains("recovered and written back"));
         // One session on disk: the new one, holding what the container now has.
         let now = session::scan(&root).unwrap();
         assert_eq!(now.len(), 1, "{now:?}");
         assert_eq!(
-            fs::read(now[0].payload_path()).unwrap(),
+            fs::read(now[0].content_path()).unwrap(),
             b"the edit that never landed"
         );
     }
@@ -1607,7 +1608,7 @@ mod tests {
 
         assert!(left.dir().exists(), "the edit was thrown away");
         assert_eq!(
-            fs::read(left.payload_path()).unwrap(),
+            fs::read(left.content_path()).unwrap(),
             b"an edit worth keeping"
         );
         assert_eq!(
@@ -1674,14 +1675,14 @@ mod tests {
         let mut r = Resident::new(&root);
 
         let opened = ok(r.handle(opening(c), &w.outside()));
-        let dir = session::scan(&root).unwrap()[0].payload_dir();
+        let dir = session::scan(&root).unwrap()[0].content_dir();
         fs::write(dir.join(".~lock.report.pdf#"), b"still working").unwrap();
 
         let closed = ok(r.handle(Request::Close(session_named_in(&opened)), &w.outside()));
         assert!(
             closed
                 .iter()
-                .any(|l| l.contains("still has the payload open")),
+                .any(|l| l.contains("still has the content file open")),
             "{closed:?}"
         );
         assert!(
@@ -1705,7 +1706,7 @@ mod tests {
         let mut r = Resident::new(&root).waiting(Duration::ZERO, Duration::from_secs(300));
 
         let opened = ok(r.handle(opening(c.clone()), &w.outside()));
-        let dir = session::scan(&root).unwrap()[0].payload_dir();
+        let dir = session::scan(&root).unwrap()[0].content_dir();
         let sibling = dir.join(".~lock.report.pdf#");
         fs::write(&sibling, b"still working").unwrap();
         ok(r.handle(Request::Close(session_named_in(&opened)), &w.outside()));
@@ -1723,7 +1724,7 @@ mod tests {
         // It reached the container, which is the whole point.
         let mut held = slpc::Container::open(&c).unwrap();
         let mut bytes = Vec::new();
-        std::io::Read::read_to_end(&mut held.payload().unwrap(), &mut bytes).unwrap();
+        std::io::Read::read_to_end(&mut held.content().unwrap(), &mut bytes).unwrap();
         assert_eq!(bytes, b"the last save");
         // Said rather than done silently: the risk this accepts is a save that
         // was half-written, and being able to see what happened is the only
@@ -1749,7 +1750,7 @@ mod tests {
         let mut r = Resident::new(&root).waiting(Duration::ZERO, Duration::from_secs(300));
 
         let opened = ok(r.handle(opening(c), &w.outside()));
-        let dir = session::scan(&root).unwrap()[0].payload_dir();
+        let dir = session::scan(&root).unwrap()[0].content_dir();
         let sibling = dir.join(".~lock.report.pdf#");
         fs::write(&sibling, b"still working").unwrap();
         ok(r.handle(Request::Close(session_named_in(&opened)), &w.outside()));
@@ -1986,7 +1987,7 @@ mod tests {
     }
 
     #[test]
-    fn a_payload_that_is_a_program_is_the_one_thing_red_is_for() {
+    fn a_content_file_that_is_a_program_is_the_one_thing_red_is_for() {
         // Concept 5.1's check, which fires close to never and means one thing
         // when it does. Nothing else in this file may reach `Danger`.
         let tmp = tempfile::tempdir().unwrap();

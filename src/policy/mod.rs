@@ -5,7 +5,7 @@
 //
 //! Concept 10. Four layers — machine policy, user policy, user configuration,
 //! built-in default — resolved into one answer, and one function that answers
-//! it for a payload.
+//! it for a content file.
 //!
 //! **This module is the resolution and not the sources.** Reading a registry
 //! subtree, a configuration profile, or a file under `/etc` is a platform's
@@ -184,8 +184,8 @@ impl fmt::Display for Origin {
 /// [`crate::present::Channel::ask`] rather than `report`, so nothing here
 /// reaches them. That is structural rather than a rule somebody has to
 /// remember: a session waiting on a decision would otherwise be silenced into
-/// stranding its payload, and concept 6.3 has nothing else to offer that person
-/// until the next launch.
+/// stranding its content file, and concept 6.3 has nothing else to offer that
+/// person until the next launch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Notify {
     /// Everything, including what happens on its own.
@@ -290,7 +290,7 @@ pub trait Source {
 /// not provide.
 ///
 /// **`slpc` is not here**, and concept 10 explains why. A container whose
-/// payload is a container is usually somebody having packed one by mistake, or
+/// content file is a container is usually somebody having packed one by mistake, or
 /// an archival wrapper, and neither wants an automatic recursive open. It stays
 /// allowlistable for the archival user who nests deliberately.
 ///
@@ -343,7 +343,7 @@ pub struct Effective {
     pub uncomparable_entries: Vec<String>,
 }
 
-/// What is to be done with a payload.
+/// What is to be done with a content file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Decision {
     /// Permitted. The folded extension is carried so a caller reports the same
@@ -361,19 +361,19 @@ pub enum Decision {
     NoUsableExtension,
 }
 
-/// Resolve the layers and answer for this payload, in one call.
+/// Resolve the layers and answer for this content file, in one call.
 ///
-/// **Takes the payload's name and not an extension.** Concept 10 requires the
-/// decision to be made after the extension is taken and folded, and a signature
-/// accepting a key would let a caller hand in one it computed some other way.
-/// The folding is [`extension::policy_key`]'s, once, here.
+/// **Takes the content file's name and not an extension.** Concept 10 requires
+/// the decision to be made after the extension is taken and folded, and a
+/// signature accepting a key would let a caller hand in one it computed some
+/// other way. The folding is [`extension::policy_key`]'s, once, here.
 ///
 /// # Errors
 ///
 /// Where a layer exists and cannot be read. Nothing is decided in that case,
 /// because a policy that cannot be established is not a policy that permits.
-pub fn decide(source: &dyn Source, payload_name: &str) -> std::result::Result<Decision, Error> {
-    let Some(key) = extension::policy_key(payload_name) else {
+pub fn decide(source: &dyn Source, content_name: &str) -> std::result::Result<Decision, Error> {
+    let Some(key) = extension::policy_key(content_name) else {
         return Ok(Decision::NoUsableExtension);
     };
     let effective = resolve(source)?;
@@ -489,7 +489,7 @@ impl Effective {
     }
 }
 
-/// Fold each entry the way a payload's extension is folded, so that a list and
+/// Fold each entry the way a content file's extension is folded, so that a list and
 /// a filename are compared as the same kind of thing. An entry that will not
 /// fold is collected rather than dropped.
 fn fold_into(into: &mut BTreeSet<String>, list: Option<&[String]>, uncomparable: &mut Vec<String>) {
@@ -721,7 +721,7 @@ mod tests {
     }
 
     #[test]
-    fn a_payload_with_no_usable_extension_is_refused_whatever_the_lists_say() {
+    fn a_content_file_with_no_usable_extension_is_refused_whatever_the_lists_say() {
         // Concept 5.1: there is no setting for this, because the dialog it
         // would otherwise raise offers every executable on the machine.
         let s = Stack {
@@ -741,7 +741,7 @@ mod tests {
     }
 
     #[test]
-    fn list_entries_are_folded_the_way_a_payload_name_is() {
+    fn list_entries_are_folded_the_way_a_content_name_is() {
         let s = Stack {
             machine: Some(Layer {
                 allowed: list(&["PDF", ".Txt"]),

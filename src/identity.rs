@@ -103,7 +103,7 @@ fn numbers(_path: &Path, meta: &std::fs::Metadata) -> Option<(u64, u64)> {
 /// **Opened for its attributes and nothing more.** `FILE_READ_ATTRIBUTES` is
 /// what the call needs and the least it can ask for, and the share mode is
 /// `std`'s default of read, write and delete. Nothing here may stand in the way
-/// of the application editing its payload, and measured on 2026-09-01: a
+/// of the application editing its content file, and measured on 2026-09-01: a
 /// container already held open by another handle for reading and writing still
 /// answers.
 ///

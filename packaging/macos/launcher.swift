@@ -55,7 +55,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
         }
         let alert = NSAlert()
         alert.messageText = "Slipcase Open works from a double-click."
-        alert.informativeText = "Open a .slpc container and its payload opens in its own application. Edits are written back when you save. From a terminal: slipcase-open sessions"
+        alert.informativeText = "Open a .slpc container and its content file opens in its own application. Edits are written back when you save. From a terminal: slipcase-open sessions"
         alert.addButton(withTitle: "OK")
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()

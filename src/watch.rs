@@ -1,4 +1,4 @@
-//! Watching the payload directory, and what the events in it mean.
+//! Watching the content directory, and what the events in it mean.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
@@ -6,13 +6,13 @@
 //! **The watch is on the directory and never on the file**, which concept 6
 //! calls one of the three things that make write-back detection hard. A serious
 //! editor saves by writing a temporary sibling and renaming it over the target,
-//! so a watcher registered on the payload loses its handle on the first save
-//! and never fires again. `notify` will watch a directory on all three
+//! so a watcher registered on the content file loses its handle on the first
+//! save and never fires again. `notify` will watch a directory on all three
 //! platforms, but only if it is asked to.
 //!
 //! ## The sibling signal
 //!
-//! Concept 6.1: the payload directory holds one file, put there by this tool,
+//! Concept 6.1: the content directory holds one file, put there by this tool,
 //! so anything else appearing in it was created by the target application — a
 //! lock file, an autosave, a backup, a save in progress. Nothing here needs to
 //! know which, or what any of them are called, which is why there is no table
@@ -33,35 +33,35 @@ use std::time::Duration;
 
 use notify::{RecommendedWatcher, RecursiveMode, Watcher as _};
 
-/// What happened in a payload directory.
+/// What happened in a content directory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Change {
-    /// The payload itself was written, replaced, or removed. The write-back
-    /// trigger.
-    Payload,
+    /// The content file itself was written, replaced, or removed. The
+    /// write-back trigger.
+    Content,
     /// Something the target application made appeared beside it.
     SiblingAppeared,
     /// Something it had made went away.
     SiblingWentAway,
 }
 
-/// What an event in the payload directory means, given the payload's name.
+/// What an event in the content directory means, given the content file's name.
 ///
 /// Pure, so the rule is testable without a filesystem or a race. Paths are
 /// compared by their final component: `notify` reports absolute paths, and a
 /// rename within the directory arrives as paths that differ only there.
 ///
-/// A rename over the payload produces events naming both the temporary sibling
-/// and the payload, and both are worth reporting — the first says the
-/// application is working, the second is the save.
+/// A rename over the content file produces events naming both the temporary
+/// sibling and the content file, and both are worth reporting — the first says
+/// the application is working, the second is the save.
 #[must_use]
-pub fn classify(payload: &str, paths: &[&Path], kind: EventKind) -> Vec<Change> {
+pub fn classify(content_name: &str, paths: &[&Path], kind: EventKind) -> Vec<Change> {
     paths
         .iter()
         .map(|p| {
-            let is_payload = p.file_name().is_some_and(|n| n == payload);
-            match (is_payload, kind) {
-                (true, _) => Change::Payload,
+            let is_content = p.file_name().is_some_and(|n| n == content_name);
+            match (is_content, kind) {
+                (true, _) => Change::Content,
                 (false, EventKind::Gone) => Change::SiblingWentAway,
                 (false, _) => Change::SiblingAppeared,
             }
@@ -82,12 +82,13 @@ impl EventKind {
     /// Reduce one of `notify`'s events, or discard it.
     ///
     /// **Reading a file is not changing it.** A plain read of the watched
-    /// payload emits `Access(Open(Any))` on Linux — measured on 2026-08-30 —
-    /// and treating that as a save makes every reader of the payload a source
-    /// of spurious write-backs. Anything that reads it counts: the write-back
-    /// itself opens the payload, and so does `recover::state`, which is called
-    /// once per session by `sessions`. Running `sessions` in a loop beside an
-    /// open session produced a repack per poll before this arm existed.
+    /// content file emits `Access(Open(Any))` on Linux — measured on
+    /// 2026-08-30 — and treating that as a save makes every reader of the
+    /// content file a source of spurious write-backs. Anything that reads it
+    /// counts: the write-back itself opens the content file, and so does
+    /// `recover::state`, which is called once per session by `sessions`.
+    /// Running `sessions` in a loop beside an open session produced a repack
+    /// per poll before this arm existed.
     ///
     /// The repacks are invisible from outside, which is why this is a rule and
     /// a test rather than something anyone would notice: each one writes the
@@ -115,7 +116,7 @@ impl EventKind {
     }
 }
 
-/// A watch on one payload directory.
+/// A watch on one content directory.
 ///
 /// Holds the platform watcher, which stops when this is dropped.
 pub struct Watch {
@@ -142,18 +143,18 @@ pub struct Watch {
 const STOP_WAIT: Duration = Duration::from_secs(5);
 
 impl Watch {
-    /// Watch `dir` for changes to `payload` and to anything beside it.
+    /// Watch `dir` for changes to `content_name` and to anything beside it.
     ///
-    /// Non-recursive: the payload directory has no subdirectories of this
+    /// Non-recursive: the content directory has no subdirectories of this
     /// tool's making, and an application that creates one has still created a
     /// sibling, which is the signal either way.
     ///
     /// # Errors
     ///
     /// Where the platform watcher cannot be created or cannot watch `dir`.
-    pub fn on(dir: &Path, payload: &str) -> notify::Result<Self> {
+    pub fn on(dir: &Path, content_name: &str) -> notify::Result<Self> {
         let (tx, changes) = mpsc::channel();
-        let payload = payload.to_string();
+        let content_name = content_name.to_string();
         let handler = move |event: notify::Result<notify::Event>| {
             let Ok(event) = event else {
                 // A dropped or errored event is not a reason to tear down the
@@ -166,7 +167,7 @@ impl Watch {
                 return;
             };
             let paths: Vec<&Path> = event.paths.iter().map(AsRef::as_ref).collect();
-            for change in classify(&payload, &paths, kind) {
+            for change in classify(&content_name, &paths, kind) {
                 // A closed receiver means the session is gone and there is
                 // nobody to tell.
                 if tx.send(change).is_err() {
@@ -212,7 +213,7 @@ impl Watch {
     }
 }
 
-/// Whether the target application has anything of its own in the payload
+/// Whether the target application has anything of its own in the content
 /// directory.
 ///
 /// Asked of the directory rather than tracked from events, because events can
@@ -222,9 +223,9 @@ impl Watch {
 /// # Errors
 ///
 /// Where the directory cannot be read.
-pub fn siblings_present(dir: &Path, payload: &str) -> std::io::Result<bool> {
+pub fn siblings_present(dir: &Path, content_name: &str) -> std::io::Result<bool> {
     for entry in std::fs::read_dir(dir)? {
-        if entry?.file_name() != *payload {
+        if entry?.file_name() != *content_name {
             return Ok(true);
         }
     }
@@ -284,7 +285,7 @@ mod tests {
     fn at(names: &[&str]) -> Vec<PathBuf> {
         names
             .iter()
-            .map(|n| Path::new("/s/payload").join(n))
+            .map(|n| Path::new("/s/content").join(n))
             .collect()
     }
 
@@ -293,11 +294,11 @@ mod tests {
     }
 
     #[test]
-    fn writing_the_payload_is_the_write_back_trigger() {
+    fn writing_the_content_file_is_the_write_back_trigger() {
         let p = at(&["report.pdf"]);
         assert_eq!(
             classify("report.pdf", &refs(&p), EventKind::Touched),
-            [Change::Payload]
+            [Change::Content]
         );
     }
 
@@ -330,37 +331,38 @@ mod tests {
     }
 
     #[test]
-    fn the_payload_going_away_is_still_the_payload() {
-        // A rename over it arrives as the payload being replaced, and an
+    fn the_content_file_going_away_is_still_the_content_file() {
+        // A rename over it arrives as the content file being replaced, and an
         // application that deletes and rewrites is doing a save in two steps.
         // Either way the container should be asked to catch up.
         let p = at(&["report.pdf"]);
         assert_eq!(
             classify("report.pdf", &refs(&p), EventKind::Gone),
-            [Change::Payload]
+            [Change::Content]
         );
     }
 
     #[test]
     fn a_rename_naming_both_paths_reports_both() {
         // The atomic save: a temporary sibling renamed over the target. The
-        // sibling says the application is working and the payload is the save,
-        // and dropping either would lose one of the two things the watch is for.
+        // sibling says the application is working and the content file is the
+        // save, and dropping either would lose one of the two things the watch
+        // is for.
         let p = at(&["report.pdf.tmp", "report.pdf"]);
         assert_eq!(
             classify("report.pdf", &refs(&p), EventKind::Touched),
-            [Change::SiblingAppeared, Change::Payload]
+            [Change::SiblingAppeared, Change::Content]
         );
     }
 
     #[test]
-    fn a_payload_named_like_a_lock_file_is_still_the_payload() {
+    fn a_content_file_named_like_a_lock_file_is_still_the_content_file() {
         // SPEC 2.3 permits any plain filename. Matching by name and not by
         // shape is what keeps this true.
         let p = at(&["~$report.docx"]);
         assert_eq!(
             classify("~$report.docx", &refs(&p), EventKind::Touched),
-            [Change::Payload]
+            [Change::Content]
         );
     }
 
@@ -378,9 +380,9 @@ mod tests {
     }
 
     #[test]
-    fn reading_the_payload_is_not_a_change_to_it() {
-        // Write-back opens the payload to read it, which inotify reports as an
-        // access on the watched file. Treating that as a save makes the
+    fn reading_the_content_file_is_not_a_change_to_it() {
+        // Write-back opens the content file to read it, which inotify reports
+        // as an access on the watched file. Treating that as a save makes the
         // write-back its own trigger: measured on 2026-08-30, one edit produced
         // three repacks and would have produced more had the session stayed
         // open.
@@ -391,18 +393,18 @@ mod tests {
         // including the tempdir appearing and the `write` below, at the
         // platform's own latency rather than before this returns. Measured on
         // an Apple silicon runner 2026-09-07, the third run in a loop: the
-        // setup arrived as `[SiblingAppeared, Payload, Payload]` inside the
+        // setup arrived as `[SiblingAppeared, Content, Content]` inside the
         // window and read as the read. inotify and ReadDirectoryChangesW
         // deliver only what follows registration and never showed it. So the
         // watch is drained until it goes quiet, which absorbs the replay on
         // every platform, and only what the read then produces is measured —
         // which is nothing: probed five times on that platform, a settled read
-        // produced no `Payload`, because a read is `Access` and `EventKind::of`
+        // produced no `Content`, because a read is `Access` and `EventKind::of`
         // discards it. The earlier version had no settle and asserted against
         // the whole window, so it was measuring the notifier.
         let tmp = tempfile::tempdir().unwrap();
-        let payload = tmp.path().join("report.pdf");
-        std::fs::write(&payload, b"first").unwrap();
+        let content_path = tmp.path().join("report.pdf");
+        std::fs::write(&content_path, b"first").unwrap();
 
         let watch = Watch::on(tmp.path(), "report.pdf").unwrap();
 
@@ -413,7 +415,7 @@ mod tests {
             && std::time::Instant::now() < cap
         {}
 
-        let _ = std::fs::read(&payload).unwrap();
+        let _ = std::fs::read(&content_path).unwrap();
 
         let deadline = std::time::Instant::now() + Duration::from_secs(2);
         let mut seen = Vec::new();
@@ -423,8 +425,8 @@ mod tests {
             }
         }
         assert!(
-            !seen.contains(&Change::Payload),
-            "reading the payload was reported as a change: {seen:?}"
+            !seen.contains(&Change::Content),
+            "reading the content file was reported as a change: {seen:?}"
         );
     }
 
@@ -435,27 +437,27 @@ mod tests {
         // target — which is the case a watch registered on the file would miss
         // entirely.
         let tmp = tempfile::tempdir().unwrap();
-        let payload = tmp.path().join("report.pdf");
-        std::fs::write(&payload, b"first").unwrap();
+        let content_path = tmp.path().join("report.pdf");
+        std::fs::write(&content_path, b"first").unwrap();
 
         let watch = Watch::on(tmp.path(), "report.pdf").unwrap();
 
         let scratch = tmp.path().join("report.pdf.tmp");
         std::fs::write(&scratch, b"second").unwrap();
-        std::fs::rename(&scratch, &payload).unwrap();
+        std::fs::rename(&scratch, &content_path).unwrap();
 
         // Generously, because this is at the platform's pace and not ours.
         let mut seen = Vec::new();
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
-        while std::time::Instant::now() < deadline && !seen.contains(&Change::Payload) {
+        while std::time::Instant::now() < deadline && !seen.contains(&Change::Content) {
             if let Some(c) = watch.next_change(Duration::from_millis(250)) {
                 seen.push(c);
             }
         }
         assert!(
-            seen.contains(&Change::Payload),
+            seen.contains(&Change::Content),
             "the save never arrived: {seen:?}"
         );
-        assert_eq!(std::fs::read(&payload).unwrap(), b"second");
+        assert_eq!(std::fs::read(&content_path).unwrap(), b"second");
     }
 }

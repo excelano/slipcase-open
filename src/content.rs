@@ -8,16 +8,16 @@
 //! them reads the bytes. Sniffing a content type and checking policy against it
 //! would be checking a value with no bearing on what executes.
 //!
-//! What survives is narrow and is not policy. It reports a payload whose bytes
-//! are an executable image or a script under a name that claims neither — the
-//! shape of a phishing attachment.
+//! What survives is narrow and is not policy. It reports a content file whose
+//! bytes are an executable image or a script under a name that claims neither
+//! — the shape of a phishing attachment.
 //!
 //! **[`crate::flow`] refuses on it, and that is a veto rather than a control.**
 //! Nothing here permits anything: the allowlist decides what may be opened, and
 //! all this can do is say no to something it already allowed. So it is allowed
-//! to be narrow in a way a control could not be — a payload that is exactly
-//! what it claims and still hostile passes without comment, and that is not a
-//! gap in it, because it was never the thing standing in the way.
+//! to be narrow in a way a control could not be — a content file that is
+//! exactly what it claims and still hostile passes without comment, and that
+//! is not a gap in it, because it was never the thing standing in the way.
 //!
 //! **It is a handful of magic numbers and not a type table.** A `.docx`
 //! sniffing as a ZIP is noise and goes unmentioned, so nothing here has to tell
@@ -51,8 +51,8 @@ impl Executable {
     }
 }
 
-/// How many bytes of a payload this needs. Four for every magic number here,
-/// and two for a shebang.
+/// How many bytes of a content file this needs. Four for every magic number
+/// here, and two for a shebang.
 pub const HEAD: usize = 4;
 
 /// What the leading bytes are, where they are something that runs.
@@ -60,8 +60,8 @@ pub const HEAD: usize = 4;
 /// **`cafebabe` is missing on purpose.** It is a Mach-O universal binary and it
 /// is also a Java class file, and telling them apart means reading the field
 /// after it and deciding whether it is an architecture count or a version. A
-/// false positive here is a warning shown to somebody about a payload that is
-/// fine, which costs more than missing a fat binary — and a fat binary's
+/// false positive here is a warning shown to somebody about a content file
+/// that is fine, which costs more than missing a fat binary — and a fat binary's
 /// members are Mach-O, so the single-architecture form is the common one and is
 /// caught.
 #[must_use]
@@ -79,7 +79,8 @@ pub fn executable(head: &[u8]) -> Option<Executable> {
     }
 }
 
-/// Whether the payload is something that runs while its name says otherwise.
+/// Whether the content file is something that runs while its name says
+/// otherwise.
 ///
 /// `None` where the bytes are not executable, and `None` where they are and the
 /// extension already says so — a `.exe` that is a PE image is not
@@ -87,8 +88,8 @@ pub fn executable(head: &[u8]) -> Option<Executable> {
 ///
 /// The extension is the folded one from [`crate::extension::policy_key`]. An
 /// extension too exotic to fold is not on the list below and so does not
-/// suppress the report, which is the safe direction: the payload is executable
-/// and the name says something nobody can compare.
+/// suppress the report, which is the safe direction: the content file is
+/// executable and the name says something nobody can compare.
 #[must_use]
 pub fn misrepresents(head: &[u8], policy_key: Option<&str>) -> Option<Executable> {
     let what = executable(head)?;
@@ -101,11 +102,11 @@ pub fn misrepresents(head: &[u8], policy_key: Option<&str>) -> Option<Executable
 /// Extensions where executable content is what a person would expect.
 ///
 /// Not a type table and not a policy list — nothing is permitted or refused by
-/// being here. It exists so that the warning does not fire on a payload that is
-/// exactly what its name says, and it is short because it only has to cover the
-/// names people actually use for things that run. An extension missing from it
-/// costs a warning shown about an honest payload, which is the direction to err
-/// in.
+/// being here. It exists so that the warning does not fire on a content file
+/// that is exactly what its name says, and it is short because it only has to
+/// cover the names people actually use for things that run. An extension
+/// missing from it costs a warning shown about an honest content file, which
+/// is the direction to err in.
 const EXPECTED: &[&str] = &[
     // Windows
     "exe", "dll", "com", "scr", "sys", "cpl", "ocx", "drv", "efi", // Unix
@@ -142,8 +143,8 @@ mod tests {
     #[test]
     fn a_universal_binary_is_not_reported() {
         // `cafebabe` is a Java class file too, and a warning shown about an
-        // honest payload costs more than missing a fat binary whose members
-        // are Mach-O anyway. See the note on `executable`.
+        // honest content file costs more than missing a fat binary whose
+        // members are Mach-O anyway. See the note on `executable`.
         assert_eq!(executable(b"\xca\xfe\xba\xbe"), None);
     }
 
@@ -161,7 +162,7 @@ mod tests {
 
     #[test]
     fn short_input_answers_rather_than_panicking() {
-        // A zero-length payload is conformant under SPEC 2.3, and a one-byte
+        // A zero-length content file is conformant under SPEC 2.3, and a one-byte
         // one is a slice every pattern here is longer than.
         assert_eq!(executable(b""), None);
         assert_eq!(executable(b"M"), None);
@@ -195,8 +196,9 @@ mod tests {
     #[test]
     fn an_extension_too_exotic_to_fold_does_not_suppress_the_report() {
         // `policy_key` answers `None` for one that is not ASCII alphanumeric.
-        // The payload is executable and the name says something nothing can
-        // compare, which is the case to report rather than the case to excuse.
+        // The content file is executable and the name says something nothing
+        // can compare, which is the case to report rather than the case to
+        // excuse.
         assert_eq!(misrepresents(b"MZ\x90\x00", None), Some(Executable::Pe));
     }
 }

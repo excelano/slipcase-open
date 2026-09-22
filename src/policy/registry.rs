@@ -145,7 +145,7 @@ impl Source for Registry {
 /// written with the registry editor came back with a trailing empty entry — the
 /// terminator, which the format requires and which a reader is meant to drop —
 /// and it reached `resolve` as an extension. The symptom was the interface
-/// reporting an entry in a policy list that cannot match any payload, naming an
+/// reporting an entry in a policy list that cannot match any content file, naming an
 /// empty one, to somebody who had written a perfectly ordinary list — which is
 /// worse than it sounds: a person told their policy contains something wrong
 /// looks for a mistake they did not make.

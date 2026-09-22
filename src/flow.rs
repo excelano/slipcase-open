@@ -30,7 +30,7 @@ use crate::{content, extract, recover, writeback};
 pub enum Error {
     /// It is not a container, or not one this build can read.
     Container(slpc::Error),
-    /// The payload is a program wearing a document's name, so it was not
+    /// The content file is a program wearing a document's name, so it was not
     /// opened. Concept 5.1: the one content check there is, and the only thing
     /// it can do is refuse something policy had already allowed.
     Misrepresented(content::Executable),
@@ -38,16 +38,16 @@ pub enum Error {
     /// say which of the several reasons applies.
     Refused(Decision),
     /// Policy could not be established. Distinct from a refusal: nothing has
-    /// decided that this payload may not be opened, and the remedy is to fix
-    /// the source rather than to change the lists.
+    /// decided that this content file may not be opened, and the remedy is to
+    /// fix the source rather than to change the lists.
     Policy(policy::Error),
     /// The session directory could not be made.
     Session(std::io::Error),
-    /// The payload did not reach the session directory.
+    /// The content file did not reach the session directory.
     Extract(extract::Error),
     /// The desktop would not open it.
     Launch(std::io::Error),
-    /// The payload directory could not be watched. Fatal rather than
+    /// The content directory could not be watched. Fatal rather than
     /// degraded: concept 6 already concedes that detection is unreliable, and a
     /// session with no watch at all would write back only at close while
     /// looking like one that writes back on every save.
@@ -60,7 +60,7 @@ impl fmt::Display for Error {
             Self::Container(e) => write!(f, "{e}"),
             Self::Misrepresented(what) => write!(
                 f,
-                "the payload is {}, not the document its name claims, so it was not opened",
+                "the content file is {}, not the document its name claims, so it was not opened",
                 what.describes()
             ),
             Self::Refused(d) => match d {
@@ -68,7 +68,7 @@ impl fmt::Display for Error {
                 Decision::NotPermitted { key } => write!(f, "{key} is not in the allowed set"),
                 Decision::NoUsableExtension => write!(
                     f,
-                    "the payload has no usable extension, so the desktop would ask which \
+                    "the content file has no usable extension, so the desktop would ask which \
                      application to run it with"
                 ),
                 Decision::Open { .. } => write!(f, "permitted"),
@@ -76,29 +76,30 @@ impl fmt::Display for Error {
             Self::Policy(e) => write!(f, "policy could not be read: {e}"),
             Self::Session(e) => write!(f, "the session could not be started: {e}"),
             Self::Extract(e) => write!(f, "{e}"),
-            Self::Launch(e) => write!(f, "the payload could not be opened: {e}"),
-            Self::Watch(e) => write!(f, "the payload directory could not be watched: {e}"),
+            Self::Launch(e) => write!(f, "the content file could not be opened: {e}"),
+            Self::Watch(e) => write!(f, "the content directory could not be watched: {e}"),
         }
     }
 }
 
 impl std::error::Error for Error {}
 
-/// A session that is open, with its payload launched and its directory watched.
+/// A session that is open, with its content file launched and its directory
+/// watched.
 pub struct Opened {
     session: Session,
     watch: Watch,
     /// What the platform recorded about where the container came from, carried
-    /// onto the payload.
+    /// onto the content file.
     pub mark: slpc::provenance::Mark,
-    saw_payload_change: bool,
+    saw_content_change: bool,
 }
 
 /// What closing a session did.
 pub enum Closed {
     /// Written back where asked, and the session directory removed.
     Cleared,
-    /// The target application still has things of its own in the payload
+    /// The target application still has things of its own in the content
     /// directory, so the session was handed to recovery instead of being
     /// removed. Concept 6.2: the close is honoured, but deleting the directory
     /// underneath a running editor sends its next save nowhere this tool will
@@ -140,7 +141,7 @@ impl Lingering {
     }
 
     /// Whether the application appears to have finished: nothing of its own
-    /// left in the payload directory (concept 6.1), and nothing written there
+    /// left in the content directory (concept 6.1), and nothing written there
     /// for `quiet`.
     ///
     /// **Both halves, because either alone is wrong.** Siblings gone is the
@@ -160,10 +161,13 @@ impl Lingering {
         // Unreadable means the answer is not known, and the safe reading of not
         // known is that the application is still there. A directory that has
         // gone is the other case and settles: there is nothing left to wait
-        // for, and what remains is a recovery record naming a payload that is
-        // not on disk, which `recover` reports.
-        !crate::watch::siblings_present(&self.session.payload_dir(), &self.session.record().payload)
-            .unwrap_or(true)
+        // for, and what remains is a recovery record naming a content file that
+        // is not on disk, which `recover` reports.
+        !crate::watch::siblings_present(
+            &self.session.content_dir(),
+            &self.session.record().content_name,
+        )
+        .unwrap_or(true)
     }
 
     /// Give up the watch and hand back the session, for the caller that is
@@ -180,7 +184,7 @@ impl Lingering {
 ///
 /// See [`Error`]. Nothing is left behind on any of them except
 /// [`Error::Extract`] carrying [`extract::Error::Unmarked`] with
-/// `payload_removed` false, which says so.
+/// `content_removed` false, which says so.
 pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result<Opened, Error> {
     // Step 1. Opening is validating: `Container::open` applies SPEC 3 and the
     // limits SPEC 6 asks for before it will answer any question about the file.
@@ -188,7 +192,7 @@ pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result
 
     // Step 2, and step 3's refusals. Resolved here rather than passed in.
     let decision =
-        policy::decide(outside.policy, container.payload_name()).map_err(Error::Policy)?;
+        policy::decide(outside.policy, container.content_name()).map_err(Error::Policy)?;
     if !matches!(decision, Decision::Open { .. }) {
         return Err(Error::Refused(decision));
     }
@@ -197,16 +201,16 @@ pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result
     //
     // **A veto, not a control, and the distinction is what keeps 5.1's argument
     // standing.** The extension still decides what may be opened — the
-    // allowlist above is the control, this admits nothing, and a payload that
-    // gets past here has been permitted by policy and not by inspection. All
-    // this can do is say *no* to something already permitted. 5.1's reasoning
-    // about why sniffing cannot be the control is untouched; what changed is
-    // the last line of it, which had this telling the person and standing
-    // aside.
+    // allowlist above is the control, this admits nothing, and a content file
+    // that gets past here has been permitted by policy and not by inspection.
+    // All this can do is say *no* to something already permitted. 5.1's
+    // reasoning about why sniffing cannot be the control is untouched; what
+    // changed is the last line of it, which had this telling the person and
+    // standing aside.
     //
     // **Before the session, so nothing reaches the disk.** The bytes are read
     // out of the container, so a refusal here means the executable was never
-    // written anywhere outside it — no session directory, no payload file, no
+    // written anywhere outside it — no session directory, no content file, no
     // mark, and nothing for a later sweep to find. That is worth more than the
     // warning it replaces.
     if let Some(what) = misrepresentation(&mut container, &decision) {
@@ -215,26 +219,26 @@ pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result
 
     // Step 4.
     let mut session =
-        session::create(root, container_path, container.payload_name()).map_err(Error::Session)?;
+        session::create(root, container_path, container.content_name()).map_err(Error::Session)?;
 
     // Steps 5 and 6. A failure here takes the session directory with it rather
     // than leaving a half-made one for recovery to ask about.
     let mark = match extract::extract(&mut container, &mut session) {
         Ok(m) => m,
         Err(e) => {
-            let payload = session.payload_path();
+            let content_path = session.content_path();
             let _ = session.clone().remove();
             // `extract` reports whether *it* managed to take the ungated
-            // payload back off disk, and then this removes the whole session
-            // directory, which usually succeeds where the single unlink did
-            // not. Left alone, the message tells somebody there is an ungated
-            // executable on disk after the file has gone. Re-asked of the
-            // filesystem, after the cleanup, so the sentence is true when it is
-            // printed.
+            // content file back off disk, and then this removes the whole
+            // session directory, which usually succeeds where the single
+            // unlink did not. Left alone, the message tells somebody there is
+            // an ungated executable on disk after the file has gone. Re-asked
+            // of the filesystem, after the cleanup, so the sentence is true
+            // when it is printed.
             return Err(Error::Extract(match e {
                 extract::Error::Unmarked { cause, .. } => extract::Error::Unmarked {
                     cause,
-                    payload_removed: !payload.exists(),
+                    content_removed: !content_path.exists(),
                 },
                 other => other,
             }));
@@ -244,7 +248,7 @@ pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result
     // Step 8 before step 7: the watch is registered before the application is
     // told the file exists, or a save that arrives quickly enough is a save
     // nothing was listening for.
-    let watch = match Watch::on(&session.payload_dir(), &session.record().payload) {
+    let watch = match Watch::on(&session.content_dir(), &session.record().content_name) {
         Ok(w) => w,
         Err(e) => {
             let _ = session.clone().remove();
@@ -252,7 +256,7 @@ pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result
         }
     };
 
-    if let Err(e) = outside.launcher.launch(&session.payload_path()) {
+    if let Err(e) = outside.launcher.launch(&session.content_path()) {
         let _ = session.clone().remove();
         return Err(Error::Launch(e));
     }
@@ -261,12 +265,13 @@ pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result
         session,
         watch,
         mark,
-        saw_payload_change: false,
+        saw_content_change: false,
     })
 }
 
-/// What concept 5.1's check makes of the payload, read out of the container
-/// rather than off disk so the answer is available before anything is written.
+/// What concept 5.1's check makes of the content file, read out of the
+/// container rather than off disk so the answer is available before anything
+/// is written.
 fn misrepresentation<R: std::io::Read + std::io::Seek>(
     container: &mut slpc::Container<R>,
     decision: &Decision,
@@ -276,10 +281,10 @@ fn misrepresentation<R: std::io::Read + std::io::Seek>(
         _ => None,
     };
     let mut head = [0u8; content::HEAD];
-    let mut payload = container.payload().ok()?;
+    let mut piece = container.content().ok()?;
     let mut at = 0;
     while at < head.len() {
-        match std::io::Read::read(&mut payload, &mut head[at..]) {
+        match std::io::Read::read(&mut piece, &mut head[at..]) {
             Ok(0) | Err(_) => break,
             Ok(n) => at += n,
         }
@@ -294,30 +299,34 @@ impl Opened {
         &self.session
     }
 
-    /// Where the payload was put.
+    /// Where the content file was put.
     #[must_use]
-    pub fn payload_path(&self) -> PathBuf {
-        self.session.payload_path()
+    pub fn content_path(&self) -> PathBuf {
+        self.session.content_path()
     }
 
-    /// Whether the payload has been seen to change since the session opened.
+    /// Whether the content file has been seen to change since the session
+    /// opened.
     #[must_use]
     pub fn saw_a_change(&self) -> bool {
-        self.saw_payload_change
+        self.saw_content_change
     }
 
-    /// Whether the target application has anything of its own in the payload
+    /// Whether the target application has anything of its own in the content
     /// directory (concept 6.1).
     ///
     /// # Errors
     ///
-    /// Where the payload directory cannot be read.
+    /// Where the content directory cannot be read.
     pub fn application_is_working(&self) -> std::io::Result<bool> {
-        crate::watch::siblings_present(&self.session.payload_dir(), &self.session.record().payload)
+        crate::watch::siblings_present(
+            &self.session.content_dir(),
+            &self.session.record().content_name,
+        )
     }
 
-    /// Take whatever the watch has to say, and write back once if the payload
-    /// was among it.
+    /// Take whatever the watch has to say, and write back once if the content
+    /// file was among it.
     ///
     /// Once, rather than once per event. A single save arrives as several
     /// events — a temporary sibling, a rename, a metadata touch — and repacking
@@ -342,21 +351,21 @@ impl Opened {
     /// relied on that being true of every application on three platforms, which
     /// is not a thing this code is in a position to know.
     fn pump_including(&mut self, first: Option<Change>) -> Result<bool, writeback::Error> {
-        let mut payload_changed = first == Some(Change::Payload);
+        let mut content_changed = first == Some(Change::Content);
         for change in self.watch.drain() {
-            if change == Change::Payload {
-                payload_changed = true;
+            if change == Change::Content {
+                content_changed = true;
             }
         }
-        if !payload_changed {
+        if !content_changed {
             return Ok(false);
         }
-        self.saw_payload_change = true;
+        self.saw_content_change = true;
         self.save_if_changed()
     }
 
-    /// Write the payload back, unless it already matches what the container
-    /// holds.
+    /// Write the content file back, unless it already matches what the
+    /// container holds.
     ///
     /// **Asked of the bytes rather than of the events.** One save arrives as
     /// several events — a temporary sibling, a rename, a metadata touch — and
@@ -407,7 +416,7 @@ impl Opened {
     /// so is the answer: it asks, and calls
     /// [`save_if_changed`](Self::save_if_changed) if the answer is yes. This
     /// used to take a `bool` and repack unconditionally on it, which rebuilt
-    /// the container even when the payload matched it byte for byte, and
+    /// the container even when the content file matched it byte for byte, and
     /// rebuilt it twice when the final pump had just done so.
     ///
     /// # Errors
@@ -421,8 +430,8 @@ impl Opened {
 
         // Concept 6.2. The close is honoured either way; what changes is
         // whether the directory goes now or is handed to recovery, so that an
-        // editor still holding the payload has somewhere for its next save to
-        // land and the next launch asks about it.
+        // editor still holding the content file has somewhere for its next
+        // save to land and the next launch asks about it.
         if self.application_is_working().unwrap_or(true) {
             return Ok(Closed::LeftForRecovery(Box::new(Lingering {
                 session: self.session,
@@ -476,13 +485,13 @@ mod tests {
         }
     }
 
-    fn container(at: &Path, name: &str, payload: &[u8]) -> PathBuf {
+    fn container(at: &Path, name: &str, content_bytes: &[u8]) -> PathBuf {
         let doc: slpc::toml_edit::DocumentMut =
-            format!("slipcase_version = \"1.0\"\n\n[payload]\nfile = \"{name}\"\n")
+            format!("slipcase_version = \"1.1\"\n\n[content]\nfile = \"{name}\"\n")
                 .parse()
                 .unwrap();
         let path = at.join(format!("{name}.slpc"));
-        slpc::pack_reader(name, payload, doc, fs::File::create(&path).unwrap()).unwrap();
+        slpc::pack_reader(name, content_bytes, doc, fs::File::create(&path).unwrap()).unwrap();
         path
     }
 
@@ -494,8 +503,8 @@ mod tests {
         let launcher = Recording::default();
 
         let o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
-        assert_eq!(launcher.launched(), [o.payload_path()]);
-        assert_eq!(fs::read(o.payload_path()).unwrap(), b"%PDF first");
+        assert_eq!(launcher.launched(), [o.content_path()]);
+        assert_eq!(fs::read(o.content_path()).unwrap(), b"%PDF first");
         assert!(!o.saw_a_change());
     }
 
@@ -510,9 +519,9 @@ mod tests {
 
         // The way a serious editor saves: a temporary sibling renamed over the
         // target, which is the case a watch on the file would miss.
-        let scratch = o.payload_path().with_extension("pdf.tmp");
+        let scratch = o.content_path().with_extension("pdf.tmp");
         fs::write(&scratch, b"edited").unwrap();
-        fs::rename(&scratch, o.payload_path()).unwrap();
+        fs::rename(&scratch, o.content_path()).unwrap();
 
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
         while std::time::Instant::now() < deadline && !o.saw_a_change() {
@@ -522,7 +531,7 @@ mod tests {
 
         let mut back = slpc::Container::open(&c).unwrap();
         let mut got = Vec::new();
-        std::io::copy(&mut back.payload().unwrap(), &mut got).unwrap();
+        std::io::copy(&mut back.content().unwrap(), &mut got).unwrap();
         assert_eq!(got, b"edited");
     }
 
@@ -543,7 +552,7 @@ mod tests {
         )
         .unwrap();
 
-        fs::write(o.payload_path(), b"edited in place").unwrap();
+        fs::write(o.content_path(), b"edited in place").unwrap();
 
         let deadline = std::time::Instant::now() + Duration::from_secs(10);
         while std::time::Instant::now() < deadline && !o.saw_a_change() {
@@ -553,7 +562,7 @@ mod tests {
 
         let mut back = slpc::Container::open(&c).unwrap();
         let mut got = Vec::new();
-        std::io::copy(&mut back.payload().unwrap(), &mut got).unwrap();
+        std::io::copy(&mut back.content().unwrap(), &mut got).unwrap();
         assert_eq!(got, b"edited in place");
     }
 
@@ -576,9 +585,9 @@ mod tests {
 
         let mut o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
 
-        let scratch = o.payload_path().with_extension("pdf.tmp");
+        let scratch = o.content_path().with_extension("pdf.tmp");
         fs::write(&scratch, b"edited").unwrap();
-        fs::rename(&scratch, o.payload_path()).unwrap();
+        fs::rename(&scratch, o.content_path()).unwrap();
 
         // Pump well past the point where the save has landed, so every event
         // it produced has arrived and been acted on.
@@ -598,7 +607,8 @@ mod tests {
     #[test]
     fn policy_refuses_before_a_session_directory_exists() {
         // Concept 10 puts enforcement in the launch path, and a refusal that
-        // had already written the payload somewhere would be a refusal in name.
+        // had already written the content file somewhere would be a refusal in
+        // name.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
@@ -613,7 +623,7 @@ mod tests {
     }
 
     #[test]
-    fn a_payload_with_no_usable_extension_is_refused() {
+    fn a_content_file_with_no_usable_extension_is_refused() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "README", b"hello");
@@ -621,7 +631,7 @@ mod tests {
 
         match open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)) {
             Err(e) => assert!(e.to_string().contains("no usable extension"), "{e}"),
-            Ok(_) => panic!("a payload with no usable extension was opened"),
+            Ok(_) => panic!("a content file with no usable extension was opened"),
         }
         assert!(crate::session::scan(&root).unwrap().is_empty());
     }
@@ -648,8 +658,8 @@ mod tests {
             "nothing was handed to the desktop"
         );
         // The refusal is before the session, so the bytes never left the
-        // container: no session directory, no payload on disk, and nothing for
-        // a later sweep to find.
+        // container: no session directory, no content file on disk, and
+        // nothing for a later sweep to find.
         assert!(
             !root.exists() || crate::session::scan(&root).unwrap().is_empty(),
             "the executable reached the disk"
@@ -659,9 +669,9 @@ mod tests {
     #[test]
     fn a_program_under_its_own_name_is_left_to_policy() {
         // The other half of *veto, not control*: this check never admits
-        // anything and never fires on a payload that is what it says. What
-        // happens to a `.exe` is the allowlist's business, and here nothing
-        // stands in its way.
+        // anything and never fires on a content file that is what it says.
+        // What happens to a `.exe` is the allowlist's business, and here
+        // nothing stands in its way.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "setup.exe", b"MZ\x90\x00 an installer");
@@ -670,7 +680,7 @@ mod tests {
         let opened = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent));
         assert!(
             !matches!(opened, Err(Error::Misrepresented(_))),
-            "the content check refused a payload that is what its name says"
+            "the content check refused a content file that is what its name says"
         );
     }
 
@@ -702,14 +712,14 @@ mod tests {
         let launcher = Recording::default();
 
         let mut o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
-        fs::write(o.payload_path(), b"edited quietly").unwrap();
+        fs::write(o.content_path(), b"edited quietly").unwrap();
         // Deliberately not pumped: this is the path where nothing was seen.
         assert!(o.save_if_changed().unwrap());
         assert!(matches!(o.close().unwrap(), Closed::Cleared));
 
         let mut back = slpc::Container::open(&c).unwrap();
         let mut got = Vec::new();
-        std::io::copy(&mut back.payload().unwrap(), &mut got).unwrap();
+        std::io::copy(&mut back.content().unwrap(), &mut got).unwrap();
         assert_eq!(got, b"edited quietly");
         assert!(crate::session::scan(&root).unwrap().is_empty());
     }
@@ -729,8 +739,8 @@ mod tests {
         // about one run in six. What the handover rule guarantees is that the
         // directory survives, and that is what is checked.
         let o = open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)).unwrap();
-        let payload = o.payload_path();
-        fs::write(payload.with_file_name("~$report.pdf"), b"").unwrap();
+        let content_path = o.content_path();
+        fs::write(content_path.with_file_name("~$report.pdf"), b"").unwrap();
 
         assert!(matches!(o.close().unwrap(), Closed::LeftForRecovery(_)));
 
@@ -738,7 +748,7 @@ mod tests {
         assert_eq!(left.len(), 1);
         // Still there for the editor's next save to land in, which is the whole
         // point of not deleting it.
-        assert!(payload.is_file());
+        assert!(content_path.is_file());
     }
 
     #[test]
@@ -757,7 +767,7 @@ mod tests {
         )
         .unwrap();
 
-        fs::write(o.payload_path(), b"edited").unwrap();
+        fs::write(o.content_path(), b"edited").unwrap();
         fs::remove_file(&c).unwrap();
 
         assert!(matches!(
@@ -769,8 +779,8 @@ mod tests {
     #[test]
     fn a_different_container_at_the_recorded_path_refuses_the_write_back() {
         // The guard belongs on the acting side and not only in `recover`:
-        // repacking here would rename the payload of a container this session
-        // was never opened against.
+        // repacking here would rename the content file of a container this
+        // session was never opened against.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
@@ -781,7 +791,7 @@ mod tests {
         )
         .unwrap();
 
-        fs::write(o.payload_path(), b"edited").unwrap();
+        fs::write(o.content_path(), b"edited").unwrap();
         let other = container(tmp.path(), "plan.dwg", b"unrelated");
         fs::rename(&other, &c).unwrap();
 
@@ -792,22 +802,22 @@ mod tests {
             }
             other => panic!("{other:?}"),
         }
-        // Untouched: still the other container, still its own payload name.
+        // Untouched: still the other container, still its own content name.
         assert_eq!(
-            slpc::Container::open(&c).unwrap().payload_name(),
+            slpc::Container::open(&c).unwrap().content_name(),
             "plan.dwg"
         );
     }
 
     #[test]
-    fn saying_yes_to_an_unchanged_payload_rebuilds_nothing() {
+    fn saying_yes_to_an_unchanged_content_file_rebuilds_nothing() {
         // `close` used to take the answer as a `bool` and repack on it without
         // asking whether anything had changed. That signature is gone, so this
         // cannot be made to fail by reverting the fix the way the two above
         // can; it pins the behaviour rather than the defect. What it is worth
         // is that rewriting the only copy of a container is not a free
-        // operation, and answering *yes* to a question about a payload nobody
-        // edited should cost nothing.
+        // operation, and answering *yes* to a question about a content file
+        // nobody edited should cost nothing.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
@@ -834,7 +844,7 @@ mod tests {
         )
         .unwrap();
 
-        fs::write(o.payload_path(), b"edited").unwrap();
+        fs::write(o.content_path(), b"edited").unwrap();
         assert!(o.save_if_changed().unwrap());
         assert!(!o.save_if_changed().unwrap());
         assert!(!o.save_if_changed().unwrap());
@@ -917,7 +927,7 @@ mod tests {
                         // has a completed notification in flight when the
                         // directory goes. That is the state the captured stack
                         // was in.
-                        fs::write(o.payload_path(), b"edited").unwrap();
+                        fs::write(o.content_path(), b"edited").unwrap();
 
                         assert!(matches!(o.close().unwrap(), Closed::Cleared));
 
@@ -962,7 +972,7 @@ mod tests {
                         // Mirrors the test that wedged: a save, then the save
                         // that finds nothing to do, then the scope ends. No
                         // close.
-                        fs::write(o.payload_path(), b"edited").unwrap();
+                        fs::write(o.content_path(), b"edited").unwrap();
                         assert!(o.save_if_changed().unwrap());
                         assert!(!o.save_if_changed().unwrap());
 
@@ -1005,11 +1015,11 @@ mod tests {
         std::thread::scope(|s| {
             s.spawn(|| {
                 let ntmp = tempfile::tempdir().unwrap();
-                let payload = ntmp.path().join("neighbour.pdf");
-                fs::write(&payload, b"x").unwrap();
+                let content_path = ntmp.path().join("neighbour.pdf");
+                fs::write(&content_path, b"x").unwrap();
                 while !stop.load(std::sync::atomic::Ordering::Relaxed) {
                     let w = crate::watch::Watch::on(ntmp.path(), "neighbour.pdf").unwrap();
-                    fs::write(&payload, b"y").unwrap();
+                    fs::write(&content_path, b"y").unwrap();
                     drop(w);
                 }
             });
@@ -1024,7 +1034,7 @@ mod tests {
                     &Outside::new(&Default_, &Recording::default(), &Silent),
                 )
                 .unwrap();
-                fs::write(o.payload_path(), b"edited").unwrap();
+                fs::write(o.content_path(), b"edited").unwrap();
                 assert!(matches!(o.close().unwrap(), Closed::Cleared));
                 if i % 50 == 0 {
                     eprintln!("round {i}");
@@ -1069,7 +1079,7 @@ mod tests {
                             &Outside::new(&Default_, &Recording::default(), &Silent),
                         )
                         .unwrap();
-                        fs::write(o.payload_path(), b"edited").unwrap();
+                        fs::write(o.content_path(), b"edited").unwrap();
 
                         // The only removal in the process.
                         assert!(matches!(o.close().unwrap(), Closed::Cleared));
@@ -1129,7 +1139,7 @@ mod tests {
                     &Outside::new(&Default_, &Recording::default(), &Silent),
                 )
                 .unwrap();
-                fs::write(o.payload_path(), b"edited").unwrap();
+                fs::write(o.content_path(), b"edited").unwrap();
                 open_now.push(o);
             }
 

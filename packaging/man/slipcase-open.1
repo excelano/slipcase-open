@@ -1,6 +1,6 @@
 .TH SLIPCASE\-OPEN 1 "2026-09-07" "slipcase\-open 0.1.5" "User Commands"
 .SH NAME
-slipcase\-open \- open the payload of a Slipcase container in its own application
+slipcase\-open \- open the content file of a Slipcase container in its own application
 .SH SYNOPSIS
 .B slipcase\-open open
 .I CONTAINER
@@ -16,14 +16,14 @@ slipcase\-open \- open the payload of a Slipcase container in its own applicatio
 .br
 .B slipcase\-open policy
 .SH DESCRIPTION
-Opens the payload of a
+Opens the content file of a
 .B .slpc
 container in whatever application the desktop normally handles that kind of file
 with, watches for edits, and writes them back into the container.
 .PP
 Opening a container starts a
 .BR session .
-The payload is extracted into a private directory under the user's own state
+The content file is extracted into a private directory under the user's own state
 directory, the platform's trust\-zone mark is carried onto the copy, the
 directory is watched, and every save that reaches it is repacked into the
 container atomically.
@@ -48,13 +48,13 @@ not close.
 .TP
 .BI close " SESSION"
 Write back what the session has and clean it up. Where the application still has
-the payload open, the directory is handed to recovery instead of being removed,
+the content file open, the directory is handed to recovery instead of being removed,
 so the application's next save has somewhere to land.
 .TP
 .BI recover " SESSION"
 Act on a session left behind. Requires
 .B \-\-write\-back
-to put the payload into its container, or
+to put the content file into its container, or
 .B \-\-discard
 to throw it away. Naming a session without either reports its state and does
 nothing.
@@ -76,7 +76,7 @@ The user's own configuration, at
 where the variable is unset. Not created by the package.
 .TP
 .I $XDG_STATE_HOME/slipcase\-open/sessions
-Where a session's payload lives while it is open, at
+Where a session's content file lives while it is open, at
 .I ~/.local/state/slipcase\-open/sessions
 where the variable is unset. Deliberately not the temporary directory, which a
 reboot or a cleaner may empty underneath an edit that has not been written back.
@@ -106,7 +106,7 @@ Every key is optional, and one that is absent means the layer has no opinion
 about it rather than that it forbids everything.
 .TP
 .B allowed
-The payload extensions that may be opened, compared with ASCII case folded.
+The content file extensions that may be opened, compared with ASCII case folded.
 .TP
 .B mode
 Whether
@@ -121,7 +121,7 @@ Extensions refused, whatever every other setting says.
 Whether the user's own configuration is consulted at all.
 .TP
 .B confirm_each_write_back
-Ask before each write\-back rather than repacking as the payload is saved.
+Ask before each write\-back rather than repacking as the content file is saved.
 .TP
 .B notify
 How much is said without being asked: "important" by default, or "everything"
@@ -129,12 +129,12 @@ for a notification on every write\-back. Nothing here can silence a question.
 .SH SECURITY
 The allowed set is a guardrail against user error and social engineering in the
 convenient path, and not a security boundary. A container is a plain ZIP and any
-user can extract its payload with standard tools. The boundary is application
+user can extract its content file with standard tools. The boundary is application
 control.
 .PP
-A payload whose bytes are an executable image under an extension that is not one
+A content file whose bytes are an executable image under an extension that is not one
 is reported and still opened: the extension governs what runs, so refusing would
-assert a control this path does not carry. A payload with no usable extension is
+assert a control this path does not carry. A content file with no usable extension is
 refused, because the desktop would otherwise ask which application to run it
 with, inside a flow the person reads as opening a document.
 .SH SEE ALSO

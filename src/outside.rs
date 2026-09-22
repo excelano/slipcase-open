@@ -3,12 +3,12 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Where policy is read from, what opens a payload, and how the person is
+//! Where policy is read from, what opens a content file, and how the person is
 //! spoken to. They travel together because they are chosen together — once, by
 //! `main`, from what the machine turns out to be — and because the engine
 //! passes all three down the same path: concept 10 puts the policy decision
 //! immediately before the launch, and concept 5.1's warning is said about the
-//! same payload in the same breath.
+//! same content file in the same breath.
 //!
 //! Held as trait objects rather than as type parameters. The alternative
 //! threads three generics through every signature from the front door down to
@@ -24,7 +24,7 @@ use crate::present::{Channel, Report, Weight};
 pub struct Outside<'a> {
     /// Concept 10's layers, in whatever form this platform keeps them.
     pub policy: &'a dyn policy::Source,
-    /// Concept 5 step 7, which hands the payload to the desktop.
+    /// Concept 5 step 7, which hands the content file to the desktop.
     pub launcher: &'a dyn Launcher,
     /// Concept 9, which narrates and asks.
     pub channel: &'a dyn Channel,
@@ -60,7 +60,7 @@ impl<'a> Outside<'a> {
     ///
     /// **Every routine report goes through here and no question does.** A
     /// question is [`Channel::ask`], which this cannot reach, so no setting can
-    /// silence a session into stranding its payload.
+    /// silence a session into stranding its content file.
     pub fn report(&self, report: &Report) {
         if report.weight != Weight::Routine || self.notify == Notify::Everything {
             self.channel.report(report);
@@ -121,7 +121,7 @@ mod tests {
     fn no_setting_can_silence_a_question() {
         // The property the whole design rests on. A question is `ask`, which
         // `Outside::report` cannot reach, so a session waiting on a decision
-        // cannot be quietened into stranding its payload — and that is
+        // cannot be quietened into stranding its content file — and that is
         // structural rather than a rule somebody has to keep in mind.
         let launcher = Launching::default();
         let told = Told::default();

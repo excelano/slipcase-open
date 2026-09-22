@@ -1,23 +1,24 @@
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Open payload
-Name[de]=Nutzlast öffnen
-GenericName=Slipcase payload opener
-GenericName[de]=Slipcase-Nutzlastöffner
-Comment=Open the payload of a Slipcase container in the application that normally handles it
-Comment[de]=Die Nutzlast eines Slipcase-Containers in der Anwendung öffnen, die sie normalerweise verarbeitet
+Name=Open content file
+Name[de]=Inhaltsdatei öffnen
+GenericName=Slipcase content file opener
+GenericName[de]=Slipcase-Inhaltsdateiöffner
+Comment=Open the content file of a Slipcase container in the application that normally handles it
+Comment[de]=Die Inhaltsdatei eines Slipcase-Containers in der Anwendung öffnen, die sie normalerweise verarbeitet
 Exec=slipcase-open open %f
 Icon=document-open
 Terminal=false
-# Six types and not one. `slipcase-common` declares a payload family per icon —
-# a container named `report.pdf.slpc` types as the PDF family so that it can be
-# drawn as one — and each is a `sub-class-of` the registered container type.
-# Inheritance carries the default application but not the recommended list,
-# which is exact-type only, so a family left out here still opens but drops out
-# of the top of Open With. Adding a family there means adding it here.
+# Six types and not one. `slipcase-common` declares a content file family per
+# icon — a container named `report.pdf.slpc` types as the PDF family so that it
+# can be drawn as one — and each is a `sub-class-of` the registered container
+# type. Inheritance carries the default application but not the recommended
+# list, which is exact-type only, so a family left out here still opens but
+# drops out of the top of Open With. Adding a family there means adding it
+# here.
 MimeType=application/vnd.excelano.slipcase+zip;application/x.slipcase-pdf+zip;application/x.slipcase-document+zip;application/x.slipcase-image+zip;application/x.slipcase-audio+zip;application/x.slipcase-video+zip;
 Categories=Utility;
-Keywords=slipcase;slpc;payload;container;open;
-Keywords[de]=slipcase;slpc;Nutzlast;Container;öffnen;
+Keywords=slipcase;slpc;content;container;open;
+Keywords[de]=slipcase;slpc;Inhaltsdatei;Container;öffnen;
 StartupNotify=false

@@ -29,9 +29,9 @@
   **The secondary verb, because the viewer claims the same extension.** Concept
   4 says the two products contend for it, that last installed wins, and that the
   answer is not to engineer around it — so each registers a verb to stay one
-  click away when it is not the default. "Open payload" is this product's, and
-  without it a machine where the viewer won would have no route to this one from
-  Explorer at all.
+  click away when it is not the default. "Open content file" is this product's,
+  and without it a machine where the viewer won would have no route to this one
+  from Explorer at all.
 
   **No capability beyond `runFullTrust`.** This is a full-trust Win32 binary
   packaged as MSIX rather than a UWP app, so that capability is what lets it run
@@ -62,7 +62,7 @@
     <DisplayName>Slipcase Open</DisplayName>
     <PublisherDisplayName>@PUBLISHER_DISPLAY_NAME@</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
-    <Description>Open the payload of a Slipcase container in whatever application handles that kind of file, and write edits back into the container.</Description>
+    <Description>Open the content file of a Slipcase container in whatever application handles that kind of file, and write edits back into the container.</Description>
   </Properties>
 
   <Dependencies>
@@ -99,7 +99,7 @@
 
       <uap:VisualElements
         DisplayName="Slipcase Open"
-        Description="Open a Slipcase container's payload in its own application and write edits back."
+        Description="Open a Slipcase container's content file in its own application and write edits back."
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png">
@@ -119,7 +119,7 @@
                  and the double-click reach the same command. `main` reads a
                  lone path as `open` for exactly this reason. -->
             <uap2:SupportedVerbs>
-              <uap3:Verb Id="openpayload" Parameters="&quot;%1&quot;">Open payload</uap3:Verb>
+              <uap3:Verb Id="opencontent" Parameters="&quot;%1&quot;">Open content file</uap3:Verb>
             </uap2:SupportedVerbs>
           </uap3:FileTypeAssociation>
         </uap:Extension>

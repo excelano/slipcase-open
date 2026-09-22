@@ -22,7 +22,7 @@
 #
 # **Nothing here opens a document.** `platform::testing::Recording` is what the
 # suite launches through, so `xdg-open` is never called and no application is
-# ever handed a payload. The whole of concept 5 step 7 is unexercised here and
+# ever handed a content file. The whole of concept 5 step 7 is unexercised here and
 # is checked by hand.
 #
 # Author: David M. Anderson
@@ -211,7 +211,7 @@ jobs:
           # `application/x-zerosize` whatever the glob says. Built here rather
           # than committed: a fixture in the tree would be one more thing that
           # can drift from what SPEC §2 requires.
-          python3 -c 'import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("slipcase.metadata.toml","slipcase_version = \"1.0\"\n\n[payload]\nfile = \"report.txt\"\n"); z.writestr("report.txt","a report\n"); z.close()' "${RUNNER_TEMP}/sample.slpc"
+          python3 -c 'import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("slipcase.flyleaf.toml","slipcase_version = \"1.1\"\n\n[content]\nfile = \"report.txt\"\n"); z.writestr("report.txt","a report\n"); z.close()' "${RUNNER_TEMP}/sample.slpc"
 
           type=$(gio info -a standard::content-type "${RUNNER_TEMP}/sample.slpc" |
               sed -n 's/.*standard::content-type: //p')

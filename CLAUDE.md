@@ -1,8 +1,8 @@
 # CLAUDE.md
 
 A companion to the `slipcase` CLI and the `slipcase-desktop` viewer. Double-click a
-`.slpc`, the payload opens in whatever application normally handles it, and edits made
-there are written back into the container. No metadata UI, no preview, no container
+`.slpc`, the content file opens in whatever application normally handles it, and edits made
+there are written back into the container. No flyleaf UI, no preview, no container
 browsing. The engine is `src/lib.rs` and its modules, with no dependency on how the tool
 presents itself; `src/main.rs` is the command line over it, which concept §9 keeps as the
 floor beneath the notifications and the tray. Every security-relevant decision —
@@ -28,7 +28,7 @@ Releases: run `ship slipcase/slipcase-open`. There is no release document.
 ## Rules
 
 **Assert what the code guarantees, not what it happened to do.** `pump` decides from the
-bytes, whether the payload differs from what the container holds, and not from how many
+bytes, whether the content file differs from what the container holds, and not from how many
 events arrived, because the event count is a function of how busy the machine is. A test
 that counts events, or reads state a pump may or may not have reached yet, is measuring
 the machine.

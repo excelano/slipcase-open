@@ -43,7 +43,7 @@ type — so this entry has to be in it.
 carrying it answers `false` to `g_app_info_should_show()`, which is the predicate
 GIO documents for whether an application belongs in a menu and which the app
 choosers filter on. An entry hidden from those lists is an entry concept 4
-cannot reach. The cost of leaving it displayed is that "Open payload" also
+cannot reach. The cost of leaving it displayed is that "Open content file" also
 appears in the applications grid, where launching it with no argument prints the
 usage and exits.
 
@@ -73,8 +73,8 @@ decision, taken once for both products because both make the same claim on the
 same extension.
 
 **The desktop entry names six types, not one.** `slipcase-common` declares a
-payload family per icon — `application/x.slipcase-pdf+zip` against `*.pdf.slpc`,
-and four more — so that a container named for its payload can be drawn with a
+content file family per icon — `application/x.slipcase-pdf+zip` against `*.pdf.slpc`,
+and four more — so that a container named for its content file can be drawn with a
 mark for it. Each is a `sub-class-of application/vnd.excelano.slipcase+zip`, and
 that inheritance carries the default application but not the *recommended* list,
 which is matched on the exact type. A family missing from `MimeType=` therefore

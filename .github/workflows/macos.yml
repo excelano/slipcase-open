@@ -82,7 +82,7 @@ jobs:
           lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
           "$lsregister" -f "$app"
 
-          python3 -c 'import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("slipcase.metadata.toml","slipcase_version = \"1.0\"\n\n[payload]\nfile = \"report.txt\"\n"); z.writestr("report.txt","a report\n"); z.close()' "${RUNNER_TEMP}/sample.slpc"
+          python3 -c 'import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],"w"); z.writestr("slipcase.flyleaf.toml","slipcase_version = \"1.1\"\n\n[content]\nfile = \"report.txt\"\n"); z.writestr("report.txt","a report\n"); z.close()' "${RUNNER_TEMP}/sample.slpc"
 
           open -a "$app" "${RUNNER_TEMP}/sample.slpc"
 

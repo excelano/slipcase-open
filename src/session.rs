@@ -13,13 +13,13 @@
 //! directory, and recovery is a scan of that one tree rather than a record
 //! pointing somewhere that may no longer be there.
 //!
-//! ## The payload sits one level down
+//! ## The content file sits one level down
 //!
-//! A session directory holds `session.toml` and a `payload/` directory, and the
-//! payload goes inside the latter under its own name. Two reasons, and the
+//! A session directory holds `session.toml` and a `content/` directory, and the
+//! content file goes inside the latter under its own name. Two reasons, and the
 //! first is a collision: SPEC 2.3 permits any plain filename, `session.toml`
-//! included, so a payload beside the record could overwrite it. The second is
-//! that concept 6.1 reads *anything else in the directory* as the target
+//! included, so a content file beside the record could overwrite it. The second
+//! is that concept 6.1 reads *anything else in the directory* as the target
 //! application's doing, and that inference is only sound if the tool put
 //! exactly one file there.
 
@@ -32,9 +32,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// The file inside a session directory that carries [`Record`].
 const RECORD: &str = "session.toml";
 
-/// The directory inside a session directory that carries the payload, and
+/// The directory inside a session directory that carries the content file, and
 /// nothing this tool put there.
-const PAYLOAD_DIR: &str = "payload";
+const CONTENT_DIR: &str = "content";
 
 /// How many names [`create`] will try before giving up. A thousand sessions
 /// opened inside one second is not a thing that happens, and a directory that
@@ -43,33 +43,33 @@ const ATTEMPTS: u32 = 1024;
 
 /// What a session remembers across a crash.
 ///
-/// Deliberately small. Concept 6.3 removed the *payload* digest this used to
-/// carry: the container records a CRC-32 for its payload already, so recovery
-/// compares against the container rather than against a second copy of the fact
-/// that can drift from it — and drift is likeliest at the moment this file is
-/// consulted.
+/// Deliberately small. Concept 6.3 removed the *content file* digest this used
+/// to carry: the container records a CRC-32 for its content file already, so
+/// recovery compares against the container rather than against a second copy of
+/// the fact that can drift from it — and drift is likeliest at the moment this
+/// file is consulted.
 ///
 /// [`Record::agreed`] is not that digest coming back, and the difference is
-/// worth being exact about. The removed one answered *has the payload changed*,
-/// which the container can answer better. This one answers *which side changed*,
-/// which nothing can answer without a record, because both sides are only
-/// visible now and the question is about then. It is a note of a past moment
-/// rather than a cached copy of a present fact, so there is nothing for it to
-/// drift from: if it is stale, the answer it gives — that the container is not
-/// where we left it — is the true one.
+/// worth being exact about. The removed one answered *has the content file
+/// changed*, which the container can answer better. This one answers *which
+/// side changed*, which nothing can answer without a record, because both sides
+/// are only visible now and the question is about then. It is a note of a past
+/// moment rather than a cached copy of a present fact, so there is nothing for
+/// it to drift from: if it is stale, the answer it gives — that the container
+/// is not where we left it — is the true one.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     /// Where the container was when the session opened, resolved. It may have
     /// moved or gone since, which concept 6.4 requires recovery to survive
     /// rather than fail at the rename.
     pub container: PathBuf,
-    /// The payload's name inside the container, which is also its name inside
-    /// `payload/` and therefore what decides which application opens it.
-    pub payload: String,
+    /// The content file's name inside the container, which is also its name
+    /// inside `content/` and therefore what decides which application opens it.
+    pub content_name: String,
     /// When the session opened, in seconds since the Unix epoch.
     ///
     /// A number rather than a formatted timestamp, because nothing in the tool
-    /// needs to render it: concept 6.3 shows a person the payload's own
+    /// needs to render it: concept 6.3 shows a person the content file's own
     /// modification time, which comes from the filesystem. Storing it this way
     /// keeps a date-formatting dependency out of a crate that would otherwise
     /// have no use for one.
@@ -77,16 +77,17 @@ pub struct Record {
     /// How many write-backs this session has performed, which concept 6.2 shows
     /// beside the session.
     pub write_backs: u64,
-    /// The container's payload CRC-32 at the last moment this session and the
-    /// container were known to agree: the extraction, or the most recent
+    /// The container's content file CRC-32 at the last moment this session and
+    /// the container were known to agree: the extraction, or the most recent
     /// write-back.
     ///
-    /// **What it is for is telling which side moved.** A payload that differs
-    /// from its container is either an edit that never landed or a container
-    /// that changed underneath a dead session, and those want opposite
-    /// treatment — the first is the person's own work and goes back, the second
-    /// is a conflict only they can settle. Comparing the two sides now cannot
-    /// separate them, because both are only observable in the present.
+    /// **What it is for is telling which side moved.** A content file that
+    /// differs from its container is either an edit that never landed or a
+    /// container that changed underneath a dead session, and those want
+    /// opposite treatment — the first is the person's own work and goes back,
+    /// the second is a conflict only they can settle. Comparing the two sides
+    /// now cannot separate them, because both are only observable in the
+    /// present.
     ///
     /// `None` for a session written by a build that did not record it, and for
     /// one whose container could not be read at the time. Recovery treats that
@@ -114,17 +115,17 @@ impl Session {
         &self.record
     }
 
-    /// The directory the payload sits in, and the one to watch. Concept 6.1
-    /// reads anything else appearing here as the target application's work.
+    /// The directory the content file sits in, and the one to watch. Concept
+    /// 6.1 reads anything else appearing here as the target application's work.
     #[must_use]
-    pub fn payload_dir(&self) -> PathBuf {
-        self.dir.join(PAYLOAD_DIR)
+    pub fn content_dir(&self) -> PathBuf {
+        self.dir.join(CONTENT_DIR)
     }
 
-    /// The payload itself.
+    /// The content file itself.
     #[must_use]
-    pub fn payload_path(&self) -> PathBuf {
-        self.payload_dir().join(&self.record.payload)
+    pub fn content_path(&self) -> PathBuf {
+        self.content_dir().join(&self.record.content_name)
     }
 
     /// Count a write-back, and write that down before returning.
@@ -141,8 +142,8 @@ impl Session {
         write_record(&self.dir, &self.record)
     }
 
-    /// Write down that the container's payload is this, and that it is what
-    /// this session's payload came from or was last put into.
+    /// Write down that the container's content file is this, and that it is
+    /// what this session's content file came from or was last put into.
     ///
     /// Called at the two moments the two sides are made to agree: the
     /// extraction, and the commit of a write-back. Nowhere else — a value
@@ -195,8 +196,8 @@ impl Session {
 /// restart without being configuration or data, and never `XDG_RUNTIME_DIR`,
 /// which is cleared at logout. `~/Library/Application Support` on macOS rather
 /// than `Caches`, which the system may purge at will. `%LOCALAPPDATA%` on
-/// Windows and deliberately not the roaming profile, since an extracted payload
-/// cannot follow a user between machines.
+/// Windows and deliberately not the roaming profile, since an extracted content
+/// file cannot follow a user between machines.
 ///
 /// # Errors
 ///
@@ -243,18 +244,19 @@ fn platform_base() -> Option<PathBuf> {
 /// which `PLAN.md` carried as an open defect with three explanations measured
 /// and found wrong. A redirection layer can tombstone a *file* in the layer
 /// beneath it and cannot remove a *directory* there, so `remove_dir_all`
-/// unlinked the payload and failed on `payload/` with `ERROR_SHARING_VIOLATION`
-/// — for ever, not transiently, and with no process holding anything. Measured
-/// the same day: the same executable, byte for byte, with the same package
-/// identity, removes the directory when it runs from a staging tree and never
-/// removes it when it runs from the package's install location; fifteen such
-/// directories survived twelve seconds of a packaged sweep retrying them, while
-/// any other process removed each one on the first ask.
+/// unlinked the content file and failed on `content/` with
+/// `ERROR_SHARING_VIOLATION` — for ever, not transiently, and with no process
+/// holding anything. Measured the same day: the same executable, byte for
+/// byte, with the same package identity, removes the directory when it runs
+/// from a staging tree and never removes it when it runs from the package's
+/// install location; fifteen such directories survived twelve seconds of a
+/// packaged sweep retrying them, while any other process removed each one on
+/// the first ask.
 ///
 /// So the answer is to stop asking for a path this process will not be given.
 /// `LocalCacheFolder` and not `LocalFolder`: both were measured to create and
 /// remove cleanly here, and the cache is the one Windows neither roams nor
-/// includes in a device backup, which is what a copy of somebody's payload
+/// includes in a device backup, which is what a copy of somebody's content file
 /// should be — concept 17's backup-exposure question, settled on this platform
 /// by where the directory is rather than by a warning about it.
 #[cfg(target_os = "windows")]
@@ -352,7 +354,7 @@ fn platform_base() -> Option<PathBuf> {
 /// # Errors
 ///
 /// Where the container cannot be resolved, or the tree cannot be created.
-pub fn create(root: &Path, container: &Path, payload: &str) -> io::Result<Session> {
+pub fn create(root: &Path, container: &Path, content_name: &str) -> io::Result<Session> {
     let container = fs::canonicalize(container)?;
     let started = seconds_since_epoch();
 
@@ -385,7 +387,7 @@ pub fn create(root: &Path, container: &Path, payload: &str) -> io::Result<Sessio
     let session = Session {
         record: Record {
             container,
-            payload: payload.to_string(),
+            content_name: content_name.to_string(),
             started,
             write_backs: 0,
             // Not known yet. `extract` is what sets it, because that is the
@@ -395,7 +397,7 @@ pub fn create(root: &Path, container: &Path, payload: &str) -> io::Result<Sessio
         dir,
     };
 
-    create_private_dir_all(&session.payload_dir())?;
+    create_private_dir_all(&session.content_dir())?;
     write_record(&session.dir, &session.record)?;
     Ok(session)
 }
@@ -466,9 +468,9 @@ fn create_private_dir_all(at: &Path) -> io::Result<()> {
 /// Narrow a directory to its owner.
 ///
 /// Set after creation rather than through the umask, because the umask is the
-/// user's and a permissive one would leave a payload readable by every account
-/// on the machine. Windows needs nothing: `%LOCALAPPDATA%` is already scoped by
-/// an inherited ACL, and there is no mode to set.
+/// user's and a permissive one would leave a content file readable by every
+/// account on the machine. Windows needs nothing: `%LOCALAPPDATA%` is already
+/// scoped by an inherited ACL, and there is no mode to set.
 #[cfg(unix)]
 fn private(at: &Path) -> io::Result<()> {
     use std::os::unix::fs::PermissionsExt as _;
@@ -499,7 +501,7 @@ fn write_record(dir: &Path, record: &Record) -> io::Result<()> {
         )
     })?;
     doc["container"] = toml_edit::value(container);
-    doc["payload"] = toml_edit::value(record.payload.as_str());
+    doc["content_name"] = toml_edit::value(record.content_name.as_str());
     doc["started"] = toml_edit::value(i64::try_from(record.started).unwrap_or(i64::MAX));
     doc["write_backs"] = toml_edit::value(i64::try_from(record.write_backs).unwrap_or(i64::MAX));
     if let Some(agreed) = record.agreed {
@@ -515,7 +517,7 @@ fn read_record(dir: &Path) -> io::Result<Record> {
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, format!("{RECORD}: {e}")))?;
 
     let mut want = BTreeMap::new();
-    for key in ["container", "payload"] {
+    for key in ["container", "content_name"] {
         let v = doc.get(key).and_then(|v| v.as_str()).ok_or_else(|| {
             io::Error::new(
                 io::ErrorKind::InvalidData,
@@ -533,7 +535,7 @@ fn read_record(dir: &Path) -> io::Result<Record> {
 
     Ok(Record {
         container: PathBuf::from(&want["container"]),
-        payload: want["payload"].clone(),
+        content_name: want["content_name"].clone(),
         started: number("started"),
         write_backs: number("write_backs"),
         // Absent where an older build wrote this, which recovery reads as not
@@ -547,7 +549,7 @@ fn read_record(dir: &Path) -> io::Result<Record> {
 
 #[cfg(test)]
 mod tests {
-    use super::{create, default_root, scan, PAYLOAD_DIR, RECORD};
+    use super::{create, default_root, scan, CONTENT_DIR, RECORD};
     use std::fs;
 
     /// A container on disk to point a session at. Its contents do not matter
@@ -559,36 +561,37 @@ mod tests {
     }
 
     #[test]
-    fn a_session_holds_its_record_and_a_payload_directory() {
+    fn a_session_holds_its_record_and_a_content_directory() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = a_container(tmp.path());
 
         let s = create(&root, &c, "report.pdf").unwrap();
         assert!(s.dir().join(RECORD).is_file());
-        assert!(s.payload_dir().is_dir());
-        assert_eq!(s.payload_dir().file_name().unwrap(), PAYLOAD_DIR);
-        assert_eq!(s.payload_path(), s.payload_dir().join("report.pdf"));
+        assert!(s.content_dir().is_dir());
+        assert_eq!(s.content_dir().file_name().unwrap(), CONTENT_DIR);
+        assert_eq!(s.content_path(), s.content_dir().join("report.pdf"));
     }
 
     #[test]
-    fn the_payload_sits_below_the_record_rather_than_beside_it() {
+    fn the_content_file_sits_below_the_record_rather_than_beside_it() {
         // SPEC 2.3 permits any plain filename, `session.toml` included, so a
-        // payload beside the record could overwrite it. And concept 6.1 reads
-        // anything else in the payload directory as the target application's
-        // doing, which is only sound if the tool put one file there.
+        // content file beside the record could overwrite it. And concept 6.1
+        // reads anything else in the content directory as the target
+        // application's doing, which is only sound if the tool put one file
+        // there.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = a_container(tmp.path());
 
         let s = create(&root, &c, RECORD).unwrap();
-        fs::write(s.payload_path(), b"payload").unwrap();
+        fs::write(s.content_path(), b"content").unwrap();
 
         assert!(s.dir().join(RECORD).is_file());
         assert!(fs::read_to_string(s.dir().join(RECORD))
             .unwrap()
-            .contains("payload ="));
-        assert_eq!(fs::read(s.payload_path()).unwrap(), b"payload");
+            .contains("content_name ="));
+        assert_eq!(fs::read(s.content_path()).unwrap(), b"content");
     }
 
     #[test]
@@ -681,13 +684,13 @@ mod tests {
     }
 
     #[test]
-    fn removing_a_session_takes_the_payload_with_it() {
+    fn removing_a_session_takes_the_content_file_with_it() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = a_container(tmp.path());
 
         let s = create(&root, &c, "report.pdf").unwrap();
-        fs::write(s.payload_path(), b"edited").unwrap();
+        fs::write(s.content_path(), b"edited").unwrap();
         let dir = s.dir().to_path_buf();
         s.remove().unwrap();
 
@@ -704,7 +707,7 @@ mod tests {
         let c = a_container(tmp.path());
 
         let s = create(&root, &c, "report.pdf").unwrap();
-        for d in [&root, &s.dir().to_path_buf(), &s.payload_dir()] {
+        for d in [&root, &s.dir().to_path_buf(), &s.content_dir()] {
             let mode = fs::metadata(d).unwrap().permissions().mode() & 0o777;
             assert_eq!(mode, 0o700, "{}", d.display());
         }
@@ -741,12 +744,12 @@ mod tests {
     }
 
     #[test]
-    fn removing_a_session_takes_the_payload_and_the_record_with_it() {
+    fn removing_a_session_takes_the_content_file_and_the_record_with_it() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = a_container(tmp.path());
         let s = create(&root, &c, "report.pdf").unwrap();
-        fs::write(s.payload_path(), b"something").unwrap();
+        fs::write(s.content_path(), b"something").unwrap();
         let dir = s.dir().to_path_buf();
 
         s.remove().unwrap();

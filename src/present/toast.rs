@@ -319,8 +319,8 @@ fn body(summary: &str, detail: &[String], choices: &[Choice], weight: Weight) ->
 
 /// The five characters XML will not take raw.
 ///
-/// A payload's name reaches here, and concept 9 already learned this on the
-/// other platform: a name carrying an ampersand or a quote would otherwise be
+/// A content file's name reaches here, and concept 9 already learned this on
+/// the other platform: a name carrying an ampersand or a quote would otherwise be
 /// markup, and the toast would either render wrongly or not parse at all.
 fn escape(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
@@ -380,7 +380,7 @@ mod tests {
     }
 
     #[test]
-    fn a_payload_name_with_markup_in_it_is_escaped() {
+    fn a_content_name_with_markup_in_it_is_escaped() {
         // The case the Linux arm met first: a name is somebody else's text and
         // reaches the channel unaltered.
         let xml = body(

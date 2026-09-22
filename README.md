@@ -1,19 +1,19 @@
 # slipcase-open
 
-Double-click a `.slpc`, and the payload opens in whatever application normally
-handles it. Edit it there, save, and the edit is written back into the
-container. A `.slpc` is a Slipcase container: a ZIP archive holding a payload
-together with a TOML document describing it, specified at
+Double-click a `.slpc`, and the content file opens in whatever application
+normally handles it. Edit it there, save, and the edit is written back into
+the container. A `.slpc` is a Slipcase container: a ZIP archive holding a
+content file together with a TOML document describing it, specified at
 <https://slipcaseformat.org>.
 
-No metadata window, no preview, no container browsing. Those are what
+No flyleaf window, no preview, no container browsing. Those are what
 [`slipcase-desktop`](https://github.com/excelano/slipcase-desktop) is for, and
 the two products claim the same file association deliberately: whichever was
 installed last wins, and the other stays one click away in the Open With menu.
 
 ## What it does
 
-Opening a container starts a **session**. The payload is extracted into the
+Opening a container starts a **session**. The content file is extracted into the
 user's own state directory, the platform's trust-zone mark is carried onto the
 copy, the directory is watched, and the document is handed to the desktop. Every
 save that reaches that directory is repacked into the container atomically.
@@ -27,7 +27,7 @@ anything outstanding.
 
 A session that survives a crash is put back where its container has not moved,
 on the next launch, and nobody is asked about it. Only a genuine conflict — both
-the payload and the container changed since they last agreed — is a question,
+the content file and the container changed since they last agreed — is a question,
 because that is the one case the tool cannot settle without knowing which side
 somebody meant to keep.
 
@@ -49,7 +49,7 @@ are how to see what is open and what was left behind.
 
 ## Policy
 
-The set of payload extensions that may be opened is configurable by the user and
+The set of content file extensions that may be opened is configurable by the user and
 lockable by an administrator, in this order: machine policy, then user policy,
 then user configuration, then the built-in default.
 
@@ -89,7 +89,7 @@ outright.
 
 The allowlist is a guardrail against user error and social engineering in the
 convenient path, and not a security boundary. A container is a plain ZIP and any
-user can extract the payload with standard tools. The boundary is application
+user can extract the content file with standard tools. The boundary is application
 control — AppLocker, WDAC, and their equivalents.
 
 ## Installing
@@ -110,7 +110,7 @@ line with no association above it, and a double-clicked container still opens
 the archive tool until `slipcase-common` and `install.sh` have run.
 
 **Windows**, as an MSIX package. `packaging/windows/README.md` has the build and
-the decisions behind it; the association, the *Open payload* verb on a
+the decisions behind it; the association, the *Open content file* verb on a
 container's context menu, and the command line all come from the package. There
 is no window: an icon by the clock takes its colour from whether your work is
 where it should be, and its menu names the file.

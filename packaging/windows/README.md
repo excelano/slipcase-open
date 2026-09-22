@@ -29,7 +29,7 @@ was tested rather than a fresh build of the same commit.
 
 `build-msix.ps1` builds before it packages, and that is not a convenience. It
 did not, until 2026-09-03, and it shipped a package containing a binary eight
-hours stale whose executable-payload refusal was simply absent. The check that
+hours stale whose executable-content-file refusal was simply absent. The check that
 was supposed to catch it compared the staged binary against the installed one,
 which is two copies of the same stale file agreeing with each other. **A claim
 that a package contains a change is traced to the source, not to another copy of
@@ -79,7 +79,7 @@ redirection layer can tombstone a file belonging to the layer beneath it and
 cannot remove a directory there.
 
 That produced a defect hunted for two days as something else: session
-directories that survived their own removal, leaving an empty `payload/` and a
+directories that survived their own removal, leaving an empty `content/` and a
 record, so the session list and the tray showed a corpse. It was permanent, not
 transient, and no process held anything — the same executable, byte for byte,
 with the same package identity, removes the directory when it runs from the
@@ -88,7 +88,7 @@ staging tree and never removes it when it runs from the install location.
 `session::platform_base` asks Windows where the package keeps its data rather
 than asking for a variable it will not be given. `LocalCacheFolder` rather than
 `LocalFolder`, because the cache is the store Windows neither roams nor puts in
-a device backup, which is what a copy of somebody's payload should be.
+a device backup, which is what a copy of somebody's content file should be.
 
 **The lesson generalises past this defect.** The harness that failed to
 reproduce it for twenty rounds was driving the unpackaged binary. Anything
@@ -120,7 +120,7 @@ keeps the incumbent and offers the newcomer; it does not switch.
 
 What survives from concept §4 is the consequence — each product registers a
 secondary verb, so the one which is not the default stays reachable. *Open
-payload* is this product's, and without it a machine where the viewer won would
+content file* is this product's, and without it a machine where the viewer won would
 have no route to this one from Explorer at all.
 
 A practical consequence for anything scripted here: a plain double-click on a
@@ -235,7 +235,7 @@ checks use, and every layer goes through the same reader.
 
 Two things nothing automated can do, both needing a person at this desktop:
 
-- **The zone warning.** A marked container's payload carries `ZoneId=3` onto the
+- **The zone warning.** A marked container's content file carries `ZoneId=3` onto the
   extracted copy, and `ShellExecuteEx` is called with the check left on, but
   that the warning is *displayed* has never been watched. Nothing automated can
   watch a modal dialog, and the suite never reaches the launcher on any

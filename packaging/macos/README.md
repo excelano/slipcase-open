@@ -27,7 +27,7 @@ a claim behind it. Concept 4's check is then a container and a shell:
 ## Not the Mac App Store, and why
 
 Concept 15 made the Store conditional on one question: whether a sandboxed
-editor can open a payload extracted inside another application's container.
+editor can open a content file extracted inside another application's container.
 `slipcase-desktop` answered it on 2026-08-25 — the handover survives — and the
 same measurement showed what does not: `Destination::in_place` creates a
 sibling of the container and renames it over the original, and the grant a
@@ -90,13 +90,13 @@ Against the assembled bundle, unsigned, registered from `dist/`, through
 does:
 
 - A container opens: the launcher hands it over and exits, the instance
-  stays, TextEdit shows the payload, `sessions` lists it.
-- A save writes back: the payload edited in place, the container holding the
+  stays, TextEdit shows the content file, `sessions` lists it.
+- A save writes back: the content file edited in place, the container holding the
   edit within the watcher's next tick.
 - A second open of the same container hands over: same instance, one
   session, no second launcher left running.
 - `close` ends the session and the instance exits.
-- A container carrying `com.apple.quarantine` yields a payload carrying the
+- A container carrying `com.apple.quarantine` yields a content file carrying the
   same value, which is `slpc::provenance` doing on macOS what the concept
   table says.
 - A container in `~/Downloads` opens and writes back with no prompt, which is

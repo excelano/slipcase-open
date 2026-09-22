@@ -106,7 +106,7 @@ fi
 [ -x "$(command -v update-desktop-database || true)" ] &&
     update-desktop-database "${prefix}/share/applications" || true
 
-echo "installed the payload entry under ${prefix}"
+echo "installed the desktop entry under ${prefix}"
 
 # Said rather than assumed. An entry naming a type nothing has declared is an
 # entry no file manager will ever offer, and the symptom — double-clicking a

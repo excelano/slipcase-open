@@ -42,14 +42,14 @@ lands.
 
 ## Phase 0 — the `slpc` accessor
 
-Concept §14 needs `Container::payload_crc()`: the CRC-32 the ZIP central
-directory already records for the payload member, which lets recovery compare
-the extracted payload against the container without keeping a record of its own
+Concept §14 needs `Container::content_crc()`: the CRC-32 the ZIP central
+directory already records for the content member, which lets recovery compare
+the extracted content file against the container without keeping a record of its own
 (§6.3).
 
 It is one field on the private `Entry` struct, populated in `entries_of` from
 the same pass that already reads the name, the size and the kind, and one
-accessor mirroring `payload_size` — the same `Unsupported::Version` refusal, the
+accessor mirroring `content_size` — the same `Unsupported::Version` refusal, the
 same shared borrow. The doc comment says it is the ZIP field rather than a
 Slipcase one and disclaims fixity, because SPEC §5 defines no fixity key and a
 format library exposing a checksum invites the reading it declined to license.
@@ -82,7 +82,7 @@ The bulk of the work, and all of it testable without a desktop.
 
 **Done.** Container open and validation through `slpc`. Extension extraction
 mirroring `slipcase-desktop`'s `Path::extension` rule so the two products never
-disagree about what a payload's extension is (§5.2). Policy as a pure function
+disagree about what a content file's extension is (§5.2). Policy as a pure function
 over the §10 precedence chain, behind a source trait whose first implementation
 reads TOML files at paths it is given. The session directory and its TOML record (§6.4). Extract, launch behind
 the platform trait, watch the session directory with `notify`, sibling detection
@@ -130,7 +130,7 @@ table emptied, and *the recovery question comes first* as a refusal naming two
 commands. Both became what concept 8 asks for once there was somewhere to ask.
 
 **The recovery sweep lands here rather than in Phase 1, and it was blocked rather
-than forgotten.** Concept §6.3 says a recovered payload matching its container
+than forgotten.** Concept §6.3 says a recovered content file matching its container
 means nothing was lost: clean up and say nothing. Nothing implements that half,
 because in Phase 1 it cannot be done safely — a session that is open and not yet
 edited reads as unchanged, and no process can tell a live session from a dead
@@ -231,7 +231,7 @@ the bindings collapse it into: the marked and unmarked answers are identical in
 every case, and what moves them is `SetSource` and the extension. That interface
 is for a client which has *received* an attachment and is deciding whether to
 save and run it, so the zone comes from the source it is told about rather than
-from the file. This tool arrives after that point, with the payload already on
+from the file. This tool arrives after that point, with the content file already on
 disk and already marked by `slpc::provenance`.
 
 What does consult the mark is `ShellExecuteEx` itself, so the launcher is that
@@ -254,14 +254,14 @@ the host. `windows.yml` runs the whole gate now, and `linux.yml` cross-checks
 for.** `packaging/windows` holds the manifest, the build script, the import
 check and the identity template; the identity itself is Partner Center's and is
 not committed. Measured on 2026-09-01 through the real association: a marked
-container opens from Explorer, the payload is extracted carrying its zone into a
+container opens from Explorer, the content file is extracted carrying its zone into a
 session, and the registered application is launched with it.
 
 **That sentence used to say the session was under the real `%LOCALAPPDATA%`,
 "MSIX redirects neither", and it was wrong.** It generalised the sibling's
 registry measurement to files without measuring files, and it stood for four
 days while the defect it caused was hunted as something else. What the
-observation actually showed is that a session appeared and the payload worked;
+observation actually showed is that a session appeared and the content file worked;
 where it appeared was never checked. See Phase 4's closing section.
 
 **"Last installed wins" is not what Windows does, and concept §4 needs the line
@@ -295,7 +295,7 @@ Three questions took the first one apart and none had an answer: the greyed
 entries offered nothing, `Close` was indistinguishable from `Quit` with one
 session open, and nothing changed when a file was saved. `present::Mood` is the
 answer — one question asked continuously, *is my work safe*, with red reserved
-for a payload that is a program. The instance now stays until it is asked to
+for a content file that is a program. The instance now stays until it is asked to
 leave, which **supersedes concept §8's exit rule wherever there is a standing
 surface**: the rule was written for a process with no face, and a warning raised
 by a process on its way out has nowhere to go. Concept §12's session list is not
@@ -304,18 +304,18 @@ why the tray exists; the Start tile is.
 **Two behaviour changes that amend the concept rather than implement it**, both
 verified through the real double-click:
 
-- **§5.1's content check refuses.** A payload whose bytes are a program under a
+- **§5.1's content check refuses.** A content file whose bytes are a program under a
   name claiming otherwise is not opened, before anything is extracted, and it is
   said in a way that cannot be missed. It stays a veto and not a control: it
   admits nothing, so nothing is permitted by it.
 - **§6.3 puts an edit back** where the container has not moved, and asks only
   where both sides changed. Telling those apart needed one new value in the
   session record — what the container held when the two last agreed — which is
-  not the payload digest §6.3 removed and says so.
+  not the content file digest §6.3 removed and says so.
 
 **Closed, 2026-09-05: session directories survived their own removal because a
-packaged process is not given the directory it asks for.** The payload went, an
-empty `payload/` was left, the record stayed, and `sessions` and the tray listed
+packaged process is not given the directory it asks for.** The content file went, an
+empty `content/` was left, the record stayed, and `sessions` and the tray listed
 a corpse. It was carried here as open for two days with three explanations
 measured and discarded, and the reason none of them fit is that all of them
 looked inside the product.
@@ -330,7 +330,7 @@ in the real location and cannot tell which layer one is in.
 
 **A redirection layer can tombstone a file underneath it and cannot remove a
 directory there.** That is the corpse exactly: `remove_dir_all` unlinks the
-payload, then fails on `payload/` with `ERROR_SHARING_VIOLATION`, permanently,
+content file, then fails on `content/` with `ERROR_SHARING_VIOLATION`, permanently,
 with nothing holding anything.
 
 What separates it from every earlier reading is that the discriminator is
@@ -382,17 +382,17 @@ with the path it asked for instead of the one it got. It reports the true path
 now because it reports what `default_root` resolved.
 
 **Two things are proven end to end on Windows and one is not.** A marked
-container opens, the payload is extracted carrying `ZoneId=3` and its `HostUrl`,
-the registered application is launched, an edit to the payload is written back,
+container opens, the content file is extracted carrying `ZoneId=3` and its `HostUrl`,
+the registered application is launched, an edit to the content file is written back,
 and the repacked container is still marked. What is *not* proven is that the
-zone warning is displayed for a payload that earns one: nothing automated can
+zone warning is displayed for a content file that earns one: nothing automated can
 watch a modal dialog, and the suite never reaches the launcher on any platform.
 That one needs a person at a desktop.
 
 ### The refusal nobody saw, 2026-09-06
 
 Reported from the keyboard rather than found here: on a machine where nothing of
-this tool was running, double-clicking a container whose payload is a program did
+this tool was running, double-clicking a container whose content file is a program did
 *nothing at all*. Opening an ordinary container first and then the same one
 produced the refusal every time.
 
@@ -433,7 +433,7 @@ line written to a file on each branch:
 
 | cold double-click | what `standing` did |
 | --- | --- |
-| a payload that must be refused | never called at all |
+| a content file that must be refused | never called at all |
 | an ordinary container | called; `show_up` succeeded |
 
 `main::open` returned through its idle exit, which sat *above* the line that
@@ -529,7 +529,7 @@ gates nothing before Phase 5. *Answered by the viewer on 2026-08-25 and taken
 into Phase 5 above: the editor can, and the save cannot.*
 
 **Deferred to implementation.** Concept §17 holds four items that are settled by
-writing the code rather than by more design: a payload size warranting a
+writing the code rather than by more design: a content file size warranting a
 warning, what a mid-session policy change does, removing the first-run shortcut
 where §15 has not made it moot, and whether the state directory's backup
 exposure is said to the user or only to administrators.

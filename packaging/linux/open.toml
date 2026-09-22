@@ -10,7 +10,7 @@
 # so an untouched file leaves the built-in set in force. Uncomment what you mean
 # to set.
 #
-# The set of payload extensions that may be opened. Compared with ASCII case
+# The set of content file extensions that may be opened. Compared with ASCII case
 # folded, and an extension that is not ASCII alphanumeric cannot be allowlisted
 # at all: the shell folds ASCII and nothing more, and a rule this tool could
 # match but the shell could not would permit one thing and open another.
@@ -30,7 +30,7 @@
 # Whether the user's own additions are honoured at all.
 # user_may_extend = false
 
-# Ask before each write-back rather than repacking as the payload is saved. Off
+# Ask before each write-back rather than repacking as the content file is saved. Off
 # by default; on for archival use.
 # confirm_each_write_back = false
 
@@ -43,7 +43,7 @@
 #
 # Nothing here can silence a question. A session waiting on a decision is asked
 # through a different path entirely, so no setting can quieten one into leaving
-# a payload stranded.
+# a content file stranded.
 #
 # The desktop's own per-application notification settings are the blunt version
 # of this and are not ours to duplicate: GNOME, Windows and macOS can each turn

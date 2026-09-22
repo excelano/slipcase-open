@@ -379,7 +379,7 @@ Kept as written on 2026-09-07 before the stack was read. The localisation in
 this section is wrong: the hang is not inside `wait_and_pump`.
 
 The test saves the way a real editor does — writes a temporary sibling and
-renames it over the payload — then loops under a ten-second deadline calling
+renames it over the content file — then loops under a ten-second deadline calling
 `Opened::wait_and_pump(250ms)` until the change is seen. The deadline is checked
 only between calls, so it cannot bound a single call that never returns. The
 hang is therefore inside one `wait_and_pump`.
@@ -394,15 +394,15 @@ Reading the code in that path (`src/flow.rs`, `src/writeback.rs`,
   `for` loop is the one construct in the path with no time bound: it runs while
   the channel has a message ready, so a watcher that floods the channel would
   spin it forever.
-- `save_if_changed` calls `recover::state` (reads the payload) and
-  `writeback::write_back` (reads the payload, replaces the container). Both are
+- `save_if_changed` calls `recover::state` (reads the content file) and
+  `writeback::write_back` (reads the content file, replaces the container). Both are
   bounded file operations; `writeback.rs` has no retry or spin loop, only the
   bounded loops inside its own tests.
 
 So the two suspects are the receive not returning and the drain flooding, both
 in the `notify` v8 `ReadDirectoryChangesW` backend, not in this crate's save
 logic. The container written by `write_back` lives beside the source container,
-not in the watched payload directory, so the write-back does not feed the watch.
+not in the watched content directory, so the write-back does not feed the watch.
 
 ## Why it has not been pinned down
 
@@ -451,7 +451,7 @@ suppress the bug.
      is enqueueing without end. Then look at the watcher thread and at what
      `ReadDirectoryChangesW` is reporting.
    - Is it inside `write_back`, i.e. a file operation (`ReplaceFileW`, a read of
-     the payload) blocked? That would move the suspect to the filesystem, and
+     the content file) blocked? That would move the suspect to the filesystem, and
      antivirus on the machine is the first thing to rule out.
 
 3. **If a debugger is not to hand, catch the phase with file probes.** Re-apply
@@ -480,7 +480,7 @@ pub fn diag(msg: &str) {
 
 In `wait_and_pump`, a line before `next_change`, one printing its result, and
 one after `pump_including`. In `pump_including`, a line before the drain, one
-after it printing the count and `payload_changed`, and lines bracketing
+after it printing the count and `content_changed`, and lines bracketing
 `save_if_changed`. In the test, `super::diag` calls before and after `open`,
 after the rename, and inside the loop bracketing each `wait_and_pump` with an
 iteration counter. Put `diag` above `open`'s doc comment, not between the doc

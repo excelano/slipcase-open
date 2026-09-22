@@ -88,7 +88,7 @@
 	<!--
 	  Answers the export compliance question in the bundle rather than in a
 	  form. Nothing here implements cryptography or makes a network request;
-	  `slpc` refuses an encrypted payload rather than decrypting one.
+	  `slpc` refuses an encrypted content file rather than decrypting one.
 	-->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>

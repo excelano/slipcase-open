@@ -62,7 +62,7 @@ welche Fassung gemeint war.
 **Es ist vorsichtig damit, was es öffnet.** Kam ein Container aus dem Internet,
 sagt die entpackte Kopie das auch, damit die Anwendung, die sie öffnet, die
 Datei mit der Vorsicht behandelt, die sie allem von außen entgegenbringt. Eine
-Nutzlast, deren Inhalt ein Programm ist, während ihr Name ein Dokument
+Inhaltsdatei, deren Inhalt ein Programm ist, während ihr Name ein Dokument
 verspricht, wird rundheraus abgelehnt, bevor etwas auf die Platte gelangt, und Sie erfahren,
 warum. Und
 geöffnet werden überhaupt nur gewöhnliche Dokument- und Bildtypen.
@@ -90,7 +90,7 @@ nichts, was Sie hineinlegen, an diese Anwendung gebunden ist.
 [locales."de-de".microsoft]
 name = "Slipcase Open"
 short-description = """
-Die Nutzlast eines Slipcase-Containers in der Anwendung öffnen, die diesen
+Die Inhaltsdatei eines Slipcase-Containers in der Anwendung öffnen, die diesen
 Dateityp ohnehin schon öffnet — und beim Speichern wird Ihre Änderung in den
 Container zurückgeschrieben.
 """
@@ -101,7 +101,7 @@ features = [
   "Endet eine Anwendung oder der Rechner, während ein Dokument offen ist, liegt die Änderung weiter auf der Platte und geht beim nächsten Mal in ihren Container zurück.",
   "Gefragt werden Sie nur, wenn der Container sich ebenfalls änderte — der eine Fall, in dem nur Sie antworten können.",
   "Kam ein Container aus dem Internet, trägt auch die entpackte Kopie diese Markierung, damit die öffnende Anwendung vorsichtig bleibt.",
-  "Eine Nutzlast, deren Inhalt ein Programm ist, während ihr Name ein Dokument verspricht, wird abgelehnt, bevor etwas auf die Platte gelangt, und Sie erfahren warum.",
+  "Eine Inhaltsdatei, deren Inhalt ein Programm ist, während ihr Name ein Dokument verspricht, wird abgelehnt, bevor etwas auf die Platte gelangt, und Sie erfahren warum.",
   "Geöffnet werden überhaupt nur gewöhnliche Dokument- und Bildtypen.",
   "Welche Dateitypen geöffnet werden dürfen, ist per Gruppenrichtlinie einstellbar und festsetzbar; eine ADMX-Vorlage ist separat erhältlich.",
   "Computerrichtlinie schlägt Benutzerrichtlinie, Benutzerrichtlinie schlägt die eigenen Einstellungen, und eine Sperrliste schlägt alles.",
@@ -113,7 +113,7 @@ keywords = [
   "slpc",
   "Slipcase",
   "Container",
-  "Nutzlast",
+  "Inhaltsdatei",
   "öffnen",
   "bearbeiten",
   "Archiv",
@@ -145,7 +145,7 @@ container changed as well, so that only you can say which version was meant.
 **It is careful about what it opens.** A container that arrived from the
 internet keeps that marking when its document is extracted, so the application
 that opens it treats the file with the caution it gives anything from outside.
-A payload whose contents are a program while its name claims to be a document
+A content file whose contents are a program while its name claims to be a document
 is refused outright, before anything reaches the disk, and you are told why. And
 only ordinary document and image types are opened at all.
 
@@ -172,7 +172,7 @@ in one is locked to this application.
 [locales."en-us".microsoft]
 name = "Slipcase Open"
 short-description = """
-Open the payload of a Slipcase container in whatever application already
+Open the content file of a Slipcase container in whatever application already
 handles that kind of file, and have your edits written back into the container
 when you save.
 """
@@ -183,7 +183,7 @@ features = [
   "If an application or the machine stops while a document is open, the edit is still on disk and goes back into its container next time.",
   "You are asked which version was meant only when the container changed as well, which is the one case where only you can answer.",
   "A container that arrived from the internet keeps that marking when its document is extracted, so the opening application stays cautious.",
-  "A payload whose contents are a program while its name claims a document is refused before anything reaches the disk, and you are told why.",
+  "A content file whose contents are a program while its name claims a document is refused before anything reaches the disk, and you are told why.",
   "Only ordinary document and image types are opened at all.",
   "The file types that may be opened are configurable and lockable through Group Policy, with an ADMX template available separately.",
   "Machine policy beats user policy, user policy beats a user's own settings, and a deny list wins over everything.",
@@ -195,7 +195,7 @@ keywords = [
   "slpc",
   "slipcase",
   "container",
-  "payload",
+  "content",
   "open",
   "edit",
   "archive",

@@ -62,7 +62,7 @@
     to behave this way always -- it checked that the binary existed and said
     nothing about how old it was -- and on 2026-09-03 that shipped a package
     built from a binary eight hours stale, whose refusal of an executable
-    payload was simply absent from it. The hash check that was supposed to catch
+    content file was simply absent from it. The hash check that was supposed to catch
     this compared the staged file against the installed one, which is two copies
     of the same stale binary agreeing with each other. Building here is what
     makes the package a statement about the source.
@@ -116,7 +116,7 @@ function Step([string] $what) { Write-Host "build-msix: $what" -ForegroundColor 
 # Shrink this list when a finding goes away; the run says so when one does.
 #
 #   Blocked executables   `ShellExecuteExW`, which is concept 5 step 7 and the
-#                         thing this product is for: hand the payload to the
+#                         thing this product is for: hand the content file to the
 #                         desktop, deliberately without the two flags that would
 #                         switch off the Mark-of-the-Web check. Removing the
 #                         reference would remove the application. Read out of

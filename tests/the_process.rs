@@ -18,7 +18,7 @@
 //! front door and the configuration are all pointed at a temporary tree, the
 //! session bus is pointed at nothing — so concept 9's channel falls back to
 //! the terminal and the suite does not put notifications on somebody's screen —
-//! and the launcher is a stub, so a payload it opens goes nowhere.
+//! and the launcher is a stub, so a content file it opens goes nowhere.
 
 // The level `Cargo.toml` explains: `forbid` everywhere Windows is not.
 #![cfg_attr(not(windows), forbid(unsafe_code))]
@@ -100,13 +100,19 @@ impl Alone {
         command
     }
 
-    fn container(&self, name: &str, payload: &[u8]) -> PathBuf {
+    fn container(&self, name: &str, content_bytes: &[u8]) -> PathBuf {
         let doc: slpc::toml_edit::DocumentMut =
-            format!("slipcase_version = \"1.0\"\n\n[payload]\nfile = \"{name}\"\n")
+            format!("slipcase_version = \"1.1\"\n\n[content]\nfile = \"{name}\"\n")
                 .parse()
                 .unwrap();
         let path = self.path().join(format!("{name}.slpc"));
-        slpc::pack_reader(name, payload, doc, std::fs::File::create(&path).unwrap()).unwrap();
+        slpc::pack_reader(
+            name,
+            content_bytes,
+            doc,
+            std::fs::File::create(&path).unwrap(),
+        )
+        .unwrap();
         path
     }
 
@@ -118,7 +124,7 @@ impl Alone {
     fn a_crashed_session(&self, container: &Path, name: &str, edit: &[u8]) {
         let mut left = session::create(&self.sessions(), container, name).unwrap();
         extract::extract(&mut slpc::Container::open(container).unwrap(), &mut left).unwrap();
-        std::fs::write(left.payload_path(), edit).unwrap();
+        std::fs::write(left.content_path(), edit).unwrap();
     }
 
     /// The same, and then somebody else repacks the container behind its back,
@@ -136,12 +142,13 @@ impl Alone {
 /// every run of the suite handed `report.txt` to whatever opens text on the
 /// developer's desktop, and `check.sh` runs the suite five times. The stub goes
 /// first on `PATH`, which is how the launcher is resolved, so the product is
-/// unchanged and the payload goes nowhere. Measured on 2026-09-07 by having the
-/// stub write its argument down: it was handed the session's payload path.
+/// unchanged and the content file goes nowhere. Measured on 2026-09-07 by
+/// having the stub write its argument down: it was handed the session's
+/// content path.
 ///
 /// Unix only. On Windows the launcher is `ShellExecuteEx`, which resolves the
 /// handler through the registry and not `PATH`, so the suite there still opens
-/// the payload in whatever is registered for it.
+/// the content file in whatever is registered for it.
 #[cfg(unix)]
 fn an_inert_launcher(bin: &Path) {
     use std::os::unix::fs::PermissionsExt;
@@ -204,8 +211,9 @@ fn a_refusal_that_raised_a_question_stays_to_be_answered() {
 #[test]
 fn a_refusal_that_raised_nothing_returns() {
     // The other half, and the reason the test above is not satisfied by a
-    // program that never exits. A payload the built-in set does not permit is
-    // refused with nothing held, so there is no front door worth keeping.
+    // program that never exits. A content file the built-in set does not
+    // permit is refused with nothing held, so there is no front door worth
+    // keeping.
     let world = Alone::new();
     let c = world.container("inner.zip", b"not a document");
 
@@ -265,7 +273,7 @@ fn an_edit_left_by_a_crash_goes_back_when_the_container_is_opened() {
 
     let mut held = slpc::Container::open(&c).unwrap();
     let mut bytes = Vec::new();
-    std::io::Read::read_to_end(&mut held.payload().unwrap(), &mut bytes).unwrap();
+    std::io::Read::read_to_end(&mut held.content().unwrap(), &mut bytes).unwrap();
     assert_eq!(
         bytes, b"the edit that never landed",
         "the edit did not reach the container"
@@ -360,7 +368,7 @@ fn a_lone_path_is_an_open() {
     // implied. What is asserted is the implication rather than the platform,
     // which is why this runs everywhere.
     //
-    // The payload is one the built-in set refuses, so both invocations stop
+    // The content file is one the built-in set refuses, so both invocations stop
     // before the launcher and no application is handed anything. Comparing the
     // two against each other rather than against a fixed string is the point:
     // it says they are the same command, whatever that command says.

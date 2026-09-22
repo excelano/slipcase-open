@@ -158,8 +158,8 @@ impl Desktop {
         weight: Weight,
     ) -> Result<u32, zbus::Error> {
         let proxy = notifications(&self.connection)?;
-        // A payload name is attacker-controlled — SPEC 2.3 constrains it only
-        // to being a plain filename — and a service advertising `body-markup`
+        // A content file's name is attacker-controlled — SPEC 2.3 constrains it
+        // only to being a plain filename — and a service advertising `body-markup`
         // parses the body as Pango. A name carrying `<b>` would then style the
         // sentence somebody is being asked to judge, and one carrying a stray
         // `&` would break the parse and take the whole body with it. SPEC 3
@@ -316,8 +316,8 @@ mod tests {
     use crate::present::{Channel, Choice, Question, Report};
 
     #[test]
-    fn a_payload_name_cannot_put_markup_in_the_body() {
-        // `payload.file` is attacker-controlled and the body is parsed as Pango
+    fn a_content_name_cannot_put_markup_in_the_body() {
+        // `content.file` is attacker-controlled and the body is parsed as Pango
         // wherever the service says `body-markup`. A name carrying a tag would
         // otherwise style the sentence somebody is being asked to judge, and a
         // bare ampersand would break the parse and lose the body with it.

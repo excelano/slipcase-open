@@ -41,13 +41,13 @@ pub mod tray;
 pub struct Listed {
     /// What `sessions` prints and `close` takes.
     pub id: String,
-    /// The payload and what has become of it, without the id in front. The
-    /// command line puts the id back; a menu has no room for one.
+    /// The content file and what has become of it, without the id in front.
+    /// The command line puts the id back; a menu has no room for one.
     pub label: String,
-    /// The payload's name alone, for a menu item that is an action rather than
-    /// a line of a report: *Close report.pdf* says what pressing it does, where
-    /// the whole label repeats what the tooltip already counted.
-    pub payload: String,
+    /// The content file's name alone, for a menu item that is an action rather
+    /// than a line of a report: *Close report.pdf* says what pressing it does,
+    /// where the whole label repeats what the tooltip already counted.
+    pub content_name: String,
     /// Live: open, or closed and waiting for the application to finish. What
     /// the standing list is reassuring somebody about.
     pub live: bool,
@@ -95,8 +95,8 @@ pub enum Mood {
     /// outstanding.
     AtRisk,
     /// Danger, and nothing else may use it or it stops meaning anything. Today
-    /// that is one thing: a payload that is a program wearing a document's
-    /// name.
+    /// that is one thing: a content file that is a program wearing a
+    /// document's name.
     Danger,
 }
 
@@ -198,7 +198,7 @@ pub enum Weight {
     Ordinary,
     /// Worth being interrupted for. Concept 5.1's content check earns this and
     /// says why: it fires close to never, and when it fires it means the
-    /// payload is an executable wearing a document's name.
+    /// content file is an executable wearing a document's name.
     Interrupt,
 }
 
@@ -256,11 +256,11 @@ impl Report {
 /// on all three platforms and as a verb on the command line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Choice {
-    /// Put the payload back into its container.
+    /// Put the content file back into its container.
     WriteBack,
-    /// Throw the payload away and remove the session.
+    /// Throw the content file away and remove the session.
     Discard,
-    /// Show the payload directory, and decide later.
+    /// Show the content directory, and decide later.
     Reveal,
 }
 
@@ -378,7 +378,7 @@ pub trait Channel {
     ///
     /// **The other half of [`insist`](Self::insist), and it exists because a
     /// refusal was silently lost.** Measured against the installed package on
-    /// 2026-09-06: a container whose payload is a program, double-clicked with
+    /// 2026-09-06: a container whose content file is a program, double-clicked with
     /// no instance already running, produced nothing at all — no box, no window,
     /// the process gone inside 400ms. With an instance running it produced the
     /// box every time. The difference is entirely who was left alive: the

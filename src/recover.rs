@@ -17,34 +17,36 @@
 //! learn.
 //!
 //! Two things keep the risk small. Most applications save by writing a sibling
-//! and renaming over the payload — the behaviour concept 6.1 already relies on
-//! to know the application is working — so the file is the old bytes or the
-//! complete new ones and not a prefix of either. And what is written back is
-//! reported rather than done silently, so an outcome that looks wrong is
-//! visible while the container is still open in front of somebody.
+//! and renaming over the content file — the behaviour concept 6.1 already
+//! relies on to know the application is working — so the file is the old bytes
+//! or the complete new ones and not a prefix of either. And what is written
+//! back is reported rather than done silently, so an outcome that looks wrong
+//! is visible while the container is still open in front of somebody.
 //!
 //! **It only acts where it knows which side moved**, which is
 //! [`State::Edited`] and nothing else. Where the container has changed too,
 //! nobody but the person can say which copy is the one they want, and that is
 //! the question worth interrupting for.
 //!
-//! The ZIP central directory already stores a CRC-32 for the payload member, so
-//! recovery computes the CRC of the extracted payload and compares. Equal means
-//! nothing was lost. Different means an edit never landed.
+//! The ZIP central directory already stores a CRC-32 for the content member, so
+//! recovery computes the CRC of the extracted content file and compares. Equal
+//! means nothing was lost. Different means an edit never landed.
 //!
-//! **Comparing against the container beats recording a digest of the payload.**
-//! A recorded value is a second copy of a fact and can drift from it, and the
-//! moment it gets consulted is after a crash, which is when a session record is
-//! least trustworthy. The container's own value needs nothing maintaining it:
-//! repacking recomputes it, so the comparison stays correct across every
-//! write-back in a session as a side effect of the write-backs themselves.
+//! **Comparing against the container beats recording a digest of the content
+//! file.** A recorded value is a second copy of a fact and can drift from it,
+//! and the moment it gets consulted is after a crash, which is when a session
+//! record is least trustworthy. The container's own value needs nothing
+//! maintaining it: repacking recomputes it, so the comparison stays correct
+//! across every write-back in a session as a side effect of the write-backs
+//! themselves.
 //!
 //! **The one value the session does record is not that**, and the difference is
-//! the whole reason it is allowed. *Has the payload changed* is answerable from
-//! the container and is answered there. *Which side changed* is answerable from
-//! neither side, because both are only observable now and the question is about
-//! then — see [`crate::session::Record::agreed`], which notes what the container
-//! held at the two moments the two were made to agree and nothing else.
+//! the whole reason it is allowed. *Has the content file changed* is answerable
+//! from the container and is answered there. *Which side changed* is answerable
+//! from neither side, because both are only observable now and the question is
+//! about then — see [`crate::session::Record::agreed`], which notes what the
+//! container held at the two moments the two were made to agree and nothing
+//! else.
 //!
 //! **It is change detection and never fixity.** The question is whether the
 //! file changed, not whether it can be proved untampered — anybody able to
@@ -63,20 +65,20 @@ use crate::session::Session;
 /// What a session left behind turned out to be.
 #[derive(Debug)]
 pub enum State {
-    /// No payload in the session directory. The session died between being
-    /// created and being filled, so there is nothing to recover and nothing to
-    /// ask about.
+    /// No content file in the session directory. The session died between
+    /// being created and being filled, so there is nothing to recover and
+    /// nothing to ask about.
     NothingExtracted,
-    /// The payload still matches the one in the container. Nothing was lost:
-    /// clean up and say nothing.
+    /// The content file still matches the one in the container. Nothing was
+    /// lost: clean up and say nothing.
     Unchanged,
-    /// The payload differs from the one in the container, and the container is
-    /// still holding what this session last agreed with it about. So the
-    /// difference is this session's own edit and nobody else's, and it goes
-    /// back.
+    /// The content file differs from the one in the container, and the
+    /// container is still holding what this session last agreed with it
+    /// about. So the difference is this session's own edit and nobody else's,
+    /// and it goes back.
     Edited,
-    /// The payload differs from the container *and* the container is not what
-    /// it was when the two last agreed. Both sides moved.
+    /// The content file differs from the container *and* the container is not
+    /// what it was when the two last agreed. Both sides moved.
     ///
     /// **The one case worth interrupting for.** Writing back would throw away
     /// whatever changed the container, and discarding would throw away the
@@ -85,21 +87,22 @@ pub enum State {
     /// session was not running.
     Diverged,
     /// The container is no longer where the session recorded it. Concept 6.4
-    /// requires surviving this rather than failing at the rename: the payload
-    /// is still here, and the person can be offered somewhere else to put it.
+    /// requires surviving this rather than failing at the rename: the content
+    /// file is still here, and the person can be offered somewhere else to put
+    /// it.
     ContainerGone,
     /// Something is at the recorded path, and it is not the container this
-    /// session was opened against — its payload goes by another name. Writing
-    /// back would rename the payload of a container somebody else's session may
-    /// be holding.
+    /// session was opened against — its content file goes by another name.
+    /// Writing back would rename the content file of a container somebody
+    /// else's session may be holding.
     ContainerChanged {
         /// What the session recorded.
         recorded: String,
         /// What the file at that path says now.
         found: String,
     },
-    /// The container is there and cannot be read, or the payload cannot be. A
-    /// question for a person rather than an answer.
+    /// The container is there and cannot be read, or the content file cannot
+    /// be. A question for a person rather than an answer.
     Unreadable(String),
 }
 
@@ -200,8 +203,8 @@ impl State {
 /// What became of a session left behind.
 #[must_use]
 pub fn state(session: &Session) -> State {
-    let payload = session.payload_path();
-    if !payload.is_file() {
+    let content_path = session.content_path();
+    if !content_path.is_file() {
         return State::NothingExtracted;
     }
 
@@ -213,16 +216,16 @@ pub fn state(session: &Session) -> State {
         Err(e) => return State::Unreadable(e.to_string()),
     };
 
-    // Asked before the CRC, because a container holding a different payload
-    // answers the wrong question rather than answering it wrongly.
-    if container.payload_name() != session.record().payload {
+    // Asked before the CRC, because a container holding a different content
+    // file answers the wrong question rather than answering it wrongly.
+    if container.content_name() != session.record().content_name {
         return State::ContainerChanged {
-            recorded: session.record().payload.clone(),
-            found: container.payload_name().to_string(),
+            recorded: session.record().content_name.clone(),
+            found: container.content_name().to_string(),
         };
     }
 
-    let (stored, made) = match (container.payload_crc(), crc_of(&payload)) {
+    let (stored, made) = match (container.content_crc(), crc_of(&content_path)) {
         (Ok(a), Ok(b)) => (a, b),
         (Err(e), _) => return State::Unreadable(e.to_string()),
         (_, Err(e)) => return State::Unreadable(e.to_string()),
@@ -232,9 +235,9 @@ pub fn state(session: &Session) -> State {
         return State::Unchanged;
     }
 
-    // The payload and the container disagree. Which of them moved is the whole
-    // question, and only the record answers it: `agreed` is what the container
-    // held the last time this session and it were made to agree.
+    // The content file and the container disagree. Which of them moved is the
+    // whole question, and only the record answers it: `agreed` is what the
+    // container held the last time this session and it were made to agree.
     //
     // Not known — an older build, or a container unreadable at the time — is
     // read as *not known to agree* and asks. That is the cautious direction and
@@ -254,9 +257,9 @@ pub fn state(session: &Session) -> State {
 pub fn crc_of(path: &Path) -> io::Result<u32> {
     let mut file = File::open(path)?;
     let mut hasher = crc32fast::Hasher::new();
-    // Streamed rather than read whole: a payload may be any size, and holding
-    // one in memory to checksum it would make recovery fail on the containers
-    // most worth recovering.
+    // Streamed rather than read whole: a content file may be any size, and
+    // holding one in memory to checksum it would make recovery fail on the
+    // containers most worth recovering.
     // On the heap. Sixty-four kilobytes of stack is a lot to ask of a thread
     // whose size this crate does not choose.
     let mut buf = vec![0u8; 64 * 1024];
@@ -276,13 +279,13 @@ mod tests {
     use std::fs;
     use std::path::{Path, PathBuf};
 
-    fn container(at: &Path, name: &str, payload: &[u8]) -> PathBuf {
+    fn container(at: &Path, name: &str, content_bytes: &[u8]) -> PathBuf {
         let doc: slpc::toml_edit::DocumentMut =
-            format!("slipcase_version = \"1.0\"\n\n[payload]\nfile = \"{name}\"\n")
+            format!("slipcase_version = \"1.1\"\n\n[content]\nfile = \"{name}\"\n")
                 .parse()
                 .unwrap();
         let path = at.join(format!("{name}.slpc"));
-        slpc::pack_reader(name, payload, doc, fs::File::create(&path).unwrap()).unwrap();
+        slpc::pack_reader(name, content_bytes, doc, fs::File::create(&path).unwrap()).unwrap();
         path
     }
 
@@ -293,7 +296,7 @@ mod tests {
     }
 
     #[test]
-    fn a_payload_nobody_touched_is_the_quiet_case() {
+    fn a_content_file_nobody_touched_is_the_quiet_case() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
@@ -313,7 +316,7 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
 
         let s = opened(&root, &c, "report.pdf");
-        fs::write(s.payload_path(), b"edited and then the process died").unwrap();
+        fs::write(s.content_path(), b"edited and then the process died").unwrap();
         assert!(matches!(state(&s), State::Edited));
         assert_eq!(state(&s).course(), Course::WriteBack);
         assert!(!state(&s).needs_a_person());
@@ -330,7 +333,7 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
 
         let s = opened(&root, &c, "report.pdf");
-        fs::write(s.payload_path(), b"our edit").unwrap();
+        fs::write(s.content_path(), b"our edit").unwrap();
         // Somebody else repacked it while this session was not running.
         container(tmp.path(), "report.pdf", b"somebody else's second thoughts");
 
@@ -348,7 +351,7 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
 
         let s = opened(&root, &c, "report.pdf");
-        fs::write(s.payload_path(), b"edited").unwrap();
+        fs::write(s.content_path(), b"edited").unwrap();
         assert_eq!(state(&s).course(), Course::WriteBack);
 
         // Strike the line an older build would never have written.
@@ -404,7 +407,7 @@ mod tests {
         let c = container(tmp.path(), "report.pdf", b"first");
 
         let mut s = opened(&root, &c, "report.pdf");
-        fs::write(s.payload_path(), b"edited").unwrap();
+        fs::write(s.content_path(), b"edited").unwrap();
         assert!(matches!(state(&s), State::Edited));
 
         writeback::write_back(&mut s).unwrap();
@@ -423,30 +426,30 @@ mod tests {
     }
 
     #[test]
-    fn a_container_that_went_away_leaves_the_payload_worth_offering() {
+    fn a_container_that_went_away_leaves_the_content_file_worth_offering() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
 
         let s = opened(&root, &c, "report.pdf");
-        fs::write(s.payload_path(), b"edited").unwrap();
+        fs::write(s.content_path(), b"edited").unwrap();
         fs::remove_file(&c).unwrap();
 
         assert!(matches!(state(&s), State::ContainerGone));
         assert!(state(&s).needs_a_person());
-        assert!(s.payload_path().is_file());
+        assert!(s.content_path().is_file());
     }
 
     #[test]
     fn a_different_container_at_the_same_path_is_not_written_over() {
-        // Writing back here would rename the payload of a container this
+        // Writing back here would rename the content file of a container this
         // session was never opened against.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container(tmp.path(), "report.pdf", b"first");
 
         let s = opened(&root, &c, "report.pdf");
-        fs::write(s.payload_path(), b"edited").unwrap();
+        fs::write(s.content_path(), b"edited").unwrap();
 
         // Something else entirely, at the path the session recorded.
         let other = container(tmp.path(), "plan.dwg", b"unrelated");
@@ -462,7 +465,7 @@ mod tests {
     }
 
     #[test]
-    fn a_zero_length_payload_compares_rather_than_erroring() {
+    fn a_zero_length_content_file_compares_rather_than_erroring() {
         // SPEC 2.3 permits one, and CRC-32 of nothing is zero on both sides.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
@@ -471,15 +474,15 @@ mod tests {
         let s = opened(&root, &c, "empty.txt");
         assert!(matches!(state(&s), State::Unchanged));
 
-        fs::write(s.payload_path(), b"no longer empty").unwrap();
+        fs::write(s.content_path(), b"no longer empty").unwrap();
         assert!(matches!(state(&s), State::Edited));
     }
 
     #[test]
     fn the_crc_is_streamed_rather_than_read_whole() {
-        // A payload may be any size, and a recovery that needs one in memory
-        // fails on the containers most worth recovering. Larger than the
-        // buffer, so the loop runs more than once.
+        // A content file may be any size, and a recovery that needs one in
+        // memory fails on the containers most worth recovering. Larger than
+        // the buffer, so the loop runs more than once.
         let tmp = tempfile::tempdir().unwrap();
         let big = tmp.path().join("big.bin");
         let bytes = vec![0xa5u8; 300 * 1024];

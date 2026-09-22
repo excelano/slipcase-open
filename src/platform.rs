@@ -19,14 +19,14 @@
 use std::io;
 use std::path::Path;
 
-/// Handing a payload to whatever the desktop says opens it.
+/// Handing a content file to whatever the desktop says opens it.
 pub trait Launcher {
-    /// Open `payload` with the platform's own handler.
+    /// Open `content_path` with the platform's own handler.
     ///
     /// # Errors
     ///
     /// Where the platform's launcher cannot be run, or refuses.
-    fn launch(&self, payload: &Path) -> io::Result<()>;
+    fn launch(&self, content_path: &Path) -> io::Result<()>;
 }
 
 /// This machine.
@@ -36,23 +36,23 @@ pub struct Host;
 ///
 /// There is no trust-zone marking to apply here and concept 12 says so out
 /// loud: Linux keeps provenance as a note rather than as a gate, so
-/// `slpc::provenance` records where a payload came from and nothing consults it.
-/// That is the platform's shape rather than an omission in this code, and the
-/// administrator documentation states it rather than leaving it to be
-/// discovered.
+/// `slpc::provenance` records where a content file came from and nothing
+/// consults it. That is the platform's shape rather than an omission in this
+/// code, and the administrator documentation states it rather than leaving it
+/// to be discovered.
 #[cfg(target_os = "linux")]
 impl Launcher for Host {
-    fn launch(&self, payload: &Path) -> io::Result<()> {
-        spawn_detached("xdg-open", payload)
+    fn launch(&self, content_path: &Path) -> io::Result<()> {
+        spawn_detached("xdg-open", content_path)
     }
 }
 
 /// `open`, which consults `com.apple.quarantine` on the way, so the mark
-/// carried onto the payload at extraction is what raises the warning.
+/// carried onto the content file at extraction is what raises the warning.
 #[cfg(target_os = "macos")]
 impl Launcher for Host {
-    fn launch(&self, payload: &Path) -> io::Result<()> {
-        spawn_detached("open", payload)
+    fn launch(&self, content_path: &Path) -> io::Result<()> {
+        spawn_detached("open", content_path)
     }
 }
 
@@ -62,8 +62,8 @@ impl Launcher for Host {
 /// switching it off — see [`shell`], which holds the measurements.
 #[cfg(target_os = "windows")]
 impl Launcher for Host {
-    fn launch(&self, payload: &Path) -> io::Result<()> {
-        shell::hand_over(payload)
+    fn launch(&self, content_path: &Path) -> io::Result<()> {
+        shell::hand_over(content_path)
     }
 }
 
@@ -79,7 +79,8 @@ pub fn hand_the_foreground_on() {
 
 #[cfg(target_os = "windows")]
 mod shell {
-    //! Handing a payload to the shell, with Mark of the Web still consulted.
+    //! Handing a content file to the shell, with Mark of the Web still
+    //! consulted.
     //!
     //! ## `IAttachmentExecute` is not what reads the mark, and this was measured
     //!
@@ -102,7 +103,7 @@ mod shell {
     //! intended rather than failing: it is for a client that has *received* an
     //! attachment and is deciding whether to save and run it, so the zone comes
     //! from the source it is told about. This tool arrives after that: the
-    //! payload is on disk and already carries its mark, put there by
+    //! content file is on disk and already carries its mark, put there by
     //! `slpc::provenance` as `extract` placed it.
     //!
     //! ## What does read it, and the requirement that is therefore a negative
@@ -120,7 +121,7 @@ mod shell {
     //! how this would be lost.
     //!
     //! **Not measured, and it needs a person at a desktop:** that the warning is
-    //! actually shown for a marked payload. Nothing automated can watch a modal
+    //! actually shown for a marked content file. Nothing automated can watch a modal
     //! dialog, and the suite never reaches this function: the recording launcher
     //! in `platform::testing` is what every test launches through, on all three
     //! platforms.
@@ -172,16 +173,16 @@ mod shell {
     /// may not.
     ///
     /// Measured on 2026-09-02, and it is exactly this shape: the first
-    /// double-click put the payload in front, because that invocation *was* the
-    /// instance; every one after it opened the payload behind the window the
-    /// person was looking at, because the instance by then was somebody else's
-    /// old process.
+    /// double-click put the content file in front, because that invocation
+    /// *was* the instance; every one after it opened the content file behind
+    /// the window the person was looking at, because the instance by then was
+    /// somebody else's old process.
     ///
     /// `ASFW_ANY` rather than naming the instance: the client would have to ask
     /// the pipe who is serving it, and the answer would still be wrong half the
-    /// time — concept 6 says a payload frequently goes to an application that
-    /// is already running, so the process which ends up in front is neither the
-    /// client nor the instance.
+    /// time — concept 6 says a content file frequently goes to an application
+    /// that is already running, so the process which ends up in front is
+    /// neither the client nor the instance.
     #[allow(unsafe_code)]
     pub(super) fn hand_the_foreground_on() {
         // SAFETY: gives away a right this process holds, takes no pointer, and
@@ -190,17 +191,18 @@ mod shell {
         let _ = unsafe { AllowSetForegroundWindow(ASFW_ANY) };
     }
 
-    /// Hand `payload` to whatever the shell says opens it, and stop caring.
+    /// Hand `content_path` to whatever the shell says opens it, and stop
+    /// caring.
     ///
     /// # Errors
     ///
     /// Where the thread that does the handing cannot be started. Anything the
     /// shell itself refuses is not reported, for the reason in the module
     /// documentation.
-    pub(super) fn hand_over(payload: &Path) -> io::Result<()> {
+    pub(super) fn hand_over(content_path: &Path) -> io::Result<()> {
         // Widened here rather than in the thread, so that a path this process
         // can see is what gets sent rather than one resolved later.
-        let path: Vec<u16> = payload
+        let path: Vec<u16> = content_path
             .as_os_str()
             .encode_wide()
             .chain(std::iter::once(0))
@@ -222,8 +224,8 @@ mod shell {
         // started. Windows refuses a foreground change from a process that does
         // not have it, and the refusal is silent: the document opens *behind*
         // whatever the person was looking at. Measured on 2026-09-02 — a
-        // container double-clicked in Explorer opened its payload behind the
-        // Explorer window — and this is the documented way to pass the right
+        // container double-clicked in Explorer opened its content file behind
+        // the Explorer window — and this is the documented way to pass the right
         // on, since this process was itself activated by that double-click.
         //
         // `ASFW_ANY` rather than a process id, because there is none to name:
@@ -311,7 +313,7 @@ mod shell {
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 impl Launcher for Host {
-    fn launch(&self, _payload: &Path) -> io::Result<()> {
+    fn launch(&self, _content_path: &Path) -> io::Result<()> {
         Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "no launcher for this platform",
@@ -331,10 +333,10 @@ impl Launcher for Host {
 /// and nothing about the application — which is the same reason concept 6 will
 /// not take process exit as a save signal.
 #[cfg(unix)]
-fn spawn_detached(program: &str, payload: &Path) -> io::Result<()> {
+fn spawn_detached(program: &str, content_path: &Path) -> io::Result<()> {
     use std::process::{Command, Stdio};
     let mut child = Command::new(program)
-        .arg(payload)
+        .arg(content_path)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -387,11 +389,11 @@ pub mod testing {
     }
 
     impl Launcher for Recording {
-        fn launch(&self, payload: &Path) -> io::Result<()> {
+        fn launch(&self, content_path: &Path) -> io::Result<()> {
             if self.refuse {
                 return Err(io::Error::new(io::ErrorKind::NotFound, "no handler"));
             }
-            self.launched.lock().unwrap().push(payload.to_owned());
+            self.launched.lock().unwrap().push(content_path.to_owned());
             Ok(())
         }
     }

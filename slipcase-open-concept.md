@@ -10,19 +10,19 @@ lists what was deliberately left to implementation.*
 ## 1. What it is
 
 A minimal companion to the Slipcase CLI and viewer: double-click a `.slpc`, the
-payload opens in whatever application normally handles it, and edits made there
+content file opens in whatever application normally handles it, and edits made there
 are written back into the container.
 
-No metadata UI. No container browsing. No preview. The payload, its own
+No flyleaf UI. No container browsing. No preview. The content file, its own
 application, and a write-back path.
 
 ## 2. Why it's separate from Slipcase (the viewer)
 
-`slipcase-desktop` is metadata-first and deliberately has no payload preview.
-Its audience is people who care about the metadata — one container at a time,
+`slipcase-desktop` is flyleaf-first and deliberately has no content file preview.
+Its audience is people who care about the flyleaf — one container at a time,
 or, if the inventory mode is ever built, a corpus at a time.
 
-There is a second audience with no interest in metadata at all: someone who has
+There is a second audience with no interest in the flyleaf at all: someone who has
 been sent a `.slpc` and wants the document inside it. For them the viewer is a
 detour, and the honest alternative today is "extract with 7-Zip, open the file."
 `slipcase-open` makes that path direct and, unlike 7-Zip, closes the loop by
@@ -35,8 +35,8 @@ command line where it does not (§9).
 
 ## 3. Non-goals
 
-- Editing or displaying metadata (that is the viewer's job).
-- Rendering payload content (permanently out of scope across the project).
+- Editing or displaying the flyleaf (that is the viewer's job).
+- Rendering a content file's contents (permanently out of scope across the project).
 - Browsing containers, searching, or anything corpus-shaped.
 - Acting as a security boundary (see §11).
 
@@ -49,14 +49,14 @@ type and a desktop entry on Linux.
 
 `slipcase-desktop` claims the same association, so a machine with both installed
 has two products contending for it. That is rarer than it looks, because the
-audiences barely overlap. Someone who wants the metadata has no use for the
-payload path, and someone who was sent a document and wants to read it has no
+audiences barely overlap. Someone who wants the flyleaf has no use for the
+content file path, and someone who was sent a document and wants to read it has no
 use for the viewer. The answer is to not engineer around it: last installed
 wins, which is what the platform does with every other duplicated association,
 and the user can change it once in the platform's own default-application UI.
 
 Two things follow. Each product registers a secondary verb alongside the
-association it claims, "Open payload" here and "View metadata" in the viewer, so
+association it claims, "Open content file" here and "View flyleaf" in the viewer, so
 that whichever is not the default is one click away rather than unreachable.
 
 And neither product re-asserts the association at launch or asks to be made the
@@ -82,10 +82,10 @@ container over.
 ## 5. Flow
 
 1. Open the container via `slpc`. Validate per SPEC §3 and §6.
-2. Take the extension from `payload.file` (§5.2) and check it against effective
+2. Take the extension from `content.file` (§5.2) and check it against effective
    policy (§10). Refuse and explain if it is disallowed, or if there is no usable
    extension (§5.1).
-3. Extract the payload into a session directory of its own: per-user,
+3. Extract the content file into a session directory of its own: per-user,
    access-controlled, holding that one file and nothing else (§6.1, §6.4).
 4. Apply the host platform's trust-zone marking, propagated from the container.
 5. Launch via the platform's attachment-aware execution path.
@@ -97,13 +97,13 @@ container over.
 
 ### 5.1 Policy keys on the extension, and content sniffing is not a control
 
-The obvious design determines the payload's real type by content, checks that
+The obvious design determines the content file's real type by content, checks that
 against policy, and refuses when content and name disagree. It is wrong, and the
 reason is worth writing down, because it looks like the careful option.
 
 **Launch dispatches on the extension.** `ShellExecuteEx`, `open` and `xdg-open`
 resolve the handler from the name, and none of them reads the bytes. The
-extension alone determines what runs. So a payload whose bytes are a PE image
+extension alone determines what runs. So a content file whose bytes are a PE image
 and whose name is `invoice.pdf` opens in a PDF reader, which fails on it. There
 is no path by which the sniffed type reaches the loader, and a policy check
 against the sniffed type is therefore a check on a value that has no bearing on
@@ -123,21 +123,21 @@ manager rules in, and it needs no shipped table mapping names to types — a rul
 rather than carrying its own map.
 
 **One narrow content check survives, and it is not a policy check.** The bytes
-are read far enough to see whether the payload is an executable image — MZ/PE,
+are read far enough to see whether the content file is an executable image — MZ/PE,
 ELF, Mach-O — or a script with a shebang, under an extension that is none of
 those. Nothing else is reported: a `.docx` sniffing as a ZIP is noise and goes
 unmentioned.
 
 That is a handful of magic bytes rather than a type table, it costs the first
-few bytes of the payload, and it fires close to never in ordinary use. Because
+few bytes of the content file, and it fires close to never in ordinary use. Because
 it fires rarely and means something specific when it does, it earns an interrupt
 rather than a badge somewhere quiet. What it means is that the container's
-payload is an executable wearing a document's name, which is the shape of a
+content file is an executable wearing a document's name, which is the shape of a
 phishing attachment, and a person shown that sentence will usually stop.
 
 **It refuses, and it is a veto rather than a control.** Everything above about
 why sniffing cannot be the control still holds: the allowlist decides what may
-be opened, this check admits nothing, and a payload that gets past it has been
+be opened, this check admits nothing, and a content file that gets past it has been
 permitted by policy and not by inspection. All it can do is say *no* to
 something policy already allowed. That is a veto, and a veto needs none of the
 precision a control would — it is allowed to be narrow, and this one is.
@@ -153,7 +153,7 @@ directions: it fires close to never, and when it is wrong the cost is one
 container that will not open and can be renamed.
 
 The refusal comes before the session is created, so the bytes never leave the
-container — no session directory, no payload on disk, no mark, and nothing for a
+container — no session directory, no content file on disk, no mark, and nothing for a
 later sweep to find. It is said in a way that cannot be missed, which is where
 §12's native dialog earns its place, and the standing list carries it afterwards
 in the one colour reserved for it.
@@ -162,7 +162,7 @@ This makes §5.1's claim that the check fires close to never load-bearing rather
 than incidental. If it were noisy, refusing would be the wrong default, so it is
 worth confirming against a corpus before this ships widely.
 
-**One case does need a refusal, and it is not a mismatch.** A payload with no
+**One case does need a refusal, and it is not a mismatch.** A content file with no
 extension, or one the platform has no registration for, makes `ShellExecuteEx`
 present the Open With dialog, which hands the choice of executable to the user
 inside a flow they believe is "open the document." Require a known, allowlisted
@@ -171,13 +171,13 @@ extension and refuse when there is not one.
 ### 5.2 What counts as the extension, and how it is compared
 
 `slipcase-desktop` already answers the first half, and the two products must not
-disagree about what a payload's extension is. It takes the extension with
+disagree about what a content file's extension is. It takes the extension with
 `Path::extension()`, which gives `gz` for `archive.tar.gz` and nothing at all
 for `.bashrc`, and it has tests pinning both. Use the same rule.
 
 **Comparison against policy folds ASCII case, and an extension that is not
-ASCII alphanumeric is not allowlistable.** A payload carrying one falls into the
-refusal above for a payload with no usable extension.
+ASCII alphanumeric is not allowlistable.** A content file carrying one falls into the
+refusal above for a content file with no usable extension.
 
 Folding has to match the way the platform resolves the handler, or policy and
 the shell disagree and the disagreement is the defect. Windows registry keys are
@@ -192,7 +192,7 @@ excluding the rest costs little and the refusal can be explained.
 The deny list folds the same way, and reaches the same set. Nothing should be
 refusable by a rule the allow list could not have expressed.
 
-`payload.file` is attacker-controlled, and SPEC §2.3 constrains it only to being
+`content.file` is attacker-controlled, and SPEC §2.3 constrains it only to being
 a plain filename. The extension is what follows the last `.` in the decoded
 name, so the right-to-left override that dresses a `.exe` as a `.pdf` survives
 that rule intact. SPEC §3 already requires bidirectional formatting characters
@@ -216,13 +216,13 @@ name. (`notify` supports this on all three platforms, but only if set up
 deliberately.)
 
 **Save As is invisible.** If the user saves to a different location, no event
-fires, and the container silently retains the original payload. There is no
+fires, and the container silently retains the original content file. There is no
 detection for this. The only correct response is to not claim a write-back
 happened.
 
 ### 6.1 One signal the directory watch gives for free
 
-The payload is extracted into a directory of its own, holding that one file.
+The content file is extracted into a directory of its own, holding that one file.
 Everything else that subsequently appears there was created by the target
 application, by construction. A lock file, an autosave, a backup, a save-in-
 progress temporary: the tool does not need to know which, or what any of them
@@ -252,21 +252,21 @@ Because detection is unreliable, the tool should not pretend to be invisible.
 - The user **closes the session explicitly**, which performs a final repack and
   cleans up, subject to the application having finished with the directory.
 - A session surviving a crash is recoverable on next launch, because the
-  payload and the session record are still on disk (§6.3).
+  content file and the session record are still on disk (§6.3).
 
-This is more honest than a silent watcher, gives a place to surface "the payload
+This is more honest than a silent watcher, gives a place to surface "the content file
 changed — write it back?" if confirmation is wanted, and gives the user
 somewhere to look when they expect an edit to have landed.
 
 **Closing a session that saw no modification event offers a write-back rather
 than skipping one.** This is the only available answer to Save As. It costs one
 dialog on a path the user is already interacting with, and the alternative is a
-container that silently keeps the old payload after the user believes they
+container that silently keeps the old content file after the user believes they
 edited it. Asking is not detection and should not be described as though it
-were: the prompt says the payload was not seen to change, and lets the user say
+were: the prompt says the content file was not seen to change, and lets the user say
 otherwise.
 
-**Closing a session while the application still has the payload open does not
+**Closing a session while the application still has the content file open does not
 delete the directory.** The close is honoured: the final repack runs as it
 would otherwise. But where siblings say the application is still working in
 there (§6.1), the directory is handed to the recovery mechanism rather than
@@ -285,18 +285,18 @@ audience, off by default.
 
 ### 6.3 Recovery puts back an edit whose container has not moved
 
-A session that survives a crash is recoverable because the payload and the
+A session that survives a crash is recoverable because the content file and the
 session record are still on disk. The ZIP central directory already stores a
-CRC-32 for the payload member, so recovery computes the CRC of the extracted
-payload and compares. Equal means nothing was lost: clean up and say nothing.
+CRC-32 for the content member, so recovery computes the CRC of the extracted
+content file and compares. Equal means nothing was lost: clean up and say nothing.
 
 Different means an edit never landed, and what to do about it depends on
 something the comparison cannot see: which side moved. If the container is still
 holding what this session last agreed with it about, the difference is the
 person's own edit and nobody else's, and it is written back. If the container
 has changed too, both sides hold work the other does not and only the person can
-choose; that is the recovery item, naming the container, the payload and the
-payload's modification time, offering write-back, discard and
+choose; that is the recovery item, naming the container, the content file and the
+content file's modification time, offering write-back, discard and
 reveal-the-folder. Nothing happens until they choose, and the session directory
 survives until they do.
 
@@ -315,7 +315,7 @@ asked to learn, and it is the single most common way anyone meets this design.
 
 Two things keep the risk small, and they are why the trade is worth making
 rather than merely convenient. Most applications save by writing a sibling and
-renaming over the payload — the behaviour §6.1 already relies on to know the
+renaming over the content file — the behaviour §6.1 already relies on to know the
 application is working — so the file is the old bytes or the complete new ones
 and not a prefix of either. And what is written back is *reported*, not done
 silently: the report is not droppable by the notification setting, because
@@ -328,7 +328,7 @@ they choose between is deleting somebody's directory, writing into somebody's
 container and interrupting them, and a state added later must not fall into one
 of those by whichever way a negation happened to go.
 
-**Comparing against the container beats recording a digest of the payload.** A
+**Comparing against the container beats recording a digest of the content file.** A
 recorded value is a second copy of a fact and can drift from it, and the moment
 it gets consulted is after a crash, which is when a session record is least
 trustworthy. The container's own stored CRC needs nothing maintaining it:
@@ -336,7 +336,7 @@ repacking recomputes it, so the comparison stays correct across every write-back
 in a session as a side effect of the write-backs themselves.
 
 **The one value the session does record is not that, and the difference
-matters.** *Has the payload changed* is answerable from the container, and is
+matters.** *Has the content file changed* is answerable from the container, and is
 answered there. *Which side changed* is not answerable from either side, because
 both are only observable now and the question is about then; it needs a note of
 a past moment. So the session records what the container held at the two moments
@@ -346,18 +346,18 @@ that the container is not where we left it, is the true one. A session that neve
 recorded it, which is one written by an earlier build, is read as *not known to
 agree* and asks.
 
-`slpc` does not expose it today — `payload_size()` and `payload_mode()` are
+`slpc` does not expose it today — `content_size()` and `content_mode()` are
 there and the CRC is not — and adding the accessor reads a field the container
 already carries, which is the format library's job and costs no dependency
-(§14). Computing the extracted payload's value needs `crc32fast`, already compiled
+(§14). Computing the extracted content file's value needs `crc32fast`, already compiled
 as a transitive dependency of `zip`.
 
 **It is change detection and never fixity.** The question is whether the file
 changed, not whether it can be proved untampered: anybody able to write into the
 user's own access-controlled session directory can do worse than forge a
 checksum, so the framing that would argue for SHA-256 does not arise. The value
-is never surfaced as an integrity claim and never written into container
-metadata. SPEC §5 declined to define a fixity key and this must not become one
+is never surfaced as an integrity claim and never written into the container's
+flyleaf. SPEC §5 declined to define a fixity key and this must not become one
 by the back door.
 
 Size and modification time were the alternative and are worse. Editors that
@@ -373,33 +373,33 @@ not yet written back, silently, in the window §6.3 exists to survive.
 
 A session lives under the application's own per-user state directory, at 0700:
 `%LOCALAPPDATA%` on Windows and deliberately not the roaming profile, since an
-extracted payload cannot follow a user between machines; `~/Library/Application
+extracted content file cannot follow a user between machines; `~/Library/Application
 Support` on macOS rather than `Caches`, which the system may purge at will;
 `$XDG_STATE_HOME` on Linux, which is defined for state that must survive a
 restart without being configuration or data, and not `XDG_RUNTIME_DIR`, which is
 cleared at logout.
 
 One directory per session, holding a small TOML record naming the container's
-absolute path, the payload name, the session start, and the write-back count.
+absolute path, the content file's name, the session start, and the write-back count.
 TOML because `toml_edit` is already in the tree under `slpc`, so the record costs
 no dependency. Recovery is then a scan of one tree rather than a record pointing
 at a directory that may not be there.
 
-**The payload sits one level below the record, in a `payload/` directory of its
+**The content file sits one level below the record, in a `content/` directory of its
 own, and it took writing this to see why.** SPEC §2.3 permits any plain
-filename, `session.toml` among them, so a payload beside the record could
+filename, `session.toml` among them, so a content file beside the record could
 overwrite it — a container can be built to do that deliberately. And §6.1 reads
-anything else appearing in the payload's directory as the target application's
+anything else appearing in the content directory as the target application's
 work, which is a sound inference only where this tool put exactly one file
 there. The record sitting alongside would make the tool its own first false
 positive. One subdirectory answers both.
 
 The record cannot settle one case and the code has to: the container moved or
 was deleted while the session ran. Recovery says so and offers to save the
-payload elsewhere rather than failing at the rename.
+content file elsewhere rather than failing at the rename.
 
-**The cost of moving out of the temporary directory is that the payload is now
-somewhere backup and sync software looks.** A payload from a confidential
+**The cost of moving out of the temporary directory is that the content file is now
+somewhere backup and sync software looks.** A content file from a confidential
 container sits in the user's state directory for the life of the session, where
 `%LOCALAPPDATA%` and `~/Library/Application Support` are both routinely captured.
 That is the right trade against losing edits, and it is a trade rather than a
@@ -445,14 +445,14 @@ rename, which is the difference between replacing the only copy of a container
 on faith and doing it on evidence. Write-back has more reason to do this than
 `repack` does, because it runs unattended and repeatedly.
 
-**Write-back does not touch the metadata member.** SPEC §5 defines no checksum
+**Write-back does not touch the flyleaf member.** SPEC §5 defines no checksum
 or fixity key, and §2.2 assigns no meaning to any key beyond `slipcase_version`
-and `payload.file`, so there is nothing in a conformant container that a changed
-payload can falsify. A producer may have recorded its own size or digest under a
+and `content.file`, so there is nothing in a conformant container that a changed
+content file can falsify. A producer may have recorded its own size or digest under a
 private key permitted by §2.5, but since the specification gives those keys no
 meaning, this tool cannot know which key, what it covers, or how it is encoded.
 Guessing is worse than leaving it: a wrong digest is a false claim, where a stale
-one is at least a claim whose provenance is the producer's. The metadata member
+one is at least a claim whose provenance is the producer's. The flyleaf member
 is preserved byte for byte, and the administrator documentation says so.
 
 ## 8. Process model
@@ -474,7 +474,7 @@ it hands over and exits.
 sessions on one container would both repack it, the second write-back would
 overwrite the first, and one person's edit would be gone with nothing said. The
 resident instance keeps a table of live sessions, and an invocation naming a
-container already in it starts nothing: it re-launches that session's payload
+container already in it starts nothing: it re-launches that session's content file
 and brings the application forward, which is what a second double-click on an
 open document does everywhere else. No refusal, no second session directory, no
 divergent copies.
@@ -511,7 +511,7 @@ it.
 **A pending recovery item is resolved before a new session opens on the same
 container.** A session left behind by a crash is not in the live table, so
 nothing refuses it, but opening a fresh session first would extract the
-container's current payload and leave the recovered edit with nowhere to go. So
+container's current content file and leave the recovered edit with nowhere to go. So
 the recovery question comes first — write it back, discard it, or open fresh and
 discard it — and the new session follows the answer.
 
@@ -532,7 +532,7 @@ already the answer. What it helps is the other path into recovery, where the use
 closed a session while the editor still had the document open: a live process
 keeps watching that directory and notices the save when it happens, rather than
 leaving the question until somebody next opens a container. Bound it — once the
-siblings are gone and the payload has settled, prompt once, act on the answer,
+siblings are gone and the content file has settled, prompt once, act on the answer,
 and exit; if nobody answers, the record on disk carries the question to the next
 launch.
 
@@ -626,7 +626,7 @@ A step that needs a modal on Linux is a step that has a hole on Linux.
 
 ## 10. Policy and administration
 
-The set of payload extensions the tool will open must be configurable by the
+The set of content file extensions the tool will open must be configurable by the
 user and lockable by an administrator. Extensions rather than media types, for
 the reasons in §5.1.
 
@@ -655,7 +655,7 @@ precedence over `~/.config`.
 | Confirm each write-back | Off by default; on for archival use (§6.2) |
 | How much is said | A threshold on §9's weights, not a list of switches. Added while building Phase 3; see below |
 
-There is no setting for the extensionless case. A payload the platform has no
+There is no setting for the extensionless case. A content file the platform has no
 registration for is refused whatever the lists say (§5.1), because the dialog it
 would otherwise raise offers the user every executable on the machine.
 
@@ -671,7 +671,7 @@ one word over them.
 Two things follow. **A question cannot be quietened**, because it goes through
 the channel's *ask* rather than its *report* and the threshold cannot reach it —
 structural rather than a rule to remember, since silencing one would strand a
-payload with nothing to say so until the next launch. And **this key needs none
+content file with nothing to say so until the next launch. And **this key needs none
 of the launch-path discipline below**: it gates no decision, so it is resolved
 once when the instance starts and held.
 
@@ -684,17 +684,17 @@ tool's to duplicate — each of the three can switch it off outright. What this
 key is for is the middle ground none of them can express.
 
 **Enforcement happens in the launch path**, immediately before execution and
-after the extension has been taken from the decoded `payload.file` and folded
+after the extension has been taken from the decoded `content.file` and folded
 (§5.2).
 Disabling a control in a settings dialog is cosmetic. Any value cached at
 startup, read from a user-writable config file, or supplied over IPC is a
 bypass.
 
 **`slpc` is not in the default allowed set, and nesting needs no special case
-beyond a depth limit.** SPEC §2.3 permits a container whose payload is itself a
+beyond a depth limit.** SPEC §2.3 permits a container whose content file is itself a
 container and gives it no meaning. Opening one composes correctly without
 anything coordinating it: the inner session repacks the inner container, that
-container is the outer session's payload, the outer watcher sees it change and
+container is the outer session's content file, the outer watcher sees it change and
 repacks the outer, and each session knows only about its own container. So there
 is no correctness reason to intervene.
 
@@ -702,7 +702,7 @@ The reason to keep it off by default is judgement rather than correctness. A
 nested container is usually somebody having packed one by mistake, or an
 archival wrapper, and neither wants an automatic recursive open; the viewer is
 the better answer for looking at one. It stays allowlistable for the archival
-user who nests deliberately, and the refusal says the payload is itself a
+user who nests deliberately, and the refusal says the content file is itself a
 container and names both options.
 
 Depth needs no plumbing over the IPC front door. The engine can see that a
@@ -724,7 +724,7 @@ not the same thing: a layer permitting nothing says a great deal.
 ## 11. Honest limits
 
 **The allowlist is not a security boundary.** The `slipcase` CLI is publicly
-distributed and the container is a plain zip; any user can extract the payload
+distributed and the container is a plain zip; any user can extract the content file
 with standard tools and run it. What this control provides is a guardrail
 against user error and social engineering in the *convenient* path — which is
 where the realistic risk sits — not a barrier against a determined user. The
@@ -736,7 +736,7 @@ which would leave them worse off than before the tool existed.
 
 §5.1's content check is not a second control and must not be described as one,
 and the fact that it now refuses does not make it one. It is a veto: it admits
-nothing, so nothing is permitted *by* it, and a payload that is what it claims
+nothing, so nothing is permitted *by* it, and a content file that is what it claims
 to be and still hostile passes it without comment. An organisation that read the
 refusal as a malware check would be making exactly the mistake this section
 exists to prevent.
@@ -758,7 +758,7 @@ platforms, and the container swap is portable too, because
 | Native dialog | Message box | `NSAlert` | **Nothing guaranteed** |
 | IPC front door | Named pipe, ACL by SID | Unix socket, plus `openFile` | Unix socket |
 | Association | ProgID | Exported UTI | shared-mime-info + desktop entry |
-| Secondary verb | `shell\open-payload` under the ProgID | Services entry | Additional desktop entry, `NoDisplay` |
+| Secondary verb | `shell\open-content` under the ProgID | Services entry | Additional desktop entry, `NoDisplay` |
 | Managed policy | Registry `Policies` + ADMX | Configuration profiles | Root-owned `/etc` |
 
 Structure the differences as a small trait — `launch()`, `propagate_zone()`,
@@ -832,10 +832,10 @@ effect of the first.
 **The engine does not belong inside `slpc`, and the format is the reason before
 the dependencies are.** `slpc` is the reference implementation of SPEC.md, so
 anything in it reads as part of what a conformant implementation does. SPEC §5
-is careful about what the format takes no position on, and how a payload reaches
+is careful about what the format takes no position on, and how a content file reaches
 an application sits so far outside that it never needed excluding. Put launch
 policy, session state and a file watcher in there and the format acquires
-opinions about opening payloads, which misleads the outside implementer the
+opinions about opening content files, which misleads the outside implementer the
 crate exists to serve.
 
 The dependency argument points the same way and is easier to check. `slpc` gates
@@ -847,11 +847,11 @@ engine would add `notify`, `crc32fast`, a registry reader, `objc2` for
 it is about the container, and the line between the two is already drawn where
 those two features sit.
 
-**One addition to `slpc` is needed**: an accessor for the payload member's
+**One addition to `slpc` is needed**: an accessor for the content member's
 CRC-32, which the ZIP central directory already stores and the `zip` crate
 already surfaces on read. It is a field of the container, so reading it out is
 the format library's job, it costs no dependency, and it is what recovery
-compares against rather than keeping a payload digest of its own (§6.3).
+compares against rather than keeping a content file digest of its own (§6.3).
 
 The alternative was the engine reading the central directory itself, and it is
 worse than a version bump on any reading. It duplicates the parsing `slpc`
@@ -910,14 +910,14 @@ place ADMX/ADML files into `PolicyDefinitions`. Ship those as a separate
 administrator download, which is how Microsoft ships its own.
 
 **macOS needs one thing checked before the channel is chosen.** Under the App
-Sandbox the payload sits in the application's own container, and a sandboxed
+Sandbox the content file sits in the application's own container, and a sandboxed
 target editor — which is every Mac App Store editor — may not be able to open a
 path inside another application's container. That failure mode is bad because it
-is invisible: the payload opens in Word and fails in something from the Store,
+is invisible: the content file opens in Word and fails in something from the Store,
 with nothing to tell the user why.
 
 The subject to check is already to hand. `slipcase-desktop` DESIGN §3 has an
-Open button that extracts a payload and launches whatever the platform
+Open button that extracts a content file and launches whatever the platform
 registered, and that application ships to the Mac App Store. If Open works from
 the sandboxed build against a sandboxed editor, the objection dissolves and the
 Store is right for both products. If it does not, that is worth knowing for the
@@ -948,7 +948,7 @@ distribution requirement.
 
 ## 16. Relationship to the parked Explorer work
 
-The Explorer property handler — surfacing container metadata as Windows
+The Explorer property handler — surfacing the container's flyleaf as Windows
 properties so that Explorer's built-in faceted search works over `.slpc` files —
 is a separate parked item. It shares nothing with this tool but the `slpc`
 dependency.
@@ -964,8 +964,8 @@ live in the reference implementation.
 Not design questions. They are recorded so they are not rediscovered, and each
 is settled by writing the code rather than by more of this document.
 
-- A payload size above which extraction into the state directory (§6.4) warrants
-  a warning, given that a multi-gigabyte payload otherwise sits in
+- A content file size above which extraction into the state directory (§6.4) warrants
+  a warning, given that a multi-gigabyte content file otherwise sits in
   `%LOCALAPPDATA%` for the life of the session.
 - What a policy change mid-session does. §10 puts enforcement in the launch path
   deliberately, so a session on a newly denied extension continues; terminating

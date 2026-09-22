@@ -1,4 +1,5 @@
-//! What counts as a payload's extension, and how it is compared against policy.
+//! What counts as a content file's extension, and how it is compared against
+//! policy.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
@@ -15,28 +16,28 @@
 
 use std::path::Path;
 
-/// The payload's extension, in the case the container spells it.
+/// The content file's extension, in the case the container spells it.
 ///
 /// The rule is `slipcase-desktop`'s, deliberately: it takes the extension with
-/// `Path::extension`, and two products disagreeing about what a payload's
+/// `Path::extension`, and two products disagreeing about what a content file's
 /// extension is would be a defect visible to anyone with both installed. So
 /// `archive.tar.gz` is `gz` and never `tar.gz`, and `.bashrc` is a hidden file
 /// with no extension rather than an extension of `bashrc`.
 ///
 /// `None` where there is nothing usable. Concept 5.1 refuses that case rather
-/// than launching it, because a payload the platform has no registration for
-/// raises the Open With dialog, which offers the user every executable on the
-/// machine inside a flow they read as *open the document*.
+/// than launching it, because a content file the platform has no registration
+/// for raises the Open With dialog, which offers the user every executable on
+/// the machine inside a flow they read as *open the document*.
 #[must_use]
-pub fn of(payload_name: &str) -> Option<&str> {
-    // A conformant container's payload name has been through SPEC 2.3, which
+pub fn of(content_name: &str) -> Option<&str> {
+    // A conformant container's content name has been through SPEC 2.3, which
     // excludes both separators. Checked rather than assumed, the way the
     // sibling checks it: this decides what gets executed, and the cost of
     // asking is nothing.
-    if payload_name.is_empty() || payload_name.contains(['/', '\\']) {
+    if content_name.is_empty() || content_name.contains(['/', '\\']) {
         return None;
     }
-    match Path::new(payload_name).extension()?.to_str()? {
+    match Path::new(content_name).extension()?.to_str()? {
         "" => None,
         e => Some(e),
     }
@@ -62,8 +63,8 @@ pub fn of(payload_name: &str) -> Option<&str> {
 /// The deny list is compared through this too, and reaches the same set.
 /// Nothing should be refusable by a rule the allow list could not have written.
 #[must_use]
-pub fn policy_key(payload_name: &str) -> Option<String> {
-    let e = of(payload_name)?;
+pub fn policy_key(content_name: &str) -> Option<String> {
+    let e = of(content_name)?;
     e.chars()
         .all(|c| c.is_ascii_alphanumeric())
         .then(|| e.to_ascii_lowercase())

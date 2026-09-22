@@ -210,9 +210,11 @@ fn redress(hwnd: HWND, shown: &Shown) {
     let text = match (shown.troubles.first(), shown.lines.len()) {
         (Some(first), _) => format!("Slipcase Open - {}", first.summary),
         (None, 0) => "Slipcase Open - nothing open".to_owned(),
-        (None, 1) => "Slipcase Open - 1 payload open; saves go back into its container".to_owned(),
+        (None, 1) => {
+            "Slipcase Open - 1 content file open; saves go back into its container".to_owned()
+        }
         (None, n) => {
-            format!("Slipcase Open - {n} payloads open; saves go back into their containers")
+            format!("Slipcase Open - {n} content files open; saves go back into their containers")
         }
     };
     for (i, c) in text.encode_utf16().enumerate().take(127) {
@@ -541,13 +543,15 @@ unsafe fn offer(hwnd: HWND) {
                 // in it. A menu item here would be a step invented to have
                 // something to offer.
                 let label = match (listed.needs_a_person, listed.write_backs) {
-                    (true, _) => format!("{}  -  left behind, needs a decision", listed.payload),
-                    (false, Some(0u64)) => {
-                        format!("{}  -  open, nothing saved yet", listed.payload)
+                    (true, _) => {
+                        format!("{}  -  left behind, needs a decision", listed.content_name)
                     }
-                    (false, Some(1u64)) => format!("{}  -  saved once", listed.payload),
-                    (false, Some(n)) => format!("{}  -  saved {n} times", listed.payload),
-                    (false, None) => listed.payload.clone(),
+                    (false, Some(0u64)) => {
+                        format!("{}  -  open, nothing saved yet", listed.content_name)
+                    }
+                    (false, Some(1u64)) => format!("{}  -  saved once", listed.content_name),
+                    (false, Some(n)) => format!("{}  -  saved {n} times", listed.content_name),
+                    (false, None) => listed.content_name.clone(),
                 };
                 let text: Vec<u16> = label.encode_utf16().chain(std::iter::once(0)).collect();
                 let _ = AppendMenuW(menu, MF_STRING | MF_GRAYED, 0, PCWSTR(text.as_ptr()));

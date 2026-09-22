@@ -1,4 +1,4 @@
-//! Putting an edited payload back into the container.
+//! Putting an edited content file back into the container.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
@@ -26,14 +26,15 @@
 //! repeatedly, so a fault that would cost one person one container there costs
 //! every save here.
 //!
-//! **The metadata member is not touched.** SPEC 5 defines no checksum or fixity
+//! **The flyleaf member is not touched.** SPEC 5 defines no checksum or fixity
 //! key and 2.2 assigns no meaning to any key beyond `slipcase_version` and
-//! `payload.file`, so a changed payload falsifies nothing a conformant container
-//! says about itself. A producer may have recorded its own size or digest under
-//! a private key permitted by 2.5, and since the specification gives those keys
-//! no meaning this cannot know which, what it covers, or how it is encoded.
-//! Guessing is worse than leaving it: a wrong digest is a false claim, where a
-//! stale one is at least a claim whose provenance is the producer's.
+//! `content.file`, so a changed content file falsifies nothing a conformant
+//! container says about itself. A producer may have recorded its own size or
+//! digest under a private key permitted by 2.5, and since the specification
+//! gives those keys no meaning this cannot know which, what it covers, or how
+//! it is encoded. Guessing is worse than leaving it: a wrong digest is a false
+//! claim, where a stale one is at least a claim whose provenance is the
+//! producer's.
 
 use std::fmt;
 use std::fs::File;
@@ -45,19 +46,19 @@ use crate::session::Session;
 /// Why an edit did not reach the container.
 #[derive(Debug)]
 pub enum Error {
-    /// The payload could not be read out of the session directory.
-    Payload(std::io::Error),
+    /// The content file could not be read out of the session directory.
+    Content(std::io::Error),
     /// The container could not be read, or is no longer where the session
     /// recorded it. Concept 6.4: a container may move or go while a session
     /// runs, and this is not a failure of the edit.
     Container(std::io::Error),
     /// The file at the recorded path is not the container this session was
-    /// opened against — its payload goes by another name. Writing back would
-    /// rename the payload of a container somebody else may be holding, so it
-    /// refuses. Concept 6.3 asks the same question on the recovery side; this
-    /// is the guard on the acting side, and it belongs here because it is a
-    /// safety property of the write-back rather than an optimisation in
-    /// whatever called it.
+    /// opened against — its content file goes by another name. Writing back
+    /// would rename the content file of a container somebody else may be
+    /// holding, so it refuses. Concept 6.3 asks the same question on the
+    /// recovery side; this is the guard on the acting side, and it belongs
+    /// here because it is a safety property of the write-back rather than an
+    /// optimisation in whatever called it.
     ContainerChanged {
         /// What the session recorded.
         recorded: String,
@@ -79,7 +80,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Payload(e) => write!(f, "the edited payload could not be read: {e}"),
+            Self::Content(e) => write!(f, "the edited content file could not be read: {e}"),
             Self::Container(e) => write!(f, "the container could not be opened: {e}"),
             Self::ContainerChanged { recorded, found } => write!(
                 f,
@@ -101,35 +102,36 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-/// Put the session's payload back into its container, and count it.
+/// Put the session's content file back into its container, and count it.
 ///
 /// Unrecognised members survive, which `Repack` already guarantees and SPEC 3
-/// requires. The payload keeps the name the session recorded, so a container
-/// whose `payload.file` says one thing does not quietly acquire another.
+/// requires. The content file keeps the name the session recorded, so a
+/// container whose `content.file` says one thing does not quietly acquire
+/// another.
 ///
 /// # Errors
 ///
 /// See [`Error`]. In every variant the original container is untouched.
 pub fn write_back(session: &mut Session) -> Result<(), Error> {
     let container = session.record().container.clone();
-    let payload_path = session.payload_path();
+    let content_path = session.content_path();
 
-    let edited = File::open(&payload_path).map_err(Error::Payload)?;
+    let edited = File::open(&content_path).map_err(Error::Content)?;
 
     // Asked before anything is written. A different container at the recorded
-    // path is not a container to repack into: the payload would be renamed to
-    // this session's `payload.file`, which is a change nobody asked for made to
-    // a file this session was never opened against.
+    // path is not a container to repack into: the content file would be
+    // renamed to this session's `content.file`, which is a change nobody asked
+    // for made to a file this session was never opened against.
     let found = slpc::Container::open(&container)
         .map_err(|e| match e {
             slpc::Error::Io(e) => Error::Container(e),
             other => Error::Repack(other),
         })?
-        .payload_name()
+        .content_name()
         .to_string();
-    if found != session.record().payload {
+    if found != session.record().content_name {
         return Err(Error::ContainerChanged {
-            recorded: session.record().payload.clone(),
+            recorded: session.record().content_name.clone(),
             found,
         });
     }
@@ -147,7 +149,7 @@ pub fn write_back(session: &mut Session) -> Result<(), Error> {
     // not cosmetic on Windows, where replacing a file somebody still holds open
     // is the case that fails.
     slpc::Repack::new(source)
-        .payload(&session.record().payload, edited)
+        .content(&session.record().content_name, edited)
         .write(out.writer())
         .map_err(Error::Repack)?;
 
@@ -157,21 +159,22 @@ pub fn write_back(session: &mut Session) -> Result<(), Error> {
     }
     out.commit().map_err(Error::Swap)?;
 
-    // The container now holds what the payload holds, which is the second of
-    // the two moments the two sides are known to agree. Read back off the
-    // container rather than computed from the payload, so the value recorded is
-    // the one recovery will later compare against and cannot be a near miss.
+    // The container now holds what the content file holds, which is the second
+    // of the two moments the two sides are known to agree. Read back off the
+    // container rather than computed from the content file, so the value
+    // recorded is the one recovery will later compare against and cannot be a
+    // near miss.
     //
     // Best effort: a session that wrote back successfully and could not note it
     // is a session that will ask on recovery instead of acting, which is the
     // cautious direction and not worth failing a completed write-back over.
     if let Ok(repacked) = slpc::Container::open(&container) {
-        if let Ok(crc) = repacked.payload_crc() {
+        if let Ok(crc) = repacked.content_crc() {
             let _ = session.note_agreement(crc);
         }
     }
 
-    session.note_write_back().map_err(Error::Payload)
+    session.note_write_back().map_err(Error::Content)
 }
 
 #[cfg(test)]
@@ -181,27 +184,27 @@ mod tests {
     use std::fs;
     use std::path::{Path, PathBuf};
 
-    fn container_with(at: &Path, name: &str, payload: &[u8], extra: &str) -> PathBuf {
+    fn container_with(at: &Path, name: &str, content_bytes: &[u8], extra: &str) -> PathBuf {
         let doc: slpc::toml_edit::DocumentMut =
-            format!("slipcase_version = \"1.0\"\n{extra}\n[payload]\nfile = \"{name}\"\n")
+            format!("slipcase_version = \"1.1\"\n{extra}\n[content]\nfile = \"{name}\"\n")
                 .parse()
                 .unwrap();
         let path = at.join(format!("{name}.slpc"));
-        slpc::pack_reader(name, payload, doc, fs::File::create(&path).unwrap()).unwrap();
+        slpc::pack_reader(name, content_bytes, doc, fs::File::create(&path).unwrap()).unwrap();
         path
     }
 
-    /// A session with the payload already extracted into it.
+    /// A session with the content file already extracted into it.
     fn opened(root: &Path, container: &Path, name: &str) -> session::Session {
         let mut s = session::create(root, container, name).unwrap();
         extract::extract(&mut slpc::Container::open(container).unwrap(), &mut s).unwrap();
         s
     }
 
-    fn payload_of(container: &Path) -> Vec<u8> {
+    fn content_of(container: &Path) -> Vec<u8> {
         let mut c = slpc::Container::open(container).unwrap();
         let mut out = Vec::new();
-        std::io::copy(&mut c.payload().unwrap(), &mut out).unwrap();
+        std::io::copy(&mut c.content().unwrap(), &mut out).unwrap();
         out
     }
 
@@ -212,44 +215,44 @@ mod tests {
         let c = container_with(tmp.path(), "report.pdf", b"first", "");
 
         let mut s = opened(&root, &c, "report.pdf");
-        fs::write(s.payload_path(), b"edited").unwrap();
+        fs::write(s.content_path(), b"edited").unwrap();
         write_back(&mut s).unwrap();
 
-        assert_eq!(payload_of(&c), b"edited");
+        assert_eq!(content_of(&c), b"edited");
     }
 
     #[test]
-    fn the_metadata_member_is_returned_byte_for_byte() {
+    fn the_flyleaf_member_is_returned_byte_for_byte() {
         // Concept 7. SPEC 5 defines no fixity key and 2.2 gives no meaning to
-        // any other, so a changed payload falsifies nothing — and a private key
-        // a producer used under 2.5 is one this cannot interpret, so leaving it
-        // is the only honest option.
+        // any other, so a changed content file falsifies nothing — and a
+        // private key a producer used under 2.5 is one this cannot interpret,
+        // so leaving it is the only honest option.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let extra = "producer = \"something else\"\nsha256 = \"stale after this edit\"\n";
         let c = container_with(tmp.path(), "report.pdf", b"first", extra);
 
-        let before = slpc::Container::open(&c).unwrap().metadata_bytes().to_vec();
+        let before = slpc::Container::open(&c).unwrap().flyleaf_bytes().to_vec();
         let mut s = opened(&root, &c, "report.pdf");
-        fs::write(s.payload_path(), b"edited").unwrap();
+        fs::write(s.content_path(), b"edited").unwrap();
         write_back(&mut s).unwrap();
 
-        let after = slpc::Container::open(&c).unwrap().metadata_bytes().to_vec();
+        let after = slpc::Container::open(&c).unwrap().flyleaf_bytes().to_vec();
         assert_eq!(before, after);
     }
 
     #[test]
-    fn the_payload_keeps_the_name_the_session_recorded() {
+    fn the_content_file_keeps_the_name_the_session_recorded() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container_with(tmp.path(), "report.pdf", b"first", "");
 
         let mut s = opened(&root, &c, "report.pdf");
-        fs::write(s.payload_path(), b"edited").unwrap();
+        fs::write(s.content_path(), b"edited").unwrap();
         write_back(&mut s).unwrap();
 
         assert_eq!(
-            slpc::Container::open(&c).unwrap().payload_name(),
+            slpc::Container::open(&c).unwrap().content_name(),
             "report.pdf"
         );
     }
@@ -262,11 +265,11 @@ mod tests {
 
         let mut s = opened(&root, &c, "report.pdf");
         for n in 1..=3 {
-            fs::write(s.payload_path(), format!("edit {n}")).unwrap();
+            fs::write(s.content_path(), format!("edit {n}")).unwrap();
             write_back(&mut s).unwrap();
             assert_eq!(session::scan(&root).unwrap()[0].record().write_backs, n);
         }
-        assert_eq!(payload_of(&c), b"edit 3");
+        assert_eq!(content_of(&c), b"edit 3");
     }
 
     #[test]
@@ -280,7 +283,7 @@ mod tests {
 
         let mut s = opened(&root, &c, "report.pdf");
         for n in 0..5 {
-            fs::write(s.payload_path(), format!("{n}")).unwrap();
+            fs::write(s.content_path(), format!("{n}")).unwrap();
             write_back(&mut s).unwrap();
         }
 
@@ -302,7 +305,7 @@ mod tests {
         let c = container_with(tmp.path(), "report.pdf", b"first", "");
 
         let mut s = opened(&root, &c, "report.pdf");
-        fs::write(s.payload_path(), b"edited").unwrap();
+        fs::write(s.content_path(), b"edited").unwrap();
         fs::remove_file(&c).unwrap();
 
         assert!(matches!(write_back(&mut s), Err(Error::Container(_))));
@@ -310,16 +313,16 @@ mod tests {
     }
 
     #[test]
-    fn a_missing_payload_is_reported_and_the_container_is_left_alone() {
+    fn a_missing_content_file_is_reported_and_the_container_is_left_alone() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
         let c = container_with(tmp.path(), "report.pdf", b"first", "");
 
         let mut s = opened(&root, &c, "report.pdf");
-        fs::remove_file(s.payload_path()).unwrap();
+        fs::remove_file(s.content_path()).unwrap();
 
-        assert!(matches!(write_back(&mut s), Err(Error::Payload(_))));
-        assert_eq!(payload_of(&c), b"first");
+        assert!(matches!(write_back(&mut s), Err(Error::Content(_))));
+        assert_eq!(content_of(&c), b"first");
     }
 
     #[test]
@@ -335,10 +338,10 @@ mod tests {
             std::os::unix::fs::symlink(&real, &link).unwrap();
 
             let mut s = opened(&root, &link, "report.pdf");
-            fs::write(s.payload_path(), b"edited").unwrap();
+            fs::write(s.content_path(), b"edited").unwrap();
             write_back(&mut s).unwrap();
 
-            assert_eq!(payload_of(&real), b"edited");
+            assert_eq!(content_of(&real), b"edited");
         }
     }
 
@@ -358,10 +361,10 @@ mod tests {
         );
 
         let mut s = opened(&root, &c, "report.pdf");
-        fs::write(s.payload_path(), b"edited").unwrap();
+        fs::write(s.content_path(), b"edited").unwrap();
         write_back(&mut s).unwrap();
 
         assert!(slpc::provenance::arrived_from_elsewhere(&c));
-        assert_eq!(payload_of(&c), b"edited");
+        assert_eq!(content_of(&c), b"edited");
     }
 }

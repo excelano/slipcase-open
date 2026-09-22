@@ -37,8 +37,8 @@ pub const MAX_FRAME: usize = 64 * 1024;
 ///
 /// An invocation started from a desktop entry has no terminal, so the lines it
 /// is handed back go nowhere and the person who double-clicked learns nothing —
-/// including, on the paths that matter most, that the payload was refused or
-/// that it is an executable wearing a document's name (concept 5.1). An
+/// including, on the paths that matter most, that the content file was refused
+/// or that it is an executable wearing a document's name (concept 5.1). An
 /// invocation from a shell has a terminal and will print them itself, and an
 /// instance that also announced them would say everything twice.
 ///

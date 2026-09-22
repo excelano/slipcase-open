@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: slipcase-open\n"
 "Report-Msgid-Bugs-To: https://github.com/excelano/slipcase-open/issues\n"
-"POT-Creation-Date: 2026-09-09 13:36-0500\n"
+"POT-Creation-Date: 2026-09-21 22:14-0500\n"
 "PO-Revision-Date: 2026-09-09 13:31-0500\n"
 "Last-Translator: David M. Anderson <david.anderson@excelano.com>\n"
 "Language-Team: German\n"
@@ -59,34 +59,34 @@ msgstr "Verwerfen"
 msgid "Show me"
 msgstr "Zeig es mir"
 
-#: src/recover.rs:115
+#: src/recover.rs:118
 msgid "nothing was extracted"
 msgstr "nichts wurde entpackt"
 
-#: src/recover.rs:116
+#: src/recover.rs:119
 msgid "unchanged since it came out of the container"
 msgstr "unverändert, seit es aus dem Container kam"
 
-#: src/recover.rs:120
+#: src/recover.rs:123
 msgid "edited, and the edit never reached the container"
 msgstr "bearbeitet, und die Änderung erreichte den Container nie"
 
-#: src/recover.rs:125
+#: src/recover.rs:128
 msgid ""
 "edited, and the container changed too, so both hold work the other does not"
 msgstr ""
 "bearbeitet, und der Container änderte sich ebenfalls, sodass beide Arbeit "
 "halten, die der andere nicht hat"
 
-#: src/recover.rs:128
+#: src/recover.rs:131
 msgid "the container is no longer where it was"
 msgstr "der Container ist nicht mehr, wo er war"
 
-#: src/recover.rs:134
+#: src/recover.rs:137
 msgid "the container now holds {found} rather than {recorded}"
 msgstr "der Container hält jetzt {found} statt {recorded}"
 
-#: src/recover.rs:141
+#: src/recover.rs:144
 msgid "cannot be read: {reason}"
 msgstr "kann nicht gelesen werden: {reason}"
 
@@ -94,7 +94,7 @@ msgstr "kann nicht gelesen werden: {reason}"
 msgid "{name} was recovered and written back."
 msgstr "{name} wurde wiederhergestellt und zurückgeschrieben."
 
-#: src/resident.rs:191 src/resident.rs:725
+#: src/resident.rs:191 src/resident.rs:726
 msgid "Into {container}."
 msgstr "In {container}."
 
@@ -102,7 +102,7 @@ msgstr "In {container}."
 msgid "It had been edited after the session holding it stopped."
 msgstr "Es wurde bearbeitet, nachdem die Sitzung, die es hielt, beendet war."
 
-#: src/resident.rs:204 src/resident.rs:645 src/resident.rs:826
+#: src/resident.rs:204 src/resident.rs:646 src/resident.rs:827
 msgid "{name} could not be written back."
 msgstr "{name} konnte nicht zurückgeschrieben werden."
 
@@ -142,7 +142,7 @@ msgstr "Es kam von anderswo, und die Kopie sagt das auch."
 msgid "{name} was left behind."
 msgstr "{name} wurde zurückgelassen."
 
-#: src/resident.rs:450 src/resident.rs:723
+#: src/resident.rs:450 src/resident.rs:724
 msgid "It is {state}."
 msgstr "Es ist {state}."
 
@@ -162,55 +162,55 @@ msgstr "{name} zurückgeschrieben."
 msgid "Saves from here on are written back quietly."
 msgstr "Weitere Speicherungen werden von nun an still zurückgeschrieben."
 
-#: src/resident.rs:719
+#: src/resident.rs:720
 msgid "{name} was saved after you closed the session."
 msgstr "{name} wurde gespeichert, nachdem Sie die Sitzung geschlossen hatten."
 
-#: src/resident.rs:758
+#: src/resident.rs:759
 msgid "{name} has already been dealt with."
 msgstr "{name} wurde bereits erledigt."
 
-#: src/resident.rs:775
+#: src/resident.rs:776
 msgid "{name} is still waiting."
 msgstr "{name} wartet noch."
 
-#: src/resident.rs:782
-msgid "The payload is in {folder}"
-msgstr "Die Nutzlast liegt in {folder}"
+#: src/resident.rs:783
+msgid "The content file is in {folder}"
+msgstr "Die Inhaltsdatei liegt in {folder}"
 
-#: src/resident.rs:789
+#: src/resident.rs:790
 msgid "{folder} could not be shown: {reason}"
 msgstr "{folder} konnte nicht gezeigt werden: {reason}"
 
-#: src/resident.rs:808
+#: src/resident.rs:809
 msgid "{name} written back to {container}."
 msgstr "{name} zurückgeschrieben nach {container}."
 
-#: src/resident.rs:839
+#: src/resident.rs:840
 msgid "{name} discarded."
 msgstr "{name} verworfen."
 
-#: src/resident.rs:850
+#: src/resident.rs:851
 msgid "{name} did not open: {reason}"
 msgstr "{name} wurde nicht geöffnet: {reason}"
 
-#: src/resident.rs:876
+#: src/resident.rs:877
 msgid "{name} is still undecided."
 msgstr "{name} ist noch unentschieden."
 
-#: src/resident.rs:905
+#: src/resident.rs:906
 msgid "a session did not close: {reason}"
 msgstr "eine Sitzung wurde nicht geschlossen: {reason}"
 
-#: src/resident.rs:918
+#: src/resident.rs:919
 msgid "{name} was closed while its application was still working."
 msgstr "{name} wurde geschlossen, während seine Anwendung noch arbeitete."
 
-#: src/resident.rs:921
+#: src/resident.rs:922
 msgid "It is left for recovery: run `slipcase-open sessions`."
 msgstr ""
 "Es bleibt zur Wiederherstellung liegen: `slipcase-open sessions` ausführen."
 
-#: src/resident.rs:959
+#: src/resident.rs:960
 msgid "Not opened."
 msgstr "Nicht geöffnet."

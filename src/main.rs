@@ -51,8 +51,8 @@ use slipcase_open::present::{self, Channel, Report};
 use slipcase_open::resident::{self, Resident};
 use slipcase_open::{recover, session};
 
-/// Open the payload of a Slipcase container in its own application, and write
-/// edits back into the container.
+/// Open the content file of a Slipcase container in its own application, and
+/// write edits back into the container.
 ///
 /// Two lines rather than the table, and under `--help` rather than `-h`.
 /// Concept 9 keeps the command line the floor beneath everything else, and the
@@ -93,7 +93,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Verb {
-    /// Open a container's payload and watch for edits.
+    /// Open a container's content file and watch for edits.
     Open(Open),
     /// List the sessions on this machine and what became of each.
     Sessions,
@@ -121,10 +121,10 @@ struct Close {
 struct Recover {
     /// The session, as `sessions` lists it.
     id: String,
-    /// Put the payload back into its container.
+    /// Put the content file back into its container.
     #[arg(long, conflicts_with = "discard")]
     write_back: bool,
-    /// Throw the payload away and remove the session.
+    /// Throw the content file away and remove the session.
     #[arg(long)]
     discard: bool,
 }
@@ -446,7 +446,7 @@ fn sessions(root: &Path, door: &Path) -> Fallible {
         println!(
             "{}  {}  {}",
             id_of(s),
-            slpc::display_name(&s.record().payload),
+            slpc::display_name(&s.record().content_name),
             state
         );
         println!(
@@ -488,7 +488,7 @@ fn close(door: &Path, a: &Close) -> Fallible {
 
 fn recover_one(root: &Path, door: &Path, a: &Recover) -> Fallible {
     // A session the instance is holding is not recovery's to touch: its watcher
-    // is live and its payload may be mid-save. `close` is the verb for that,
+    // is live and its content file may be mid-save. `close` is the verb for that,
     // and it writes back on the way out.
     if let Some(Response::Ok(lines)) = hand_over(door, &Request::List)? {
         if lines
@@ -550,7 +550,7 @@ fn report_policy(outside: &Outside<'_>) {
     }
     for entry in &effective.uncomparable_entries {
         outside.report(&Report::ordinary(format!(
-            "Ignored: `{entry}` in a policy list cannot match any payload."
+            "Ignored: `{entry}` in a policy list cannot match any content file."
         )));
     }
 }
@@ -626,7 +626,7 @@ fn settings(root: &Path, door: &Path) -> Fallible {
         if effective.confirm_each_write_back {
             "confirmed each time"
         } else {
-            "as the payload is saved"
+            "as the content file is saved"
         }
     );
     println!();
@@ -642,7 +642,7 @@ fn settings(root: &Path, door: &Path) -> Fallible {
         println!();
     }
     for entry in &effective.uncomparable_entries {
-        println!("Ignored: `{entry}` in a policy list cannot match any payload.");
+        println!("Ignored: `{entry}` in a policy list cannot match any content file.");
     }
     if !effective.uncomparable_entries.is_empty() {
         println!();

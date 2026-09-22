@@ -16,12 +16,12 @@ a sentence is easier to check when somebody has said what would falsify it.
 
 | Sentence | Established by |
 | --- | --- |
-| the payload opens in the registered application | measured through the real association, `PLAN.md` Phase 4 |
+| the content file opens in the registered application | measured through the real association, `PLAN.md` Phase 4 |
 | edits are written back on save | same, and `writeback`'s tests |
 | an icon by the clock, colour as the interface | `present::Mood`, verified by hand 2026-09-03 |
 | work survives a crash and is put back | `recover::Course`, and §6.3 as amended |
 | only a genuine conflict asks | `State::Diverged` is the only state that asks after an edit |
-| the marking is carried onto the payload | measured: `ZoneId=3` and `HostUrl` on the extracted copy |
+| the marking is carried onto the content file | measured: `ZoneId=3` and `HostUrl` on the extracted copy |
 | a program under a document's name is refused | `content`'s check, verified by hand through a double-click |
 | only ordinary document and image types | `policy::EVERY` built-in set |
 | Group Policy, ADMX, precedence, deny list | `policy::registry`, `packaging/windows/policy/` |
@@ -29,7 +29,7 @@ a sentence is easier to check when somebody has said what would falsify it.
 | no network connection of any kind | nothing in the dependency tree opens a socket; `check-imports.ps1` lists what the binary imports |
 
 **One sentence is deliberately weaker than it could be.** The marking paragraph
-says the application that opens the payload *treats it with the caution it gives
+says the application that opens the content file *treats it with the caution it gives
 anything that came from outside*, rather than promising a particular warning. On
 Windows the zone is copied verbatim and `ShellExecuteEx` is called with the check
 left on, so the strong claim is very likely true — but that a warning is
@@ -45,7 +45,7 @@ photograph of its own application. What ships, both 1920x984 and in
 | | Shows |
 | --- | --- |
 | `01-payoff.png` | Explorer with three containers, each typed *Slipcase Container*, and the document from one of them open in Notepad beside it. The tray icon is **blue**. |
-| `02-refusal.png` | The same desktop, with the refusal for a payload that is a program under a document's name. The same tray icon, in the same place, now **red**. |
+| `02-refusal.png` | The same desktop, with the refusal for a content file that is a program under a document's name. The same tray icon, in the same place, now **red**. |
 
 **They are a pair, and the pairing is the argument.** One icon, one position,
 two colours — which is concept §12's claim about the icon being the whole
@@ -132,7 +132,7 @@ by `slipcase-desktop/packaging/demo-container.sh`, whose stated reason for
 existing is that three demonstrations of the same format that do not look alike
 is not a thing to discover after two listings are live. This repository has no
 script of its own for it: a second script writing a second file to one URL is
-exactly the failure that one was written to prevent. Its payload is a PDF, which
+exactly the failure that one was written to prevent. Its content file is a PDF, which
 exercises the path this product is for — extract, hand to the registered reader,
 write back on save.
 

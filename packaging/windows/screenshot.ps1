@@ -14,7 +14,7 @@
 #                     popup closes the moment something else takes the focus, so
 #                     the only way to photograph one is on a timer while a
 #                     person holds it open.
-#   -Refusal          opens a container whose payload is a program under a
+#   -Refusal          opens a container whose content file is a program under a
 #                     document's name, waits for the message box, captures it.
 #                     The one shot that can be taken without a person.
 #
@@ -161,7 +161,7 @@ function Shoot-Window([string] $title, [string] $owner) {
 }
 
 if ($Refusal) {
-    if (-not $Container) { Refuse '-Refusal needs -Container, pointing at one whose payload is a program' }
+    if (-not $Container) { Refuse '-Refusal needs -Container, pointing at one whose content file is a program' }
     if (-not (Test-Path $Container)) { Refuse "no container at $Container" }
     $Container = (Resolve-Path $Container).Path
     Step 'opening it through the shell, from a launcher with no console'
@@ -182,8 +182,8 @@ if ($Refusal) {
     # scripted. `packaging/windows/README.md` has both measurements.
     $shell = New-Object -ComObject Shell.Application
     $item = $shell.Namespace((Split-Path -Parent $Container)).ParseName((Split-Path -Leaf $Container))
-    $verb = $item.Verbs() | Where-Object { ($_.Name -replace '&', '') -eq 'Open payload' } | Select-Object -First 1
-    if (-not $verb) { Refuse "no 'Open payload' verb on that container - is the package installed?" }
+    $verb = $item.Verbs() | Where-Object { ($_.Name -replace '&', '') -eq 'Open content file' } | Select-Object -First 1
+    if (-not $verb) { Refuse "no 'Open content file' verb on that container - is the package installed?" }
     if (-not (Get-Command wscript.exe -ErrorAction SilentlyContinue)) {
         Refuse 'no wscript.exe, and calling the verb from this console would photograph the wrong invocation'
     }
@@ -194,7 +194,7 @@ path = WScript.Arguments(0)
 Set folder = shell.Namespace(Left(path, InStrRev(path, "\") - 1))
 Set item = folder.ParseName(Mid(path, InStrRev(path, "\") + 1))
 For Each v In item.Verbs()
-    If Replace(v.Name, "&", "") = "Open payload" Then
+    If Replace(v.Name, "&", "") = "Open content file" Then
         v.DoIt()
         Exit For
     End If

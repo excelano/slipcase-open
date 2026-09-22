@@ -10,8 +10,8 @@
 
   The allowlist is a guardrail and not a security boundary, and the text says so
   where an administrator is most likely to assume otherwise. A container is a
-  plain ZIP: anyone who can read one can extract its payload with the tools they
-  already have. What this setting governs is the convenient path.
+  plain ZIP: anyone who can read one can extract its content file with the
+  tools they already have. What this setting governs is the convenient path.
 
   Author: David M. Anderson
   Built with AI assistance (Claude, Anthropic)
@@ -21,7 +21,7 @@
                            revision="1.0" schemaVersion="1.0"
                            xmlns="http://schemas.microsoft.com/GroupPolicy/2006/07/PolicyDefinitions">
   <displayName>Slipcase Open</displayName>
-  <description>Settings for Slipcase Open, which opens the payload of a Slipcase container in whatever application handles that kind of file.</description>
+  <description>Settings for Slipcase Open, which opens the content file of a Slipcase container in whatever application handles that kind of file.</description>
 
   <resources>
     <stringTable>
@@ -33,12 +33,12 @@
       <string id="Cat_Open">Slipcase Open</string>
       <string id="Cat_Open_Help">Settings for Slipcase Open.
 
-Slipcase Open extracts the payload of a .slpc container, hands it to whichever application is registered for that kind of file, and writes edits back into the container when the file is saved.
+Slipcase Open extracts the content file of a .slpc container, hands it to whichever application is registered for that kind of file, and writes edits back into the container when the file is saved.
 
 Settings applied here take precedence over anything a user sets. Machine settings take precedence over user settings.</string>
 
-      <string id="AllowedExtensions">Payload types that may be opened</string>
-      <string id="AllowedExtensions_Help">Controls which payload file types Slipcase Open will hand to another application.
+      <string id="AllowedExtensions">Content file types that may be opened</string>
+      <string id="AllowedExtensions_Help">Controls which content file types Slipcase Open will hand to another application.
 
 Enter one extension per line, without a leading dot and in lower case. For example:
 
@@ -48,12 +48,12 @@ Enter one extension per line, without a leading dot and in lower case. For examp
 
 Choose whether the list replaces the built-in set or is added to it. Replace is the safer reading and is the default: an administrator who writes a list expecting it to be exhaustive, and instead gets it combined with the built-in set, has permitted file types they never listed and will not find out.
 
-If you disable or do not configure this policy, the application's built-in set applies, which is ordinary document and image types. A payload whose type is not permitted is not opened, and the person is told why.
+If you disable or do not configure this policy, the application's built-in set applies, which is ordinary document and image types. A content file whose type is not permitted is not opened, and the person is told why.
 
-This is a guardrail against mistakes and social engineering on the convenient path, and it is not a security boundary. A container is an ordinary ZIP archive, so anybody who can read one can extract its payload with tools they already have. Application control — AppLocker, Windows Defender Application Control, or an equivalent — is the boundary.</string>
+This is a guardrail against mistakes and social engineering on the convenient path, and it is not a security boundary. A container is an ordinary ZIP archive, so anybody who can read one can extract its content file with tools they already have. Application control — AppLocker, Windows Defender Application Control, or an equivalent — is the boundary.</string>
 
-      <string id="DeniedExtensions">Payload types that may never be opened</string>
-      <string id="DeniedExtensions_Help">Lists payload file types Slipcase Open will refuse, whatever else permits them.
+      <string id="DeniedExtensions">Content file types that may never be opened</string>
+      <string id="DeniedExtensions_Help">Lists content file types Slipcase Open will refuse, whatever else permits them.
 
 Enter one extension per line, without a leading dot and in lower case.
 
@@ -61,7 +61,7 @@ A type listed here is refused even if the allow list above names it, and even if
 
 If you disable or do not configure this policy, nothing is denied outright and the allow list decides.
 
-Note that Slipcase Open already refuses, regardless of any setting here, a payload whose contents are an executable image or a script while its name claims otherwise, and a payload with no extension at all.</string>
+Note that Slipcase Open already refuses, regardless of any setting here, a content file whose contents are an executable image or a script while its name claims otherwise, and a content file with no extension at all.</string>
 
       <string id="UserMayExtend">Allow users to change these settings</string>
       <string id="UserMayExtend_Help">Controls whether a user's own settings are consulted.
