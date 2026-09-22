@@ -12,7 +12,7 @@
 # Nothing else reads this. The GitHub release, the Debian changelog and the
 # AppStream entry take commit subjects.
 
-version = "0.2.0"
+version = "0.2.1"
 
 [locales]
 [locales.de-de]
