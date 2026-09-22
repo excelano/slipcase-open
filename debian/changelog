@@ -1,3 +1,10 @@
+slipcase-open (0.2.0) unstable; urgency=low
+
+  * The two members 1.1 renames, carried through: payload becomes content file
+  * Say what a missing tap costs, not that the profile needs one
+
+ -- David M. Anderson <david.anderson@excelano.com>  Tue, 22 Sep 2026 09:20:51 -0500
+
 slipcase-open (0.1.8) unstable; urgency=low
 
   * The notes are 0.1.8's, and the profile says which tap

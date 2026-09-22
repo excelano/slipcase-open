@@ -5,40 +5,17 @@
 # The version is checked against the release being cut: notes left from last
 # time stop the release rather than reaching a listing. A language the listing
 # has and this file does not is also a refusal - a German listing saying
-# something nobody wrote is worse than a release that stops.
+# something nobody wrote is worse than a release that stops. So is a language
+# written longer than the store takes, which a store answers by refusing the
+# whole submission without saying which field was wrong.
 #
 # Nothing else reads this. The GitHub release, the Debian changelog and the
 # AppStream entry take commit subjects.
 
-version = "0.1.8"
+version = "0.2.0"
 
-[locales."de-de"]
-whats-new = """
-Der Containertyp ist registriert. Die IANA hat am 16. September 2026
-`application/vnd.excelano.slipcase+zip` vergeben, und Slipcase Open meldet
-diesen Namen bei der Installation bei Windows an. Der vorläufige Name davor
-gehörte in einen Bereich für geschlossene Umgebungen, und dort gehört ein
-Format nicht hin, das in einem Store erscheint.
-
-**An den Containern ändert sich nichts.** Der Typ stand noch nie in einem
-Container, deshalb ist eine `.slpc` aus einer früheren Version dieselbe Datei
-und öffnet sich wie bisher. Anders ist nur der Name, unter dem Windows sie
-führt. Die Installation ersetzt die alte Anmeldung, statt sie neben der neuen
-stehen zu lassen: Windows kennt keinen Weg, einen Namen als Alias eines
-anderen zu hinterlegen.
-"""
-
-[locales."en-us"]
-whats-new = """
-The container type is registered. IANA assigned
-`application/vnd.excelano.slipcase+zip` on 16 September 2026, and Slipcase Open
-declares that name to Windows when it installs. The provisional name it
-replaces belonged to a tree meant for closed settings, which is not where a
-format that ships in a store belongs.
-
-**Nothing about a container changes.** The type has never been written inside
-one, so a `.slpc` made by any earlier version is the same file and opens the
-same way. What differs is the name Windows files it under. Installing replaces
-the old registration rather than leaving it beside the new one: Windows has no
-way to record one name as an alias of another.
-"""
+[locales]
+[locales.de-de]
+whats-new = "Der Containertyp ist registriert. Die IANA hat am 16. September 2026\n`application/vnd.excelano.slipcase+zip` vergeben, und Slipcase Open meldet\ndiesen Namen bei der Installation bei Windows an. Der vorläufige Name davor\ngehörte in einen Bereich für geschlossene Umgebungen, und dort gehört ein\nFormat nicht hin, das in einem Store erscheint.\n\n**An den Containern ändert sich nichts.** Der Typ stand noch nie in einem\nContainer, deshalb ist eine `.slpc` aus einer früheren Version dieselbe Datei\nund öffnet sich wie bisher. Anders ist nur der Name, unter dem Windows sie\nführt. Die Installation ersetzt die alte Anmeldung, statt sie neben der neuen\nstehen zu lassen: Windows kennt keinen Weg, einen Namen als Alias eines\nanderen zu hinterlegen."
+[locales.en-us]
+whats-new = "The container type is registered. IANA assigned\n`application/vnd.excelano.slipcase+zip` on 16 September 2026, and Slipcase Open\ndeclares that name to Windows when it installs. The provisional name it\nreplaces belonged to a tree meant for closed settings, which is not where a\nformat that ships in a store belongs.\n\n**Nothing about a container changes.** The type has never been written inside\none, so a `.slpc` made by any earlier version is the same file and opens the\nsame way. What differs is the name Windows files it under. Installing replaces\nthe old registration rather than leaving it beside the new one: Windows has no\nway to record one name as an alias of another."
