@@ -57,7 +57,9 @@ name: Windows
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
   # The release event is what attaches the package. A person's token creates
   # the release, so the event fires.
   release:

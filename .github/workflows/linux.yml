@@ -32,7 +32,9 @@ name: Linux
 
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
   # What attaches the package. A person's token creates the release, so the
   # event fires; a release created by a workflow using the default
   # GITHUB_TOKEN fires nothing, which is what the dispatch below is for. A
