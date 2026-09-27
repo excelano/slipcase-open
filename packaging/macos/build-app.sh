@@ -42,9 +42,11 @@ usage: build-app.sh [--binary PATH] [--outdir DIR] [--universal] [--sign ID]
                    done
                    ./packaging/macos/build-app.sh --universal
   --sign ID      sign both executables and the bundle with this identity, with
-                 the hardened runtime notarization requires. `security
-                 find-identity -v -p codesigning` lists what this machine
-                 holds; a release is signed with "Developer ID Application".
+                 the hardened runtime notarization requires. Optional: with
+                 --notarize and no --sign, the machine's one "Developer ID
+                 Application" certificate is found and used, and this is the
+                 override for a machine holding more than one. `security
+                 find-identity -v` lists what this machine holds.
   --notarize KEY_ID ISSUER
                  submit the signed bundle to Apple's notary service with the
                  App Store Connect API key at
@@ -52,8 +54,8 @@ usage: build-app.sh [--binary PATH] [--outdir DIR] [--universal] [--sign ID]
                  the verdict, staple it, and write the zip a cask downloads:
                  slipcase-open-VERSION-macos.zip, holding the bundle and the
                  manual page. ISSUER is the Issuer ID from App Store Connect,
-                 Users and Access, Integrations. Implies --universal and
-                 needs --sign.
+                 Users and Access, Integrations. Implies --universal, and
+                 signs with --sign or with the certificate it finds.
 USAGE
 }
 
@@ -78,14 +80,43 @@ cleanup() { [ -z "$stage" ] || rm -rf "$stage"; }
 trap cleanup EXIT INT TERM
 stage=$(mktemp -d)
 
+# The Developer ID Application certificate this machine holds, found rather
+# than named, so that a certificate on the Mac is not also a string written
+# down on whatever machine starts the release.
+#
+# **`security` lists an identity once per keychain on the search list**, so one
+# certificate comes back several times: measured on 2026-09-18, four lines for
+# a single certificate, SHA-1 288C97D6. Pairing the SHA-1 with the name and
+# collapsing with `sort -u` leaves one line per certificate, and what survives
+# that is a genuinely different certificate. Two of those is a question this
+# script must not answer by guessing, so it refuses and names them.
+#
+# **No team filter, which is where this differs from `slipcase-desktop`'s.**
+# That one narrows to the team its provisioning profile names; a Developer ID
+# build has no profile to read a team out of. The count is what makes the
+# answer safe here instead.
+find_identity() {
+    matches=$(security find-identity -v 2>/dev/null |
+        grep "Developer ID Application" |
+        sed 's/^ *[0-9]*) *\([0-9A-Fa-f]*\) *"\(.*\)"$/\1 \2/' |
+        sort -u)
+    count=$(printf '%s' "$matches" | grep -c . || true)
+    [ "$count" = 1 ] || {
+        echo "build-app.sh: expected one \"Developer ID Application\" certificate, found ${count}" >&2
+        [ "$count" = 0 ] || echo "$matches" | sed 's/^/  /' >&2
+        echo "  name the one to sign with: --sign ID" >&2
+        return 1
+    }
+    printf '%s' "$matches" | sed 's/^[0-9A-Fa-f]* //'
+}
+
 # Everything --notarize needs is checked before anything is built, because a
-# submission is a queue and finding out afterwards costs a wait.
+# submission is a queue and finding out afterwards costs a wait. The identity
+# is resolved here for the same reason: an unsigned bundle is refused by the
+# notary, and finding that out after the build is a wait for nothing.
 key=""
 if [ -n "$key_id" ]; then
-    [ -n "$identity" ] || {
-        echo "build-app.sh: --notarize needs --sign; an unsigned bundle is refused" >&2
-        exit 2
-    }
+    [ -n "$identity" ] || identity=$(find_identity) || exit 1
     universal=yes
     key="${HOME}/.appstoreconnect/private_keys/AuthKey_${key_id}.p8"
     [ -f "$key" ] || {
