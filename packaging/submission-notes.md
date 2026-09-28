@@ -1,13 +1,14 @@
 # Submission notes
 
-What a store submission needs from a person and no file supplies: the notes an
-App Review or certification reader is handed, the answers a form asks that no
-build can give, and the reasoning behind the screenshots.
+What a store submission needs from a person and no file supplies: the answers
+a form asks that no build can give, and the reasoning behind the screenshots.
 
 The listing text itself is not here. It is `store-listing.toml` beside this,
 which `ship` checks before the tag and pushes to both stores on every release,
 and what a release tells them changed is `release-notes.toml`. A field edited
-in this file would reach nobody.
+in this file would reach nobody. Microsoft's Notes for certification are there
+too, as `microsoft-review-notes`, which `ship` pushes to `NotesForCertification`
+on every submission.
 
 ## Claims in the description, and where each was established
 
@@ -124,8 +125,9 @@ they cannot be of the exact artefact uploaded, because a rebuild differs.
 
 **The reviewer has nothing to open otherwise.** Slipcase Open without a container
 does nothing visible but put up an icon, and the notes field takes no attachment,
-which is why the sample container is served from the website. Its URL goes in
-*Notes for certification* with an instruction to download it and double-click it.
+which is why the sample container is served from the website and its URL is in
+`microsoft-review-notes`, in `store-listing.toml`, with an instruction to
+download it and double-click it.
 
 **It is the sibling's container, and deliberately not a second one.** It is built
 by `slipcase-desktop/packaging/demo-container.sh`, whose stated reason for

@@ -14,7 +14,8 @@
 # bytes: apple.name and apple.subtitle 30, apple.promotional-text 170,
 # apple.keywords 100 including the commas, description 4,000 - the Microsoft
 # Store allows 10,000 and this is written to Apple's - microsoft.short-description
-# 500, microsoft.features 20 of 200, microsoft.keywords 7 of 30.
+# 500, microsoft.features 20 of 200, microsoft.keywords 7 of 30, microsoft-review-notes
+# 4,000.
 #
 # What is *not* here is what changed in this release. That is
 # release-notes.toml, which is rewritten every time; this changes when the
@@ -33,6 +34,14 @@
 # German runs longer than English, which is what the limits above are for:
 # `ship` counts every field before the tag, in characters rather than bytes,
 # and a release stops rather than a submission failing.
+
+microsoft-review-notes = """
+Slipcase Open has no window. It reads a Slipcase container, hands its payload to whatever application is registered for that kind of file, and writes a working copy back if the payload changes.
+
+A container to test with is at https://excelano.com/slipcase/quarterly-report.pdf.slpc — download it, then double-click it. The payload (a one-page PDF) opens in its registered reader; the tray icon confirms the application ran, and turns to a refusal only if the file inside the container turns out to be a program rather than a document. The container is the sibling application's own demonstration file, built by slipcase-desktop/packaging/demo-container.sh; its subject is invented and names no real person or organisation.
+
+No account, no sign-in, and no network connection of any kind are needed. runFullTrust is the only capability: it reads the container it is launched with, writes a working copy inside its own per-user application data, and asks the shell to open that copy with the application already registered for the file type. It requires no broad filesystem access and uses no device.
+"""
 
 [locales."de-de"]
 description = """
