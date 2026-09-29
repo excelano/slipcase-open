@@ -1,3 +1,15 @@
+slipcase-open (0.2.2) unstable; urgency=low
+
+  * Release notes for 0.2.2
+  * Retire the release workflows
+  * Move Microsoft's Notes for certification into the field ship pushes
+  * The Windows lane calls the fleet's reusable workflow
+  * A pull request runs the matrix once, not twice
+  * privacy-entry: state the live platforms, not "to follow"
+  * Find the signing identity rather than being told it
+
+ -- David M. Anderson <david.anderson@excelano.com>  Tue, 29 Sep 2026 11:37:51 -0500
+
 slipcase-open (0.2.1) unstable; urgency=low
 
   * Correct release-notes.toml: 0.2.0 shipped with 0.1.8's text
