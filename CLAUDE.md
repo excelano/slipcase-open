@@ -23,7 +23,7 @@ reassuring is not.
 through the platform's notifier, and event timing moves with load. A watcher test that
 passed on its first run has not been tested.
 
-Releases: run `ship slipcase/slipcase-open`. There is no release document.
+Releases: the apps in excelano/shipping, run from this directory. There is no release document.
 
 ## Rules
 
