@@ -276,7 +276,19 @@ if ($versionAppx -notmatch '^\d+\.\d+\.\d+\.0$') {
 Step "version $version -> $versionAppx"
 
 # --- the binary ------------------------------------------------------------
-$binary = Join-Path $root "target\$Configuration\slipcase-open.exe"
+# Cargo is asked where its target directory is rather than guessed at, because
+# `[build] target-dir` in a Cargo configuration file moves it and no
+# environment variable then says so. Every packaging script here asks.
+$targetDir = $null
+if (Get-Command cargo -ErrorAction SilentlyContinue) {
+    Push-Location $root
+    try {
+        $meta = cargo metadata --format-version 1 --no-deps 2>$null | ConvertFrom-Json
+        if ($meta) { $targetDir = $meta.target_directory }
+    } finally { Pop-Location }
+}
+if (-not $targetDir) { $targetDir = Join-Path $root 'target' }
+$binary = Join-Path $targetDir "$Configuration\slipcase-open.exe"
 if ($NoBuild) {
     Step "not building; packaging whatever is at target\$Configuration"
 } else {
