@@ -18,3 +18,4 @@ pick-up-here.txt
 # PDB GUID, which is why that script makes the upload and the local copy from
 # one staging tree rather than from two builds.
 /dist/
+ship.toml
