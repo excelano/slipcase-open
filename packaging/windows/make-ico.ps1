@@ -25,6 +25,10 @@
     Run it when the artwork changes. The output is checked in, because a build
     step that needs System.Drawing is not one the Linux and macOS builds should
     ever have to satisfy.
+
+.NOTES
+    Author: David M. Anderson
+    Built with AI assistance (Claude, Anthropic)
 #>
 
 [CmdletBinding()]

@@ -66,6 +66,10 @@
     this compared the staged file against the installed one, which is two copies
     of the same stale binary agreeing with each other. Building here is what
     makes the package a statement about the source.
+
+.NOTES
+    Author: David M. Anderson
+    Built with AI assistance (Claude, Anthropic)
 #>
 [CmdletBinding()]
 param(

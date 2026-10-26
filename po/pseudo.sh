@@ -22,6 +22,9 @@
 #
 # The catalogue is committed and is compiled into debug builds alone, so a
 # release carries nothing of it. `src/main.rs` is where that is spelled.
+#
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
