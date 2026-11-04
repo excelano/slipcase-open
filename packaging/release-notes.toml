@@ -12,10 +12,10 @@
 # Nothing else reads this. The GitHub release, the Debian changelog and the
 # AppStream entry take commit subjects.
 
-version = "0.2.2"
+version = "0.3.0"
 
 [locales]
 [locales.de-de]
-whats-new = "Wartungsversion: aktualisierte Abhängigkeiten. Keine Änderung an dem, was Slipcase Open tut."
+whats-new = "Sicherheitsversion: Die ZIP-Bibliothek, mit der Slipcase Open Container liest, ist auf 9.1 aktualisiert und schließt damit eine kritische und mehrere schwere Lücken beim Lesen von Archiven. Ein Eintrag, der sich beim Entpacken über seine angegebene Größe hinaus ausdehnt, wird jetzt als Fehler abgewiesen."
 [locales.en-us]
-whats-new = "Maintenance release: updated dependencies. Nothing about what Slipcase Open does has changed."
+whats-new = "Security release: the ZIP library Slipcase Open reads containers with moves to 9.1, closing a critical and several high-severity flaws in archive reading. A member that inflates past its recorded size is now refused as an error."

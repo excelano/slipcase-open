@@ -51,7 +51,7 @@ potext = "0.1"
 # path. `fs` is the atomic file placement write-back needs and `provenance` is
 # the mark carried onto the replacement; `fs` implies the second, and both are
 # named because this crate uses both directly.
-slpc = { version = "0.4.0", features = ["fs", "provenance"] }
+slpc = { version = "0.7", features = ["fs", "provenance"] }
 # The session record. Already in the tree under `slpc`, which parses the
 # flyleaf member with it, so this costs a line rather than a dependency — and
 # a content file's name may carry a quote or a backslash, which is where
@@ -188,7 +188,7 @@ testsupport = { git = "https://github.com/excelano/slpc-rust" }
 # One test builds a container the writer will not produce: a content file with
 # general purpose bit 0 set, which is what `check_content_readable` refuses.
 # Already in the tree under `slpc`.
-zip = { version = "8.6", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "9.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [lints.rust]
 # The engine reads containers and replaces files. Nothing here needs to reach

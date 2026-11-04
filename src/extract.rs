@@ -315,7 +315,7 @@ mod tests {
         let mut bytes = Vec::new();
         {
             let mut w = zip::ZipWriter::new(std::io::Cursor::new(&mut bytes));
-            let opts: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+            let opts = zip::write::SimpleFileOptions::default();
             w.start_file(slpc::FLYLEAF_MEMBER, opts).unwrap();
             std::io::Write::write_all(&mut w, doc.as_bytes()).unwrap();
             w.start_file("secret.pdf", opts).unwrap();
