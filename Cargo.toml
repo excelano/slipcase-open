@@ -188,7 +188,7 @@ testsupport = { git = "https://github.com/excelano/slpc-rust" }
 # One test builds a container the writer will not produce: a content file with
 # general purpose bit 0 set, which is what `check_content_readable` refuses.
 # Already in the tree under `slpc`.
-zip = { version = "8.6", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "9.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [lints.rust]
 # The engine reads containers and replaces files. Nothing here needs to reach
