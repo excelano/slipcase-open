@@ -1,3 +1,11 @@
+slipcase-open (0.3.0) unstable; urgency=low
+
+  * slpc 0.7 and zip 9.1: fixes GHSA-m665-v7pm-7grj (critical) and four high/medium advisories in archive reading
+  * Remove ship.conf; attribution headers in the packaging and po scripts
+  * Releases are the apps in excelano/shipping
+
+ -- David M. Anderson <david.anderson@excelano.com>  Wed, 04 Nov 2026 21:56:30 -0600
+
 slipcase-open (0.2.2) unstable; urgency=low
 
   * Release notes for 0.2.2
