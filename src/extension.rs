@@ -4,7 +4,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 5.1 puts policy on the extension rather than on a sniffed content
+//! DESIGN §5.1 puts policy on the extension rather than on a sniffed content
 //! type, because `ShellExecuteEx`, `open` and `xdg-open` all resolve a handler
 //! from the name and none of them reads the bytes. The extension is what
 //! decides what runs, so it is what policy has to be written against.
@@ -24,7 +24,7 @@ use std::path::Path;
 /// `archive.tar.gz` is `gz` and never `tar.gz`, and `.bashrc` is a hidden file
 /// with no extension rather than an extension of `bashrc`.
 ///
-/// `None` where there is nothing usable. Concept 5.1 refuses that case rather
+/// `None` where there is nothing usable. DESIGN §5.1 refuses that case rather
 /// than launching it, because a content file the platform has no registration
 /// for raises the Open With dialog, which offers the user every executable on
 /// the machine inside a flow they read as *open the document*.

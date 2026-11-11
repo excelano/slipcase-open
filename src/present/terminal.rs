@@ -3,7 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 9 keeps the command line always available, and this is what the
+//! DESIGN §9 keeps the command line always available, and this is what the
 //! instance narrates through when there is nothing better — no notification
 //! service, no session bus, or a build for a platform whose arm is not written
 //! yet.
@@ -27,7 +27,7 @@ pub struct Terminal;
 impl Channel for Terminal {
     fn report(&self, report: &Report) {
         let mut err = std::io::stderr().lock();
-        // Concept 9's weights have no terminal equivalent and none is invented:
+        // DESIGN §9's weights have no terminal equivalent and none is invented:
         // a bell or a colour would be this tool deciding it knows more about
         // somebody's terminal than their terminal does. The weight is carried
         // for the channels that can act on it.

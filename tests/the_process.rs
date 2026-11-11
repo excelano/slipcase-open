@@ -3,7 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! There is one thing only a process can be asked: whether it stays. Concept 8
+//! There is one thing only a process can be asked: whether it stays. DESIGN §8
 //! makes the instance live while an open session, a lingering one, or an
 //! unanswered question exists, and `main` is where that becomes *return now* or
 //! *serve the front door*. Every unit test in the crate can watch `is_idle`
@@ -16,7 +16,7 @@
 //!
 //! **Nothing here touches the machine it runs on.** The state directory, the
 //! front door and the configuration are all pointed at a temporary tree, the
-//! session bus is pointed at nothing — so concept 9's channel falls back to
+//! session bus is pointed at nothing — so DESIGN §9's channel falls back to
 //! the terminal and the suite does not put notifications on somebody's screen —
 //! and the launcher is a stub, so a content file it opens goes nowhere.
 
@@ -56,7 +56,7 @@ impl Alone {
     }
 
     /// Where this world's sessions land, which is the platform's own place
-    /// under the `HOME` above rather than one path for every Unix: concept 6.4
+    /// under the `HOME` above rather than one path for every Unix: DESIGN §6.4
     /// puts macOS under Application Support and not under the XDG state
     /// directory, and this suite had never run there when it said otherwise.
     fn sessions(&self) -> PathBuf {
@@ -119,7 +119,7 @@ impl Alone {
     /// What a process that died mid-session leaves behind: a session on disk,
     /// an edit that never reached the container, and nobody holding it.
     ///
-    /// Its container has not moved, so concept 6.3 as amended puts the edit
+    /// Its container has not moved, so DESIGN §6.3 puts the edit
     /// back rather than asking about it.
     fn a_crashed_session(&self, container: &Path, name: &str, edit: &[u8]) {
         let mut left = session::create(&self.sessions(), container, name).unwrap();
@@ -128,7 +128,7 @@ impl Alone {
     }
 
     /// The same, and then somebody else repacks the container behind its back,
-    /// which is the only shape that still raises concept 6.3's question.
+    /// which is the only shape that still raises DESIGN §6.3's question.
     fn a_diverged_session(&self, container: &Path, name: &str, edit: &[u8]) {
         self.a_crashed_session(container, name, edit);
         self.container(name, b"what somebody else put there in the meantime");
@@ -183,7 +183,7 @@ fn finished(child: &mut Child, within: Duration) -> bool {
 
 #[test]
 fn a_refusal_that_raised_a_question_stays_to_be_answered() {
-    // Concept 8: an open on a container with a session left behind refuses and
+    // DESIGN §8: an open on a container with a session left behind refuses and
     // asks what to do about the leftover. The refusal is not the end of the
     // invocation, because the question's buttons have nothing to reach if the
     // process goes — and it would go without withdrawing them.
@@ -249,7 +249,7 @@ fn asking_what_is_open_with_nobody_running_reads_the_state_directory() {
 
 #[test]
 fn an_edit_left_by_a_crash_goes_back_when_the_container_is_opened() {
-    // Concept 6.3 as amended, through the whole program rather than the engine:
+    // DESIGN §6.3, through the whole program rather than the engine:
     // the session below is what a crash leaves, and opening the container it
     // belongs to used to stop and ask. It now puts the edit back and carries
     // on, and the container on disk is the assertion.
@@ -267,7 +267,7 @@ fn an_edit_left_by_a_crash_goes_back_when_the_container_is_opened() {
         !said.contains("left behind"),
         "the person was asked about their own save: {said}"
     );
-    // It stays, because it opened something: concept 8 keeps the instance for
+    // It stays, because it opened something: DESIGN §8 keeps the instance for
     // the session it just started, and there is no terminal-driven exit here.
     assert!(!returned || said.contains("is open"), "{said}");
 
@@ -281,12 +281,11 @@ fn an_edit_left_by_a_crash_goes_back_when_the_container_is_opened() {
 }
 
 // Unix, because every path it names is one: `/etc/slipcase/open.toml`, the XDG
-// configuration file, and the socket under `$XDG_RUNTIME_DIR`. Concept 10 gives
-// Windows a registry subtree instead of the first two and concept 8 gives it a
+// configuration file, and the socket under `$XDG_RUNTIME_DIR`. DESIGN §10 gives
+// Windows a registry subtree instead of the first two and DESIGN §8 gives it a
 // named pipe instead of the third, so the counterpart is a different test rather
-// than this one widened. It arrives with the registry source in PLAN.md Phase 4;
-// until then `Files::for_this_platform` reads nothing there and this would be
-// asserting Linux's answers against Windows.
+// than this one widened: `Files::for_this_platform` reads nothing there and
+// this would be asserting Linux's answers against Windows.
 #[cfg(unix)]
 #[test]
 fn the_settings_verb_names_the_files_this_world_would_read() {
@@ -332,7 +331,7 @@ fn the_settings_verb_names_the_files_this_world_would_read() {
 }
 
 // Unix, for the reason above: the file it breaks on is the XDG one, and Windows
-// has no file layer to break until Phase 4 gives it one.
+// keeps its layers in the registry rather than in a file.
 #[cfg(unix)]
 #[test]
 fn a_settings_file_that_will_not_parse_is_named_before_it_is_refused() {
@@ -362,7 +361,7 @@ fn a_settings_file_that_will_not_parse_is_named_before_it_is_refused() {
 
 #[test]
 fn a_lone_path_is_an_open() {
-    // Concept 4's double-click. On Windows a packaged handler is launched with
+    // DESIGN §4's double-click. On Windows a packaged handler is launched with
     // the container path and nothing else, and a manifest has nowhere to put a
     // verb in front of it the way the desktop entry does, so the verb has to be
     // implied. What is asserted is the implication rather than the platform,

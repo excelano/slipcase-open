@@ -3,7 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 8. Launching a document returns at once, so something has to outlive
+//! DESIGN §8. Launching a document returns at once, so something has to outlive
 //! the launch to hold the watch, and a session list in the plural means a second
 //! invocation hands its container to the first rather than starting a rival with
 //! a list of its own.
@@ -38,19 +38,19 @@ pub const MAX_FRAME: usize = 64 * 1024;
 /// An invocation started from a desktop entry has no terminal, so the lines it
 /// is handed back go nowhere and the person who double-clicked learns nothing —
 /// including, on the paths that matter most, that the content file was refused
-/// or that it is an executable wearing a document's name (concept 5.1). An
+/// or that it is an executable wearing a document's name (DESIGN §5.1). An
 /// invocation from a shell has a terminal and will print them itself, and an
 /// instance that also announced them would say everything twice.
 ///
 /// Only the client knows which it is, so the client says. This decides where a
-/// message is shown and nothing else: concept 8 calls the front door a control
+/// message is shown and nothing else: DESIGN §8 calls the front door a control
 /// surface, and a field that moves text between two of this tool's own outputs
 /// is not one of its controls.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Voice {
     /// The client has somewhere to print, and will.
     Client,
-    /// The client has not, so the instance speaks through concept 9's channel.
+    /// The client has not, so the instance speaks through DESIGN §9's channel.
     Instance,
 }
 

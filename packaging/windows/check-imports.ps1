@@ -9,15 +9,12 @@
     two products' lists differ: that one is a GUI application and imports the
     window and rendering stack, this one opens a pipe and calls the shell.
 
-    Why it exists at all is borrowed evidence, and worth repeating because it is
-    the kind that is expensive to learn twice. Slipcase 0.1.1 failed Microsoft
-    Store certification on 2026-08-29 under policy 10.2.4.1: the package
-    installed on a tester's clean machine and would not start, because
-    `VCRUNTIME140.dll` ships in the Visual C++ Redistributable and not in
-    Windows. Nothing that project ran could have caught it, because every
-    machine it built on had Visual Studio and so had already hidden the fault.
-    The defect is invisible from inside the toolchain that causes it, so the
-    check has to be about the artefact rather than about whether it runs here.
+    Why it exists: a package whose binary imports `VCRUNTIME140.dll` installs
+    on a clean machine and will not start, because that DLL ships in the Visual
+    C++ Redistributable and not in Windows. A machine with Visual Studio has
+    the DLL and hides the fault. The defect is invisible from inside the
+    toolchain that causes it, so the check has to be about the artifact rather
+    than about whether it runs here.
 
     It parses the PE import table itself rather than shelling out to dumpbin,
     because dumpbin comes with Visual C++ and a check that needs the toolchain
@@ -120,7 +117,7 @@ if ($subsystem -eq 3) {
 }
 
 # Refused, and the measurement that settled it is worth stating because the
-# obvious reading of this product says the opposite. Concept 9 keeps the command
+# obvious reading of this product says the opposite. DESIGN §9 keeps the command
 # line as the floor beneath the notifications, so a console subsystem looks like
 # the honest choice for it. It is not, and the cost is behaviour rather than
 # appearance: a console subsystem binary always has a terminal, so `main`'s

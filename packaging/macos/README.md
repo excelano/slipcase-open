@@ -19,17 +19,16 @@ Build it, then register it:
 `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister`,
 and `build-app.sh` prints the full line. `lsregister -u` unregisters, which
 matters because `dist/` is ignored by git and a deleted bundle otherwise leaves
-a claim behind it. Concept 4's check is then a container and a shell:
+a claim behind it. DESIGN §4's check is then a container and a shell:
 
     open some.slpc
     "dist/Slipcase Open.app/Contents/MacOS/slipcase-open" sessions
 
 ## Not the Mac App Store, and why
 
-Concept 15 made the Store conditional on one question: whether a sandboxed
-editor can open a content file extracted inside another application's container.
-`slipcase-desktop` answered it on 2026-08-25 — the handover survives — and the
-same measurement showed what does not: `Destination::in_place` creates a
+A sandboxed editor can open a content file extracted inside another
+application's container — `slipcase-desktop` measured that the handover
+survives — and the same measurement showed what does not: `Destination::in_place` creates a
 sibling of the container and renames it over the original, and the grant a
 sandboxed process is given covers the file rather than its directory. The
 viewer paid for that with a platform-specific save path.
@@ -39,11 +38,11 @@ back later. Four things follow from the sandbox for it, the first measured by
 the viewer and the other three reasoned from the sandbox's documented shape
 rather than measured here:
 
-- `writeback.rs` forks per platform, against concept 12's one engine.
+- `writeback.rs` forks per platform, against DESIGN §12's one engine.
 - The grant Launch Services gives for an opened document dies with the
-  process, so recovery after a restart (concept 6.3) needs a security-scoped
+  process, so recovery after a restart (DESIGN §6.3) needs a security-scoped
   bookmark stored in every session record.
-- A path in `argv` carries no grant, so the command-line floor concept 9 rests
+- A path in `argv` carries no grant, so the command-line floor DESIGN §9 rests
   on cannot open a container at all.
 - `UNUserNotificationCenter` delivers an action to the bundle's own process,
   relaunching it if it has gone, which is never the process holding the
@@ -51,9 +50,9 @@ rather than measured here:
 
 So the bundle is signed with Developer ID, notarized, and installed by a cask
 or by hand, and the engine is untouched: `writeback.rs`, `recover.rs`, and the
-command line all do on macOS exactly what they do on Linux. What is given up
-is Finder's *Search App Store* for an unopenable `.slpc`, and the viewer on
-the Store already answers that search.
+command line all do on macOS what they do on Linux. What is given up
+is Finder's *Search App Store* for an unopenable `.slpc`, and that search is
+the viewer's to answer (DESIGN §15).
 
 ## Two executables in one bundle
 
@@ -70,9 +69,8 @@ platform and takes on no AppKit bindings.
 double-click to the running application if there is one, and the Rust process
 cannot receive it. With the launcher gone, every double-click starts a fresh
 one, which hands over through the front door in `endpoint.rs` the way a
-second `open` does on every platform. Measured 2026-09-07: two opens of one
-container, one instance, one session, and `pgrep` showing the launcher gone
-after each.
+second `open` does on every platform: two opens of one container give one
+instance, one session, and `pgrep` shows the launcher gone after each.
 
 `LSUIElement` is what keeps that moment invisible: no Dock bounce and no menu
 bar for the fraction of a second the launcher lives. Launched with nothing to
@@ -83,7 +81,7 @@ because there is no standing list on this platform for it to raise.
 under `Helpers`, so that the path a person symlinks or types is the obvious
 one. The cask's `binary` stanza links it into the Homebrew prefix.
 
-## What was measured, 2026-09-07
+## What to check by hand
 
 Against the assembled bundle, unsigned, registered from `dist/`, through
 `open`, which goes through Launch Services and produces the Apple Event Finder
@@ -99,20 +97,18 @@ does:
 - A container carrying `com.apple.quarantine` yields a content file carrying the
   same value, which is `slpc::provenance` doing on macOS what the concept
   table says.
-- A container in `~/Downloads` opens and writes back with no prompt, which is
-  the platform's per-folder consent not being asked for. Whether that holds
-  on a machine where nothing has been granted is not something this machine
-  can answer, and a person opening a container there for the first time may be
-  asked once.
+- A container in `~/Downloads` opens and writes back. On a machine where
+  per-folder consent was already granted there is no prompt; a person opening
+  a container there for the first time may be asked once.
 
-Not measured: a notarized bundle carrying `com.apple.quarantine` opened by a
-person, which is the Gatekeeper path a download takes and needs a download.
+A notarized bundle carrying `com.apple.quarantine` opened by a person is the
+Gatekeeper path a download takes, and checking it needs a download.
 
 ## Signing and notarization
 
     ./packaging/macos/build-app.sh --universal \
-        --sign "Developer ID Application: Excelano LLC (9K6W5PMFYP)" \
-        --notarize ZFK4K98Q7M ISSUER_ID
+        --sign "Developer ID Application: <Your Name> (<TEAMID>)" \
+        --notarize KEY_ID ISSUER_ID
 
 `--sign` signs both executables and then the bundle, with the hardened
 runtime and a timestamp, and reads the runtime flag back rather than trusting
@@ -132,7 +128,7 @@ printing the SHA-256 the cask needs.
 what is distributed outside the Store and is the only path that involves
 notarization; **Apple Development** signs a bundle that runs here and
 nowhere else; **Apple Distribution** is the Store's and is not used by this
-product. All three are on the machine this was built on.
+product.
 
 ## The cask
 
@@ -154,8 +150,8 @@ written back, so the cask says so rather than removing it quietly.
 
 ## Policy
 
-Concept 10 names configuration profiles for macOS and they are not built.
-For now macOS takes the file shape Linux has: a root-owned
+DESIGN §10 names configuration profiles for macOS and they are not built.
+macOS takes the file shape Linux has: a root-owned
 `/etc/slipcase/open.toml` for machine policy, and
 `$XDG_CONFIG_HOME/slipcase-open/policy.toml` — `~/.config` by default — for
 the person's own settings. Nothing installs either; an administrator writes
@@ -166,9 +162,7 @@ start from.
 
 ## Presentation
 
-There is no menu bar item and no notification here. Concept 9 keeps the
+There is no menu bar item and no notification here. DESIGN §9 keeps the
 command line as the floor beneath both and that floor is what ships: a
 double-clicked container opens, saves write back silently, and `sessions`
-and `recover` say what is open and what was left behind. `PLAN.md` Phase 5
-records what a first increment above the floor would be and why it was not
-taken before this shipped.
+and `recover` say what is open and what was left behind.

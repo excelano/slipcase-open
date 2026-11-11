@@ -1,5 +1,5 @@
 #!/bin/sh
-# Install the desktop integration concept 4 and 10 describe: the desktop entry
+# Install the desktop integration DESIGN §4 and 10 describe: the desktop entry
 # and the machine policy file. Optionally the binary alongside them.
 #
 # The media type is not here. `slipcase-common` declares it once for every
@@ -37,7 +37,7 @@ usage: install.sh [--prefix DIR] [--policy DIR] [--binary PATH] [--no-binary]
 With neither --binary nor --no-binary, a built executable is looked for under
 CARGO_TARGET_DIR and ./target, release before debug, and installed if found.
 
-The policy file is not installed unless asked for. Concept 10 makes it the
+The policy file is not installed unless asked for. DESIGN §10 makes it the
 highest layer on this platform, and a copy of it under ~/.local would be a
 control an administrator did not put there and cannot see.
 USAGE

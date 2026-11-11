@@ -3,12 +3,12 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 12 structures the differences as a trait with three implementations
+//! DESIGN §12 structures the differences as a trait with three implementations
 //! rather than treating cross-platform as a yes-or-no decision. This is the
-//! launch half of it; the policy sources and the presentation join it in
-//! PLAN.md Phases 3 and 4.
+//! launch half of it; the policy sources and the presentation are the other
+//! halves.
 //!
-//! **Launching does not wait, and cannot.** Concept 6 starts from the
+//! **Launching does not wait, and cannot.** DESIGN §6 starts from the
 //! observation that handing a document to the desktop frequently returns at
 //! once, because the file goes to an already-running instance of the target
 //! application and there is no child process to wait on. Roughly half of real
@@ -34,7 +34,7 @@ pub struct Host;
 
 /// `xdg-open`, which every desktop on this platform provides or is expected to.
 ///
-/// There is no trust-zone marking to apply here and concept 12 says so out
+/// There is no trust-zone marking to apply here and DESIGN §12 says so out
 /// loud: Linux keeps provenance as a note rather than as a gate, so
 /// `slpc::provenance` records where a content file came from and nothing
 /// consults it. That is the platform's shape rather than an omission in this
@@ -84,7 +84,7 @@ mod shell {
     //!
     //! ## `IAttachmentExecute` is not what reads the mark, and this was measured
     //!
-    //! Concept 12 names `IAttachmentExecute` for both the launch and the trust
+    //! DESIGN §12 names `IAttachmentExecute` for both the launch and the trust
     //! zone, and the stub this replaced repeated it. It is the wrong instrument
     //! for both halves of what this tool does, which a probe settled on
     //! 2026-09-01 by asking `CheckPolicy` about ten files — marked and unmarked,
@@ -132,13 +132,13 @@ mod shell {
     //! The dialogs this call may raise are modal and unbounded: the zone warning
     //! waits for an answer, and so does the *how do you want to open this*
     //! picker when nothing is registered. `resident::run` is what pumps the
-    //! watchers, and concept 8 makes those the reason the process exists, so it
+    //! watchers, and DESIGN §8 makes those the reason the process exists, so it
     //! is the one thread that may not wait on a person.
     //!
     //! What that costs is a failure after the handover going unreported, and the
     //! Unix arm already pays it: `spawn_detached` starts `xdg-open` and drops
     //! the result, so a missing handler is silent there too. The parity is
-    //! deliberate rather than convenient. Reporting it would need concept 9's
+    //! deliberate rather than convenient. Reporting it would need DESIGN §9's
     //! channel reachable from another thread, which it is not.
 
     use std::io;
@@ -164,7 +164,7 @@ mod shell {
     /// next may take it.
     ///
     /// **Which process is holding the right is not the one doing the launching,
-    /// and that is the whole of why this exists.** Concept 8 makes every
+    /// and that is the whole of why this exists.** DESIGN §8 makes every
     /// invocation a client of a resident instance, so a double-click starts a
     /// process that hands its request over and exits. The shell activated
     /// *that* process, so it is the one Windows will let change the foreground
@@ -180,7 +180,7 @@ mod shell {
     ///
     /// `ASFW_ANY` rather than naming the instance: the client would have to ask
     /// the pipe who is serving it, and the answer would still be wrong half the
-    /// time — concept 6 says a content file frequently goes to an application
+    /// time — DESIGN §6 says a content file frequently goes to an application
     /// that is already running, so the process which ends up in front is
     /// neither the client nor the instance.
     #[allow(unsafe_code)]
@@ -229,7 +229,7 @@ mod shell {
         // on, since this process was itself activated by that double-click.
         //
         // `ASFW_ANY` rather than a process id, because there is none to name:
-        // concept 6 says half of real applications hand the file to an instance
+        // DESIGN §6 says half of real applications hand the file to an instance
         // that is already running, so the process that ends up with the
         // foreground is frequently not the one this call starts.
         //
@@ -330,7 +330,7 @@ impl Launcher for Host {
 ///
 /// Waited on only far enough to reap it. These launchers exit immediately
 /// whether or not the document opened, so the exit status says the launcher ran
-/// and nothing about the application — which is the same reason concept 6 will
+/// and nothing about the application — which is the same reason DESIGN §6 will
 /// not take process exit as a save signal.
 #[cfg(unix)]
 fn spawn_detached(program: &str, content_path: &Path) -> io::Result<()> {

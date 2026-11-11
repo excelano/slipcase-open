@@ -6,7 +6,7 @@
 
   The bundle is the unit on macOS. A bare executable can be run, but it has no
   bundle identifier, Launch Services files it as a nameless process, and
-  nothing can be associated with it. Everything concept 4 wants on this
+  nothing can be associated with it. Everything DESIGN §4 wants on this
   platform — the double-click, the Open With entry, the icon a container is
   drawn with — comes from this file.
 
@@ -16,10 +16,10 @@
   type declared, and a machine with both has one declaration rather than two
   contending. `com.excelano.slipcase-open` names this application.
 
-  The role is Editor. Concept 6 writes edits back into the container, so this
+  The role is Editor. DESIGN §6 writes edits back into the container, so this
   application does modify the documents it opens, and Viewer would be a claim
   to the platform that is not true. LSHandlerRank is Owner for the same reason
-  the viewer's is: concept 4 has the two products claim the association on
+  the viewer's is: DESIGN §4 has the two products claim the association on
   equal footing and lets the platform's own default-application UI settle it.
 
   LSUIElement is what makes the launcher a moment rather than a program. The

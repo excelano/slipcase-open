@@ -43,8 +43,8 @@ somebody meant to keep.
 The first `open` becomes the resident instance; every later invocation hands its
 container to that one and exits. On a desktop with a notification service, the
 instance reports and asks through notifications carrying buttons. The command
-line above is always there underneath, and on macOS it is the whole of the
-interface for now: a save writes back silently, and `sessions` and `recover`
+line above is always there underneath, and on macOS it is the only
+interface: a save writes back silently, and `sessions` and `recover`
 are how to see what is open and what was left behind.
 
 ## Policy
@@ -112,7 +112,7 @@ the archive tool until `slipcase-common` and `install.sh` have run.
 **Windows**, as an MSIX package. `packaging/windows/README.md` has the build and
 the decisions behind it; the association, the *Open content file* verb on a
 container's context menu, and the command line all come from the package. There
-is no window: an icon by the clock takes its colour from whether your work is
+is no window: an icon by the clock takes its color from whether your work is
 where it should be, and its menu names the file.
 
 **macOS**, as a notarized application bundle through Homebrew:
@@ -125,7 +125,7 @@ line is on `PATH`. The zip the cask downloads is attached to each GitHub
 release and can be unpacked by hand instead. Not the Mac App Store, and
 `packaging/macos/README.md` says why: the sandbox would cost this tool its
 write-back path, its recovery, and its command line. There is no menu bar item
-and no notification on this platform yet.
+and no notification on this platform.
 
 ## Building
 
@@ -136,6 +136,6 @@ The suite runs five times, because it watches real directories through the
 platform's notifier and event timing moves with load. A watcher test that passed
 on its first run has not been tested.
 
-## Licence
+## License
 
-MIT. See `LICENSE`.
+MIT. See [LICENSE](LICENSE).

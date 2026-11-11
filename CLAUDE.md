@@ -4,11 +4,10 @@ A companion to the `slipcase` CLI and the `slipcase-desktop` viewer. Double-clic
 `.slpc`, the content file opens in whatever application normally handles it, and edits made
 there are written back into the container. No flyleaf UI, no preview, no container
 browsing. The engine is `src/lib.rs` and its modules, with no dependency on how the tool
-presents itself; `src/main.rs` is the command line over it, which concept §9 keeps as the
+presents itself; `src/main.rs` is the command line over it, which DESIGN §9 keeps as the
 floor beneath the notifications and the tray. Every security-relevant decision —
 validation, policy, the launch path, the write-back — lives in the engine, once, for all
-three platforms. `slipcase-open-concept.md` is the reasoning and `PLAN.md` the order of
-work.
+three platforms. `DESIGN.md` is the reasoning.
 
 ## Before you commit
 
@@ -39,8 +38,8 @@ if it does not fail, say what was measured and stop there. An unproven claim in 
 comment is worse than no comment, because the next reader cannot tell it apart from a
 proven one.
 
-**The catalogue is declared in the engine, not in `main`.** `resident` composes every
-report and every question and hands them to a `Channel` that only carries them, so concept
+**The catalog is declared in the engine, not in `main`.** `resident` composes every
+report and every question and hands them to a `Channel` that only carries them, so DESIGN
 §9's boundary holds for language too. What is translated is what the tool says about your
 files — a notification, a question, the button on one, a line of `sessions`, the clause
 `recover::State` renders. What is not is what it says about itself: `--help` is clap's, and
@@ -48,6 +47,6 @@ the `policy` report prints paths in a fixed-width table built to the width of En
 beside the documentation and pasted into bug reports. **`Choice::key` is never translated
 and `Choice::label` always is**: the key is what the notification service is handed and
 echoes back, and `from_key` matches on it, so a German key is a button whose press this
-build cannot recognise. `po/update-po.sh` is the only way the catalogues move, and
+build cannot recognize. `po/update-po.sh` is the only way the catalogs move, and
 `po/pseudo.sh` with `POTEXT_LANG=en-x-pseudo` is what finds a sentence that never went
 through `t`.

@@ -3,10 +3,10 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 6.4. **Not the system temporary directory**, which is the obvious
+//! DESIGN §6.4. **Not the system temporary directory**, which is the obvious
 //! place and the wrong one: a reboot, a `tmpfiles` cleaner or Storage Sense may
 //! delete anything there, and doing so would destroy an edit the user has made
-//! and the tool has not yet written back — silently, in the window concept 6.3
+//! and the tool has not yet written back — silently, in the window DESIGN §6.3
 //! exists to survive.
 //!
 //! So a session is a directory under the application's own per-user state
@@ -19,7 +19,7 @@
 //! content file goes inside the latter under its own name. Two reasons, and the
 //! first is a collision: SPEC 2.3 permits any plain filename, `session.toml`
 //! included, so a content file beside the record could overwrite it. The second
-//! is that concept 6.1 reads *anything else in the directory* as the target
+//! is that DESIGN §6.1 reads *anything else in the directory* as the target
 //! application's doing, and that inference is only sound if the tool put
 //! exactly one file there.
 
@@ -43,7 +43,7 @@ const ATTEMPTS: u32 = 1024;
 
 /// What a session remembers across a crash.
 ///
-/// Deliberately small. Concept 6.3 removed the *content file* digest this used
+/// Deliberately small. DESIGN §6.3 removed the *content file* digest this used
 /// to carry: the container records a CRC-32 for its content file already, so
 /// recovery compares against the container rather than against a second copy of
 /// the fact that can drift from it — and drift is likeliest at the moment this
@@ -60,7 +60,7 @@ const ATTEMPTS: u32 = 1024;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
     /// Where the container was when the session opened, resolved. It may have
-    /// moved or gone since, which concept 6.4 requires recovery to survive
+    /// moved or gone since, which DESIGN §6.4 requires recovery to survive
     /// rather than fail at the rename.
     pub container: PathBuf,
     /// The content file's name inside the container, which is also its name
@@ -69,12 +69,12 @@ pub struct Record {
     /// When the session opened, in seconds since the Unix epoch.
     ///
     /// A number rather than a formatted timestamp, because nothing in the tool
-    /// needs to render it: concept 6.3 shows a person the content file's own
+    /// needs to render it: DESIGN §6.3 shows a person the content file's own
     /// modification time, which comes from the filesystem. Storing it this way
     /// keeps a date-formatting dependency out of a crate that would otherwise
     /// have no use for one.
     pub started: u64,
-    /// How many write-backs this session has performed, which concept 6.2 shows
+    /// How many write-backs this session has performed, which DESIGN §6.2 shows
     /// beside the session.
     pub write_backs: u64,
     /// The container's content file CRC-32 at the last moment this session and
@@ -115,8 +115,8 @@ impl Session {
         &self.record
     }
 
-    /// The directory the content file sits in, and the one to watch. Concept
-    /// 6.1 reads anything else appearing here as the target application's work.
+    /// The directory the content file sits in, and the one to watch. DESIGN
+    /// §6.1 reads anything else appearing here as the target application's work.
     #[must_use]
     pub fn content_dir(&self) -> PathBuf {
         self.dir.join(CONTENT_DIR)
@@ -240,24 +240,23 @@ fn platform_base() -> Option<PathBuf> {
 /// redirects that variable, and the read view is *merged*, so the process also
 /// sees whatever is in the real location and cannot tell the two apart.
 ///
-/// **That merge is what produced the sessions surviving their own removal**,
-/// which `PLAN.md` carried as an open defect with three explanations measured
-/// and found wrong. A redirection layer can tombstone a *file* in the layer
-/// beneath it and cannot remove a *directory* there, so `remove_dir_all`
-/// unlinked the content file and failed on `content/` with
-/// `ERROR_SHARING_VIOLATION` — for ever, not transiently, and with no process
-/// holding anything. Measured the same day: the same executable, byte for
-/// byte, with the same package identity, removes the directory when it runs
-/// from a staging tree and never removes it when it runs from the package's
-/// install location; fifteen such directories survived twelve seconds of a
-/// packaged sweep retrying them, while any other process removed each one on
-/// the first ask.
+/// **That merge is what produced the sessions surviving their own removal**, a
+/// defect with three explanations measured and found wrong first. A redirection
+/// layer can tombstone a *file* in the layer beneath it and cannot remove a
+/// *directory* there, so `remove_dir_all` unlinked the content file and failed
+/// on `content/` with `ERROR_SHARING_VIOLATION` — for ever, not transiently,
+/// and with no process holding anything. Measured the same day: the same
+/// executable, byte for byte, with the same package identity, removes the
+/// directory when it runs from a staging tree and never removes it when it runs
+/// from the package's install location; fifteen such directories survived
+/// twelve seconds of a packaged sweep retrying them, while any other process
+/// removed each one on the first ask.
 ///
 /// So the answer is to stop asking for a path this process will not be given.
 /// `LocalCacheFolder` and not `LocalFolder`: both were measured to create and
 /// remove cleanly here, and the cache is the one Windows neither roams nor
 /// includes in a device backup, which is what a copy of somebody's content file
-/// should be — concept 17's backup-exposure question, settled on this platform
+/// should be — DESIGN §17's backup-exposure question, settled on this platform
 /// by where the directory is rather than by a warning about it.
 #[cfg(target_os = "windows")]
 fn platform_base() -> Option<PathBuf> {
@@ -576,7 +575,7 @@ mod tests {
     #[test]
     fn the_content_file_sits_below_the_record_rather_than_beside_it() {
         // SPEC 2.3 permits any plain filename, `session.toml` included, so a
-        // content file beside the record could overwrite it. And concept 6.1
+        // content file beside the record could overwrite it. And DESIGN §6.1
         // reads anything else in the content directory as the target
         // application's doing, which is only sound if the tool put one file
         // there.
@@ -614,7 +613,7 @@ mod tests {
 
     #[test]
     fn two_sessions_on_the_same_container_get_directories_of_their_own() {
-        // Whether that should be allowed is concept 8's question and the
+        // Whether that should be allowed is DESIGN §8's question and the
         // engine's answer. This is only that the naming does not collide.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");

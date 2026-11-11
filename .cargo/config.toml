@@ -1,13 +1,8 @@
-# The Visual C++ runtime is not part of Windows, and linking it dynamically is
-# how `slipcase-desktop` 0.1.1 failed Microsoft Store certification on
-# 2026-08-29: the package installed on a tester's clean machine and then refused
-# to start, because `VCRUNTIME140.dll` ships in the Visual C++ Redistributable
-# and Windows does not carry it. Every machine this project builds on has Visual
-# Studio, so every machine that could have caught it had already hidden it.
-#
-# This crate has not been through certification yet, so the borrowed lesson is
-# the whole of the evidence here — but the failure is other people's clean
-# machines rather than ours, which is the kind that is expensive to learn twice.
+# The Visual C++ runtime is not part of Windows. A binary linking it
+# dynamically installs on a clean machine and then refuses to start, because
+# `VCRUNTIME140.dll` ships in the Visual C++ Redistributable and Windows does
+# not carry it. Every machine this project builds on has Visual Studio, so none
+# of them shows the fault; it appears only on other people's clean machines.
 # `packaging/windows/check-imports.ps1` is the check that says whether it holds,
 # and the build script will not package a binary that fails it.
 #

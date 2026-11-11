@@ -1,7 +1,7 @@
 # Packaging
 
-Concept 4 registers the association, concept 10 puts machine policy under
-`/etc`, and concept 15 chooses a channel per platform. This directory is
+DESIGN §4 registers the association, DESIGN §10 puts machine policy under
+`/etc`, and DESIGN §15 chooses a channel per platform. This directory is
 those three for each of them: `linux` and `debian` below, `windows` for the
 MSIX and the Store, and `macos` for the bundle and the cask. The two
 platform directories carry their own README with the decisions behind them.
@@ -18,7 +18,7 @@ The desktop entry and the machine policy file. The media type is
     ./packaging/linux/install.sh --prefix /usr/local --policy /etc
     ./packaging/linux/uninstall.sh
 
-The policy file is not installed unless `--policy` asks for it. Concept 10 makes
+The policy file is not installed unless `--policy` asks for it. DESIGN §10 makes
 it the highest layer on this platform, and a copy under `~/.local` would be a
 control an administrator did not put there and cannot see.
 
@@ -34,29 +34,27 @@ against a real container.
 
 ### The desktop entry is displayed, and `NoDisplay` would break it
 
-Concept 4 asks that whichever of the two products is not the default stays one
+DESIGN §4 asks that whichever of the two products is not the default stays one
 click away rather than becoming unreachable. On Linux that mechanism is the Open
 With list, which is built from the applications registered against the media
 type — so this entry has to be in it.
 
-`NoDisplay=true` was the plan and is wrong. Measured on this machine: an entry
-carrying it answers `false` to `g_app_info_should_show()`, which is the predicate
+`NoDisplay=true` would hide it: an entry carrying it answers `false` to `g_app_info_should_show()`, which is the predicate
 GIO documents for whether an application belongs in a menu and which the app
-choosers filter on. An entry hidden from those lists is an entry concept 4
+choosers filter on. An entry hidden from those lists is an entry DESIGN §4
 cannot reach. The cost of leaving it displayed is that "Open content file" also
 appears in the applications grid, where launching it with no argument prints the
 usage and exits.
 
 ### The media type is not here
 
-`slipcase-common` declares `application/vnd.excelano.slipcase+zip`, which IANA
-registered on 2026-09-16, keeps the provisional `application/x.slipcase+zip` as
-an alias, and ships the icon a container is drawn with; both products depend on
-it. The alias is why nothing had to be reinstalled in step: a container types as
-the registered name and GIO unaliases when it looks for an application, so an
-entry naming only the old string went on opening one until this entry was
-changed. It needs a slipcase-common new enough to declare the registered name,
-which `install.sh` says when the machine has an older one. Two packages cannot
+`slipcase-common` declares `application/vnd.excelano.slipcase+zip`, the
+IANA-registered name, keeps the provisional `application/x.slipcase+zip` as an
+alias, and ships the icon a container is drawn with; both products depend on
+it. A container types as the registered name and GIO unaliases when it looks
+for an application, so an entry naming only the provisional string still opens
+one. This entry needs a slipcase-common new enough to declare the registered
+name, which `install.sh` says when the machine has an older one. Two packages cannot
 ship one path — dpkg refuses the second install — so the type and the icon
 belong to neither product and are declared once.
 
@@ -89,10 +87,9 @@ the file `update-mime-database` writes, rather than of the filenames in
 naming a type nothing has declared is an entry no file manager will offer, and
 the symptom looks like an association fight rather than a missing package.
 
-The desktop entry still falls back to the stock `document-open` icon, and the
-notification channel uses that name too. An application icon of its own is
-wanted here and is a different thing from the file-type icon above, which is why
-it did not come with it.
+The desktop entry uses the stock `document-open` icon, and the notification
+channel uses that name too. An application icon is a different thing from the
+file-type icon above, and this product has none of its own.
 
 ## macos
 
@@ -100,8 +97,8 @@ it did not come with it.
 
 The bundle, the launcher that receives the double-click, Developer ID signing,
 notarization, and the cask in `excelano/homebrew-tap`. `macos/README.md` has
-all of it, including why the channel is not the Mac App Store and what was
-measured by hand on 2026-09-07.
+all of it, including why the channel is not the Mac App Store and what to
+check by hand.
 
 ## debian
 
@@ -129,12 +126,12 @@ why both are in `Depends` as much as for anything they provide at run time.
 
 ## What the shipped policy file must not do
 
-`packaging/linux/open.toml` documents every key concept 10 defines and sets
+`packaging/linux/open.toml` documents every key DESIGN §10 defines and sets
 none of them, and that is a requirement rather than tidiness. It installs at
 `/etc/slipcase/open.toml`, the highest layer on this platform, so an
 uncommented line there is a policy nobody wrote being enforced on every machine
 that installs the package.
 `policy::files::the_policy_file_the_package_ships_says_nothing` is what holds it
-to that, and it found a defect the first time it ran — a layer that was present
-and empty counted as administered, so shipping the file would have told every
-install that its settings were managed when nothing had been.
+to that, and a layer that is present and empty does not count as administered,
+or shipping the file would tell every install that its settings were managed
+when nothing had been.

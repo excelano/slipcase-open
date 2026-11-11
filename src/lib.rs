@@ -4,13 +4,13 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 8 keeps this free of any dependency on how the tool presents
+//! DESIGN §8 keeps this free of any dependency on how the tool presents
 //! itself, so that the session model is one body of code on three platforms
 //! rather than three programs sharing a name, and so that every
 //! security-relevant decision — validation, policy, the launch path, the
 //! write-back — lives in one place and is testable without a desktop.
 //!
-//! `src/main.rs` is the command line over it, which concept 9 keeps as the
+//! `src/main.rs` is the command line over it, which DESIGN §9 keeps as the
 //! floor beneath the notifications and the tray.
 
 // The level `Cargo.toml` explains: `forbid` everywhere Windows is not.
@@ -20,7 +20,7 @@
 ///
 /// Declared in the engine and not in `main`, because the engine is what
 /// narrates: `resident` composes every report and every question and hands
-/// them to a `Channel` that only carries them. That is concept 9's boundary
+/// them to a `Channel` that only carries them. That is DESIGN §9's boundary
 /// holding for language as well — a second presenter would show these
 /// sentences without knowing they had been translated.
 ///

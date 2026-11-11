@@ -3,7 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 9. A notification carrying actions is the baseline and exists on all
+//! DESIGN §9. A notification carrying actions is the baseline and exists on all
 //! three platforms; the command line is the floor beneath it. This is the trait
 //! both sit behind, so the engine can narrate and ask without knowing which of
 //! the two is listening, and so the tray — an enhancement on the two platforms
@@ -14,9 +14,9 @@
 //! to it, so [`Channel::ask`] hands the question over and returns, and answers
 //! are collected on the loop's own turn by [`Channel::answers`]. Waiting on one
 //! would starve the watchers, which are the reason the process is resident
-//! (concept 8).
+//! (DESIGN §8).
 //!
-//! **This is the boundary concept 8 draws rather than a breach of it.** The
+//! **This is the boundary DESIGN §8 draws rather than a breach of it.** The
 //! engine holds the session model and calls the trait; the implementations sit
 //! beside it and are chosen by `main`. Nothing in `flow`, `writeback` or
 //! `recover` knows a notification exists.
@@ -52,7 +52,7 @@ pub struct Listed {
     /// the standing list is reassuring somebody about.
     pub live: bool,
     /// A decision only a person can make — a session left behind with an edit
-    /// in it. Concept 6.3's three choices are what it needs.
+    /// in it. DESIGN §6.3's three choices are what it needs.
     pub needs_a_person: bool,
     /// Saves written back so far, where the session is one that counts them.
     ///
@@ -133,9 +133,9 @@ pub enum Chosen {
 
 /// The standing list of what is open.
 ///
-/// Concept 12 gives this a tray icon on Windows, a menu bar item on macOS and
+/// DESIGN §12 gives this a tray icon on Windows, a menu bar item on macOS and
 /// the command line on Linux — which is why doing nothing is a complete
-/// implementation and [`Nowhere`] is one. Concept 9 says the tray joins later
+/// implementation and [`Nowhere`] is one. DESIGN §9 says the tray joins later
 /// without the engine noticing, and not noticing is what this trait is for: the
 /// loop hands it lines it was going to format anyway and asks what came back.
 pub trait Standing {
@@ -149,7 +149,7 @@ pub trait Standing {
     /// Whether this surface is itself a reason for the instance to stay.
     ///
     /// **A standing list stands until it is dismissed, and that supersedes
-    /// concept 8's exit rule wherever there is one.** The rule ends an instance
+    /// DESIGN §8's exit rule wherever there is one.** The rule ends an instance
     /// when no session, no lingering session and no unanswered question remain,
     /// which was right while the process had no face: there was nothing for it
     /// to be, so there was no reason for it to be. An icon changes that. It is
@@ -163,7 +163,7 @@ pub trait Standing {
     ///
     /// Where a terminal started this there is no icon, by [`crate::present`]'s
     /// own rule that the command line is the floor — so that invocation keeps
-    /// concept 8 exactly as written, and `open` at a prompt still returns.
+    /// DESIGN §8 exactly as written, and `open` at a prompt still returns.
     fn holding(&self) -> bool {
         false
     }
@@ -194,9 +194,9 @@ pub enum Weight {
     Routine,
     /// The answer to something the person just did — a button pressed, a verb
     /// run — or a standing fact about the machine they should know once, like
-    /// concept 10's *settings here are administered*.
+    /// DESIGN §10's *settings here are administered*.
     Ordinary,
-    /// Worth being interrupted for. Concept 5.1's content check earns this and
+    /// Worth being interrupted for. DESIGN §5.1's content check earns this and
     /// says why: it fires close to never, and when it fires it means the
     /// content file is an executable wearing a document's name.
     Interrupt,
@@ -251,7 +251,7 @@ impl Report {
 
 /// What can be done about a session, as a button.
 ///
-/// The set is concept 6.3's: write-back, discard, and reveal-the-folder. It is
+/// The set is DESIGN §6.3's: write-back, discard, and reveal-the-folder. It is
 /// deliberately small, because every member has to be expressible as a button
 /// on all three platforms and as a verb on the command line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -345,7 +345,7 @@ pub trait Channel {
     ///
     /// The case is a session that resolved itself while its question was still
     /// sitting in somebody's message list — a lingering editor's last save
-    /// landing (concept 8), or the same question answered at the command line.
+    /// landing (DESIGN §8), or the same question answered at the command line.
     /// A button that would act on a session that has gone is answerable and
     /// pointless, and the answer would have to be a refusal.
     fn withdraw(&self, about: &str);
@@ -367,7 +367,7 @@ pub trait Channel {
     /// message is the tool looking broken at the exact moment it worked.
     ///
     /// The default is [`report`](Self::report), which is right wherever the
-    /// channel has nothing louder. Concept 12 gives Windows a native message
+    /// channel has nothing louder. DESIGN §12 gives Windows a native message
     /// box and that is where this becomes a dialog.
     fn insist(&self, report: &Report) {
         self.report(report);
@@ -406,7 +406,7 @@ pub mod testing {
     use std::sync::Mutex;
 
     /// A channel that discards everything, for the tests of code that does not
-    /// speak. `flow` is all of it: concept 8 keeps the narration out of the
+    /// speak. `flow` is all of it: DESIGN §8 keeps the narration out of the
     /// engine, so a flow test that had to build a recorder would be asserting
     /// the absence of something by carrying it around.
     pub struct Silent;

@@ -1,4 +1,4 @@
-//! Concept 9's channel on Linux: `org.freedesktop.Notifications`.
+//! DESIGN §9's channel on Linux: `org.freedesktop.Notifications`.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
@@ -6,9 +6,9 @@
 //! A notification carrying actions is what the design needs, and this interface
 //! has carried an actions parameter for as long as it has existed. GNOME Shell
 //! renders them as buttons and keeps the notification in its message list,
-//! which is concept 6.2's *somewhere to look when they expect an edit to have
+//! which is DESIGN §6.2's *somewhere to look when they expect an edit to have
 //! landed* without a tray — and Linux has no dependable tray, which is the
-//! reason concept 9 inverted its own layering.
+//! reason DESIGN §9 inverted its own layering.
 //!
 //! **A D-Bus client rather than a shell out to `notify-send`.** That tool can
 //! pass an action and print back the key that was pressed, so the objection is
@@ -22,7 +22,7 @@
 //! that identifier and the key of the button. So the identifier is recorded
 //! against the session the question was about, one thread does nothing but
 //! read signals, and the resident loop collects what that thread has put down
-//! (concept 8, which will not have the loop waiting on anything but its own
+//! (DESIGN §8, which will not have the loop waiting on anything but its own
 //! tick).
 //!
 //! ## Where a service has no actions
@@ -79,7 +79,7 @@ impl Desktop {
     ///
     /// Where there is no session bus, or nothing implements the interface —
     /// both of which are ordinary rather than exceptional. A session over SSH
-    /// has neither, and the answer is concept 9's floor rather than a failure.
+    /// has neither, and the answer is DESIGN §9's floor rather than a failure.
     pub fn connect() -> Result<Self, zbus::Error> {
         let connection = Connection::session()?;
         let proxy = notifications(&connection)?;
@@ -184,8 +184,8 @@ impl Desktop {
             }),
         );
         // Never expiring for anything that has to be come back to, which is
-        // concept 9's *persists somewhere the user can return to*: a question,
-        // and a warning that concept 5.1 says earns an interrupt. Everything
+        // DESIGN §9's *persists somewhere the user can return to*: a question,
+        // and a warning that DESIGN §5.1 says earns an interrupt. Everything
         // else takes the service's own timeout, because a write-back notice
         // that had to be dismissed would make the ordinary case the noisy one.
         let timeout: i32 = if actions.is_empty() && weight != Weight::Interrupt {
@@ -357,7 +357,7 @@ mod tests {
         assert!(desktop.identifiers_for("test-0").is_empty());
     }
 
-    /// Concept 9 rests on a notification that persists somewhere the person can
+    /// DESIGN §9 rests on a notification that persists somewhere the person can
     /// return to: a recovery question is worth nothing if it goes while they
     /// are finishing a sentence. That is the desktop's behaviour rather than
     /// this code's, so it is put on a real one and looked at.
@@ -365,9 +365,9 @@ mod tests {
     /// **Measured on GNOME Shell 48.7: a notification does not outlive the
     /// process that sent it.** While the sender is alive the question is on
     /// screen and in the message list, with its buttons; once the sender's bus
-    /// connection goes, the shell removes it. So concept 9's *persists
+    /// connection goes, the shell removes it. So DESIGN §9's *persists
     /// somewhere the user can return to* holds only for as long as the instance
-    /// does, and concept 8's fallback is the record on disk rather than the
+    /// does, and DESIGN §8's fallback is the record on disk rather than the
     /// notification. Amended in both places.
     ///
     /// Holds for a minute so there is time to look, and leaves the question
@@ -392,7 +392,7 @@ mod tests {
         println!("notification {} sent. Holding for 60 seconds.", held[0]);
         // Alive on purpose. GNOME Shell watches the sending bus name, and what
         // this is asking is whether a notification outlives the process that
-        // sent it — which is what concept 9 assumes and concept 8's exit rule
+        // sent it — which is what DESIGN §9 assumes and DESIGN §8's exit rule
         // depends on.
         std::thread::sleep(std::time::Duration::from_secs(60));
         println!("exiting now; watch whether it goes with me");

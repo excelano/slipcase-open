@@ -1,8 +1,7 @@
 # Windows packaging
 
 What is here, how a package is built, and the things that were measured rather
-than assumed. `PLAN.md` Phase 4 is the history; this is what the next build
-needs to know.
+than assumed.
 
     AppxManifest.xml.in    the manifest, with the identity templated out
     build-msix.ps1         builds the binary, stages, packages, optionally signs
@@ -24,17 +23,15 @@ Two packages come out of one staging tree. The unsigned one is what goes to the
 Store, because the Store signs what it distributes; the throwaway-signed one is
 for installing here. **They are never built twice.** A rebuild of identical
 source produces a different file — the COFF timestamp, the debug directory
-timestamps and the PDB GUID — so the artefact uploaded has to be the one that
+timestamps and the PDB GUID — so the artifact uploaded has to be the one that
 was tested rather than a fresh build of the same commit.
 
-`build-msix.ps1` builds before it packages, and that is not a convenience. It
-did not, until 2026-09-03, and it shipped a package containing a binary eight
-hours stale whose executable-content-file refusal was simply absent. The check that
-was supposed to catch it compared the staged binary against the installed one,
-which is two copies of the same stale file agreeing with each other. **A claim
-that a package contains a change is traced to the source, not to another copy of
-the artefact**; the cheap decisive test is to grep the staged binary for a string
-only the new code has.
+`build-msix.ps1` builds before it packages, so a package cannot carry a stale
+binary. Comparing the staged binary against the installed one does not catch
+staleness, because two copies of the same stale file agree with each other. **A
+claim that a package contains a change is traced to the source, not to another
+copy of the artifact**; the cheap decisive test is to grep the staged binary for
+a string only the new code has.
 
 The certification kit is a third step and an elevated one:
 
@@ -42,25 +39,20 @@ The certification kit is a third step and an elevated one:
     powershell -File packaging\windows\build-msix.ps1 -SelfSign -Certify
 
 It refuses on anything the kit reports that is not already in `$KNOWN_FINDINGS`
-in that script. It started **empty** on purpose — a baseline written before the
-first run is a list of assumptions — and the first run, 2026-09-06, duly
-refused with two findings:
-
-| Finding | Verdict | What happened |
-| --- | --- | --- |
-| `Blocked executables` | FAIL | `ShellExecuteExW`, which is what this product does. Baselined, and traced to that call rather than accepted on sight. |
-| `DPIAwarenessValidation` | WARNING | No PE application manifest to read. **Fixed rather than baselined** — `build.rs` embeds one now. |
-
-Each finding earns its place in that list only after somebody traces it.
+in that script. A finding goes into that list only after somebody traces it,
+and a baseline written before a run is a list of assumptions. The one finding
+there is `Blocked executables`, which is `ShellExecuteExW`: the call this
+product exists to make. `DPIAwarenessValidation` is answered rather than
+baselined, by the PE application manifest `build.rs` embeds.
 
 The gate is deliberately a comparison against that list and not a count of
 things that are not PASS: the sibling has a finding that fails every run, so
 that gate would be red always, and a check whose red is the normal state
 announces nothing. `-ReadReport <path>` applies the gate to an existing report
-and does nothing else, which is how it was checked without an elevated run —
-against synthetic reports covering all-pass, an unexpected finding, a known one,
-a known one whose verdict changed, one that has gone away, a report with no
-overall verdict, and a report that is not there.
+and does nothing else, so the gate can be checked without an elevated run,
+against synthetic reports: all-pass, an unexpected finding, a known one, a known
+one whose verdict changed, one that has gone away, a report with no overall
+verdict, and a report that is not there.
 
 Installing the signed copy needs one administrator action, which the script
 prints and does not attempt: the throwaway certificate has to reach
@@ -71,36 +63,33 @@ importing there leaves deployment failing `0x800B0109`.
 
 ### MSIX redirects `%LOCALAPPDATA%`, and the process is not told
 
-**This is the most expensive thing in this directory.** A packaged process that
-asks for `%LOCALAPPDATA%` is given
+A packaged process that asks for `%LOCALAPPDATA%` is given
 `…\Packages\<family>\LocalCache\Local` instead, and the read view is *merged*, so
 it also sees whatever is in the real location and cannot tell the two apart. A
 redirection layer can tombstone a file belonging to the layer beneath it and
 cannot remove a directory there.
 
-That produced a defect hunted for two days as something else: session
-directories that survived their own removal, leaving an empty `content/` and a
-record, so the session list and the tray showed a corpse. It was permanent, not
-transient, and no process held anything — the same executable, byte for byte,
-with the same package identity, removes the directory when it runs from the
-staging tree and never removes it when it runs from the install location.
+Asking for the variable leaves session directories that survive their own
+removal, an empty `content/` and a record that the session list and the tray
+show as a session. The failure is permanent, not transient, and no process
+holds anything — the same executable, byte for byte, with the same package
+identity, removes the directory when it runs from the staging tree and never
+removes it when it runs from the install location.
 
 `session::platform_base` asks Windows where the package keeps its data rather
 than asking for a variable it will not be given. `LocalCacheFolder` rather than
 `LocalFolder`, because the cache is the store Windows neither roams nor puts in
 a device backup, which is what a copy of somebody's content file should be.
 
-**The lesson generalises past this defect.** The harness that failed to
-reproduce it for twenty rounds was driving the unpackaged binary. Anything
-measured about this product has to go through the shipped artefact, because the
-container is part of the product.
+**Anything measured about this product goes through the shipped artifact**,
+because the package is part of the product: a harness driving the unpackaged
+binary never reproduces this.
 
 ### `IAttachmentExecute` is not what reads Mark of the Web
 
-Measured 2026-09-01 by asking `CheckPolicy` about ten files, marked and
-unmarked, across five extensions, reading the raw `HRESULT` rather than the
-`Result` the bindings collapse it into: the marked and unmarked answers are
-identical in every case, and what moves them is `SetSource` and the extension.
+Asking `CheckPolicy` about marked and unmarked files across several extensions,
+and reading the raw `HRESULT` rather than the `Result` the bindings collapse it
+into, gives identical answers for marked and unmarked files, and what moves them is `SetSource` and the extension.
 That interface is for a client which has *received* an attachment and is
 deciding whether to save and run it, so the zone comes from the source it is
 told about rather than from the file.
@@ -118,8 +107,8 @@ set, a double-click raises *How do you want to open this file?* with **Keep usin
 this app: Slipcase** above and **Slipcase Open** below it, badged New. Windows
 keeps the incumbent and offers the newcomer; it does not switch.
 
-What survives from concept §4 is the consequence — each product registers a
-secondary verb, so the one which is not the default stays reachable. *Open
+DESIGN §4 follows from that: each product registers a secondary verb, so the
+one which is not the default stays reachable. *Open
 content file* is this product's, and without it a machine where the viewer won would
 have no route to this one from Explorer at all.
 
@@ -130,58 +119,46 @@ which is what the default activation passes too.
 
 ### The console subsystem cannot ship
 
-The binary was `WINDOWS_CUI`, so a packaged double-click raised a full-size
-console window titled with its path under `WindowsApps`, and it stayed for as
-long as the session did rather than flashing. It is the windows subsystem now,
-with the console attached back when a terminal started it — which is also what
+A `WINDOWS_CUI` binary, packaged and double-clicked, raises a full-size console
+window titled with its path under `WindowsApps`, and it stays for as long as the
+session does rather than flashing. The binary is the windows subsystem, with
+the console attached back when a terminal started it — which is also what
 keeps `slipcase-open open` at a prompt behaving like a command.
 
 ### The execution alias is not optional
 
 The binary under `WindowsApps` is ACL'd against being run directly, so without
 `windows.appExecutionAlias` every verb the command line offers would be
-unreachable from the installed product. Concept §9 keeps the command line a
+unreachable from the installed product. DESIGN §9 keeps the command line a
 shipped interface rather than a test harness, and this is what makes that true
 of the packaged build.
 
-While editing the manifest: **a double hyphen cannot appear in an XML comment**,
-which is what `makeappx` refused the file for first.
+**A double hyphen cannot appear in an XML comment**, and `makeappx` refuses a
+manifest that has one.
 
 ### A message box on a thread dies with its process
 
 The refusal is a `MessageBoxW` on a thread of its own, because the caller can be
 the resident loop and a modal loop there would stop every open session's watcher
 for as long as somebody left the box up. An invocation that refused and held
-nothing then returned immediately and took the thread down with it.
+nothing would return immediately and take the thread, and the box, down with
+it, so on a cold double-click — nothing of this tool running — the refusal
+would never appear. `Channel::stay_until_seen` closes that: the box still goes
+on a thread, and the process joins it on its way out. The front door is dropped
+first, so a refusal somebody leaves on screen does not hold a bound pipe that
+nothing is accepting on; opening an ordinary container while the box is up still
+works.
 
-Measured 2026-09-06 against the installed package, opening the same container
-through the same shell verb twice:
-
-| With | Result |
-| --- | --- |
-| nothing of this tool running | no box, no window, process gone inside 400 ms |
-| an instance already running | box on screen inside 400 ms, every time |
-
-Which is why it looked like the first double-click after a restart was the one
-that failed: it was the only one where the process that refused was also the one
-that would have had to stay. `Channel::stay_until_seen` is the fix — the box
-still goes on a thread, and the process now joins it on its way out. The front
-door is dropped first, so a refusal somebody leaves on screen does not hold a
-bound pipe that nothing is accepting on; checked by opening an ordinary
-container while the box was up.
-
-This is the same shape as the zone warning below, and it is worth saying why one
-of them is now measured and the other still is not: nothing automated can watch
-a modal dialog's *contents*, but whether a window belonging to this process
-exists at all is `MainWindowHandle`, and that is a fact a script can have.
+Nothing automated can watch a modal dialog's *contents*, which is why the zone
+warning below is a hand check, but whether a window belonging to this process
+exists at all is `MainWindowHandle`, and a script can have that.
 
 ### Two ways of asking "is the tray up", one of which lies
 
 The tray's window is an ordinary top-level window of class `slipcase-open-tray`,
 invisible (`WINDOW_STYLE(0)`, no parent). **`FindWindowW` returns 0 for it and
-`EnumWindows` finds it**, measured 2026-09-06 on the same running process in the
-same second. Several rounds of "no tray icon" here were that broken probe and
-not a finding. Enumerate and match on the owning process id — the same
+`EnumWindows` finds it**, on the same running process in the same second, so a
+`FindWindowW` probe reports "no tray icon" falsely. Enumerate and match on the owning process id — the same
 correction `screenshot.ps1` already carries for a different reason.
 
 Two further notes for anything scripted against the tray. An instance killed
@@ -198,14 +175,13 @@ Explorer looks like.
 `std::io::stderr().is_terminal()` is false for a **pipe**, so a shell that
 redirects — and this crate's own process tests, which spawn with `Stdio::piped`
 — answers no to a question meant to distinguish a shell from a double-click.
-Measured 2026-09-06 when the standing list began gating whether a process stays:
-a redirected refusal was given a tray icon and stayed for ever, hanging two
-integration tests.
+Since the standing list gates whether a process stays, a redirected refusal
+judged that way is given a tray icon and stays for ever.
 
 What separates them is whether the process was handed standard handles at all.
 Explorer gives a windows-subsystem process none, `attach_console` has already
 joined the parent's console where there was one, and a redirect still counts as
-a shell — which is the intent concept §9 states and `is_terminal` only
+a shell — which is the intent DESIGN §9 states and `is_terminal` only
 approximates. `Voice` keeps `is_terminal`, because *is somebody reading these
 lines* is a different question that a redirect really does change.
 
@@ -226,20 +202,20 @@ produces a policy that appears applied in the Group Policy editor and governs
 nothing, with no error anywhere.
 
 **The `Policies` subtree keeps standard users out under `HKCU` as well as
-`HKLM`**, which is measured: writing it from an ordinary account is refused. That
-is the property concept §10 relies on, and it means the two policy layers cannot
+`HKLM`**: writing it from an ordinary account is refused. That
+is the property DESIGN §10 relies on, and it means the two policy layers cannot
 be exercised without elevation — the user's own key is what the unelevated
 checks use, and every layer goes through the same reader.
 
-## Still to run by hand
+## Checks by hand
 
-Two things nothing automated can do, both needing a person at this desktop:
+Two things nothing automated can do, both needing a person at a Windows desktop:
 
-- **The zone warning.** A marked container's content file carries `ZoneId=3` onto the
-  extracted copy, and `ShellExecuteEx` is called with the check left on, but
-  that the warning is *displayed* has never been watched. Nothing automated can
-  watch a modal dialog, and the suite never reaches the launcher on any
-  platform.
+- **The zone warning.** A marked container's content file carries `ZoneId=3`
+  onto the extracted copy, and `ShellExecuteEx` is called with the check left
+  on, but whether the warning is *displayed* takes a person watching. Nothing
+  automated can watch a modal dialog, and the suite never reaches the launcher
+  on any platform.
 - **The ADMX in the Group Policy editor.** The pair is well formed and every
   reference in it resolves, which is checked; that `gpedit.msc` renders it and
   writes the values expected needs the files in `PolicyDefinitions`, which needs

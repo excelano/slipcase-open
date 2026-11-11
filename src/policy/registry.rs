@@ -1,9 +1,9 @@
-//! Concept 10's layers where Windows keeps them.
+//! DESIGN §10's layers where Windows keeps them.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! **The `Policies` subtree, and not the application's own key.** Concept 10
+//! **The `Policies` subtree, and not the application's own key.** DESIGN §10
 //! names `HKLM\SOFTWARE\Policies\Excelano\Slipcase` because that subtree is
 //! access-controlled against standard users and Group Policy removes what it
 //! wrote when a policy is unapplied — so a control an administrator withdraws
@@ -35,14 +35,14 @@
 //!
 //! **A value that cannot be understood is a refusal and not a shrug**, and
 //! `policy::Error::Malformed` names the key and the value rather than the key
-//! alone. This is the case concept 10 cares about most: a control an
+//! alone. This is the case DESIGN §10 cares about most: a control an
 //! administrator wrote, ignored quietly for as long as the typo survives.
 //! `notify = "loud"` is the shape of it, and it refuses.
 //!
 //! **A single string where a list belongs is understood rather than refused,
 //! and that is a decision rather than an oversight.** Measured: a `denied`
 //! written as `REG_SZ` reads back as a one-entry list, because the bindings
-//! convert it. Refusing would be defensible and is worse here. Concept 10 makes
+//! convert it. Refusing would be defensible and is worse here. DESIGN §10 makes
 //! an unreadable policy fail closed, so refusing a near-miss would stop the
 //! product opening anything at all until somebody found the wrong type — and
 //! the near-miss is not dangerous in either direction: a one-entry `denied`
@@ -65,7 +65,7 @@ const APPLICATION_KEY: &str = r"SOFTWARE\Excelano\Slipcase\Open";
 ///
 /// Written out because the macro is not exposed by the bindings, and named
 /// because the alternative — reading every failure to open as absence — is
-/// exactly the flattening concept 10 forbids: a `Policies` key an ACL refuses
+/// exactly the flattening DESIGN §10 forbids: a `Policies` key an ACL refuses
 /// would become a machine with no policy on it.
 const KEY_NOT_THERE: i32 = 0x8007_0002_u32.cast_signed();
 
@@ -87,7 +87,7 @@ impl Hive {
     }
 }
 
-/// Concept 10's layers, read from the registry.
+/// DESIGN §10's layers, read from the registry.
 #[derive(Debug, Default, Clone)]
 pub struct Registry {
     keys: BTreeMap<Origin, (Hive, &'static str)>,
@@ -100,7 +100,7 @@ impl Registry {
         Self::default()
     }
 
-    /// The layers this platform keeps in the registry, at the keys concept 10
+    /// The layers this platform keeps in the registry, at the keys DESIGN §10
     /// names.
     ///
     /// There is no machine-wide *configuration* layer and there is not meant to

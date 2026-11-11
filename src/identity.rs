@@ -3,7 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 8 keys the live session table on file identity rather than on a
+//! DESIGN §8 keys the live session table on file identity rather than on a
 //! path, and the reason is the case §7 already warns about: a container
 //! reachable under two hard links is two paths and one file. Canonicalising
 //! resolves symbolic links and does nothing about that, so a table keyed on the
@@ -85,13 +85,13 @@ fn numbers(_path: &Path, meta: &std::fs::Metadata) -> Option<(u64, u64)> {
 /// The volume serial number and the file index, through
 /// `GetFileInformationByHandle`.
 ///
-/// Concept 8 names that pair and this answered `None` until Phase 4, so Windows
-/// had no hard-link arm — which is the case the whole module exists for.
+/// DESIGN §8 names that pair; without it Windows would have no hard-link arm,
+/// which is the case this module exists for.
 /// `std::os::windows::fs::MetadataExt` exposes both and has kept them behind the
 /// unstable `windows_by_handle` feature since 2019, and this crate builds on
 /// stable, so the obvious implementation was never available.
 ///
-/// **`same-file` was the other route PLAN.md named, and it does not fit.** Its
+/// **`same-file` is the other route, and it does not fit.** Its
 /// `Handle` keys on exactly this pair and compares on it, but `key` and the
 /// `Key` type behind it are both private with no accessor, and a `Handle` holds
 /// the file open for as long as it lives. [`Identity`] is owned data held in the
@@ -193,11 +193,11 @@ mod tests {
 
     #[test]
     fn two_hard_links_are_one_container() {
-        // The case a canonicalised path cannot see, and the reason concept 8
+        // The case a canonicalised path cannot see, and the reason DESIGN §8
         // keys on identity. Both names resolve to themselves and differ, and
         // both are the same file.
         //
-        // Not `cfg(unix)` since Phase 4. This is the test the Windows arm was
+        // Not `cfg(unix)`. This is the test the Windows arm was
         // written for, and gating it there would have left the arm asserting
         // nothing on the platform it was added for.
         let tmp = tempfile::tempdir().unwrap();

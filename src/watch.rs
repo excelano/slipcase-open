@@ -3,7 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! **The watch is on the directory and never on the file**, which concept 6
+//! **The watch is on the directory and never on the file**, which DESIGN §6
 //! calls one of the three things that make write-back detection hard. A serious
 //! editor saves by writing a temporary sibling and renaming it over the target,
 //! so a watcher registered on the content file loses its handle on the first
@@ -12,7 +12,7 @@
 //!
 //! ## The sibling signal
 //!
-//! Concept 6.1: the content directory holds one file, put there by this tool,
+//! DESIGN §6.1: the content directory holds one file, put there by this tool,
 //! so anything else appearing in it was created by the target application — a
 //! lock file, an autosave, a backup, a save in progress. Nothing here needs to
 //! know which, or what any of them are called, which is why there is no table
@@ -158,7 +158,7 @@ impl Watch {
         let handler = move |event: notify::Result<notify::Event>| {
             let Ok(event) = event else {
                 // A dropped or errored event is not a reason to tear down the
-                // watch. Concept 6.2 exists because detection is unreliable,
+                // watch. DESIGN §6.2 exists because detection is unreliable,
                 // and the session close is the backstop for everything this
                 // misses.
                 return;
@@ -218,7 +218,7 @@ impl Watch {
 ///
 /// Asked of the directory rather than tracked from events, because events can
 /// be missed and the answer has to be right at the moment somebody is deciding
-/// whether to close a session (concept 6.2).
+/// whether to close a session (DESIGN §6.2).
 ///
 /// # Errors
 ///
@@ -246,8 +246,8 @@ pub fn siblings_present(dir: &Path, content_name: &str) -> std::io::Result<bool>
 /// then removes the directory wedged 9 runs in 20, one instance parked with
 /// zero CPU for over ten minutes; `Opened::close`, which removes first and
 /// drops after, wedged past a 300-second timeout with the same two stacks.
-/// `docs/windows-save-test-hang.md` has both, and the ordering alone was never
-/// the cure: the 9-in-20 case already dropped the watch first.
+/// The ordering alone was never the cure: the 9-in-20 case already dropped
+/// the watch first.
 ///
 /// So the watcher goes, and then this waits for the backend to say the watch
 /// has actually stopped, which is the guarantee the caller needs before

@@ -46,7 +46,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
 
     /// Launched with nothing to open: the bundle clicked in Applications, or
     /// Spotlight. There is no standing list on this platform for that to raise
-    /// — concept 9 keeps the command line as the floor here — so say where the
+    /// — DESIGN §9 keeps the command line as the floor here — so say where the
     /// floor is and go. A document launch delivers `open` before this fires
     /// and has already terminated by now, which is what `handed` records.
     func applicationDidFinishLaunching(_ note: Notification) {
@@ -67,7 +67,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
         child.executableURL = tool
         child.arguments = ["open", path]
         // The instance's own narration goes to its channel, and on this
-        // platform the channel is the error stream (concept 9's floor). Nobody
+        // platform the channel is the error stream (DESIGN §9's floor). Nobody
         // is reading this process's streams, and leaving them attached would
         // hold a pipe open to a launcher that has gone.
         child.standardInput = FileHandle.nullDevice

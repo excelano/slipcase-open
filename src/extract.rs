@@ -3,8 +3,8 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 5, steps 3 and 4: the content file is written into the session's own
-//! `content/` directory (concept 6.4) and then carries whatever the platform
+//! DESIGN §5, steps 3 and 4: the content file is written into the session's own
+//! `content/` directory (DESIGN §6.4) and then carries whatever the platform
 //! records about where the container came from.
 //!
 //! **A content file the mark could not be carried onto does not survive this
@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn the_content_file_is_the_only_thing_written_into_the_content_directory() {
-        // Concept 6.1 reads anything else appearing there as the target
+        // DESIGN §6.1 reads anything else appearing there as the target
         // application's work, and that inference is what the sibling signal
         // rests on. SPEC 3 says the same from the other side: nothing but the
         // content file is written when extracting.

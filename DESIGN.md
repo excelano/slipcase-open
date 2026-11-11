@@ -1,30 +1,28 @@
-# slipcase-open — concept
+# slipcase-open — design
 
-*Status: building. The design is settled and this document is it; `PLAN.md` has
-the order and what is done. Amendments found while building are marked in place
-rather than folded away, so the reason a paragraph changed stays with it. §17
-lists what was deliberately left to implementation.*
+The design of `slipcase-open`, section by section, with the reason for each
+decision. §17 lists what is left to implementation.
 
 ---
 
 ## 1. What it is
 
 A minimal companion to the Slipcase CLI and viewer: double-click a `.slpc`, the
-content file opens in whatever application normally handles it, and edits made there
-are written back into the container.
+content file opens in whatever application normally handles it, and edits made
+there are written back into the container.
 
 No flyleaf UI. No container browsing. No preview. The content file, its own
 application, and a write-back path.
 
 ## 2. Why it's separate from Slipcase (the viewer)
 
-`slipcase-desktop` is flyleaf-first and deliberately has no content file preview.
-Its audience is people who care about the flyleaf — one container at a time,
-or, if the inventory mode is ever built, a corpus at a time.
+`slipcase-desktop` is flyleaf-first and deliberately has no content file
+preview. Its audience is people who care about the flyleaf — one container at a
+time, or, if the inventory mode is ever built, a corpus at a time.
 
-There is a second audience with no interest in the flyleaf at all: someone who has
-been sent a `.slpc` and wants the document inside it. For them the viewer is a
-detour, and the honest alternative today is "extract with 7-Zip, open the file."
+There is a second audience with no interest in the flyleaf at all: someone who
+has been sent a `.slpc` and wants the document inside it. For them the viewer is
+a detour, and the alternative is "extract with 7-Zip, open the file."
 `slipcase-open` makes that path direct and, unlike 7-Zip, closes the loop by
 putting edits back.
 
@@ -43,34 +41,39 @@ command line where it does not (§9).
 ## 4. How it is invoked
 
 Double-click, the same as any other document. The tool registers as a handler
-for `.slpc` and `application/vnd.excelano.slipcase+zip` through the platform's ordinary
-mechanism: a ProgID on Windows, an exported UTI on macOS, a shared-mime-info
-type and a desktop entry on Linux.
+for `.slpc` and `application/vnd.excelano.slipcase+zip` through the platform's
+ordinary mechanism: a ProgID on Windows, an exported UTI on macOS, a
+shared-mime-info type and a desktop entry on Linux.
 
 `slipcase-desktop` claims the same association, so a machine with both installed
 has two products contending for it. That is rarer than it looks, because the
 audiences barely overlap. Someone who wants the flyleaf has no use for the
-content file path, and someone who was sent a document and wants to read it has no
-use for the viewer. The answer is to not engineer around it: last installed
-wins, which is what the platform does with every other duplicated association,
-and the user can change it once in the platform's own default-application UI.
+content file path, and someone who was sent a document and wants to read it has
+no use for the viewer. The answer is to not engineer around it: the platform
+settles a duplicated association the way it settles every other one, and the
+user can change it once in the platform's own default-application UI. On
+Windows, with both installed as packages and no `UserChoice` set, that means a
+picker: *Keep using this app: Slipcase* above and *Slipcase Open* below it,
+badged New. Windows keeps the incumbent and offers the newcomer rather than
+switching.
 
 Two things follow. Each product registers a secondary verb alongside the
-association it claims, "Open content file" here and "View flyleaf" in the viewer, so
-that whichever is not the default is one click away rather than unreachable.
+association it claims, "Open content file" here and "View flyleaf" in the
+viewer, so that whichever is not the default is one click away rather than
+unreachable.
 
 And neither product re-asserts the association at launch or asks to be made the
 default. Registering at install time and accepting the user's override is
-ordinary behaviour; a prompt on every start is how two tools sharing an
+ordinary behavior; a prompt on every start is how two tools sharing an
 extension turn into a support problem.
 
-**Amended while building it: on Linux there is no second thing to register.** A
-desktop entry naming the media type is already in the Open With list, so the one
-entry is both the association and the verb, and the work is to keep it visible
-rather than to add anything. `NoDisplay=true` is what would take it out —
-measured, an entry carrying it answers false to `g_app_info_should_show()`, the
-predicate GIO documents for menu display — and hiding it there would leave the
-non-default product unreachable, which is what this paragraph exists to prevent.
+**On Linux there is no second thing to register.** A desktop entry naming the
+media type is already in the Open With list, so the one entry is both the
+association and the verb, and the work is to keep it visible rather than to add
+anything. `NoDisplay=true` is what would take it out — an entry carrying it
+answers false to `g_app_info_should_show()`, the predicate GIO documents for
+menu display — and hiding it there would leave the non-default product
+unreachable, which is what this section exists to prevent.
 Windows and macOS keep the second registration, since a ProgID verb and a
 bundle's document role are separate declarations there.
 
@@ -97,17 +100,17 @@ container over.
 
 ### 5.1 Policy keys on the extension, and content sniffing is not a control
 
-The obvious design determines the content file's real type by content, checks that
-against policy, and refuses when content and name disagree. It is wrong, and the
-reason is worth writing down, because it looks like the careful option.
+The obvious design determines the content file's real type by content, checks
+that against policy, and refuses when content and name disagree. It is wrong,
+and the reason is worth writing down, because it looks like the careful option.
 
 **Launch dispatches on the extension.** `ShellExecuteEx`, `open` and `xdg-open`
 resolve the handler from the name, and none of them reads the bytes. The
-extension alone determines what runs. So a content file whose bytes are a PE image
-and whose name is `invoice.pdf` opens in a PDF reader, which fails on it. There
-is no path by which the sniffed type reaches the loader, and a policy check
-against the sniffed type is therefore a check on a value that has no bearing on
-what executes.
+extension alone determines what runs. So a content file whose bytes are a PE
+image and whose name is `invoice.pdf` opens in a PDF reader, which fails on it.
+There is no path by which the sniffed type reaches the loader, and a policy
+check against the sniffed type is therefore a check on a value that has no
+bearing on what executes.
 
 Sniffing is also imprecise where it would matter most. OOXML and ODF are ZIP
 archives, so a `.docx` and a bare `.zip` are the same bytes to a general
@@ -123,26 +126,27 @@ manager rules in, and it needs no shipped table mapping names to types — a rul
 rather than carrying its own map.
 
 **One narrow content check survives, and it is not a policy check.** The bytes
-are read far enough to see whether the content file is an executable image — MZ/PE,
-ELF, Mach-O — or a script with a shebang, under an extension that is none of
-those. Nothing else is reported: a `.docx` sniffing as a ZIP is noise and goes
-unmentioned.
+are read far enough to see whether the content file is an executable image —
+MZ/PE, ELF, Mach-O — or a script with a shebang, under an extension that is none
+of those. Nothing else is reported: a `.docx` sniffing as a ZIP is noise and
+goes unmentioned.
 
 That is a handful of magic bytes rather than a type table, it costs the first
-few bytes of the content file, and it fires close to never in ordinary use. Because
-it fires rarely and means something specific when it does, it earns an interrupt
-rather than a badge somewhere quiet. What it means is that the container's
-content file is an executable wearing a document's name, which is the shape of a
-phishing attachment, and a person shown that sentence will usually stop.
+few bytes of the content file, and it fires close to never in ordinary use.
+Because it fires rarely and means something specific when it does, it warrants
+an interrupt rather than a badge somewhere quiet. What it means is that the
+container's content file is an executable wearing a document's name, which is
+the shape of a phishing attachment, and a person shown that sentence will
+usually stop.
 
 **It refuses, and it is a veto rather than a control.** Everything above about
 why sniffing cannot be the control still holds: the allowlist decides what may
-be opened, this check admits nothing, and a content file that gets past it has been
-permitted by policy and not by inspection. All it can do is say *no* to
+be opened, this check admits nothing, and a content file that gets past it has
+been permitted by policy and not by inspection. All it can do is say *no* to
 something policy already allowed. That is a veto, and a veto needs none of the
 precision a control would — it is allowed to be narrow, and this one is.
 
-An earlier draft had it tell the person and stand aside, on the reasoning that
+Telling the person and standing aside is the alternative, on the reasoning that
 the extension governs what runs so a PDF reader handed a PE image fails on it
 harmlessly. That reasoning is sound about *execution* and beside the point about
 *the person*. What the check has found is a file somebody was sent, under a name
@@ -153,20 +157,19 @@ directions: it fires close to never, and when it is wrong the cost is one
 container that will not open and can be renamed.
 
 The refusal comes before the session is created, so the bytes never leave the
-container — no session directory, no content file on disk, no mark, and nothing for a
-later sweep to find. It is said in a way that cannot be missed, which is where
-§12's native dialog earns its place, and the standing list carries it afterwards
-in the one colour reserved for it.
+container — no session directory, no content file on disk, no mark, and nothing
+for a later sweep to find. It is said in a way that cannot be missed, which is
+what §12's native dialog is for, and the standing list carries it afterwards in
+the one color reserved for it.
 
-This makes §5.1's claim that the check fires close to never load-bearing rather
-than incidental. If it were noisy, refusing would be the wrong default, so it is
-worth confirming against a corpus before this ships widely.
+Refusing is the right default only because the check fires close to never. A
+noisy check would make it the wrong one.
 
-**One case does need a refusal, and it is not a mismatch.** A content file with no
-extension, or one the platform has no registration for, makes `ShellExecuteEx`
-present the Open With dialog, which hands the choice of executable to the user
-inside a flow they believe is "open the document." Require a known, allowlisted
-extension and refuse when there is not one.
+**One case does need a refusal, and it is not a mismatch.** A content file with
+no extension, or one the platform has no registration for, makes
+`ShellExecuteEx` present the Open With dialog, which hands the choice of
+executable to the user inside a flow they believe is "open the document."
+Require a known, allowlisted extension and refuse when there is not one.
 
 ### 5.2 What counts as the extension, and how it is compared
 
@@ -175,8 +178,8 @@ disagree about what a content file's extension is. It takes the extension with
 `Path::extension()`, which gives `gz` for `archive.tar.gz` and nothing at all
 for `.bashrc`, and it has tests pinning both. Use the same rule.
 
-**Comparison against policy folds ASCII case, and an extension that is not
-ASCII alphanumeric is not allowlistable.** A content file carrying one falls into the
+**Comparison against policy folds ASCII case, and an extension that is not ASCII
+alphanumeric is not allowlistable.** A content file carrying one falls into the
 refusal above for a content file with no usable extension.
 
 Folding has to match the way the platform resolves the handler, or policy and
@@ -222,8 +225,8 @@ happened.
 
 ### 6.1 One signal the directory watch gives for free
 
-The content file is extracted into a directory of its own, holding that one file.
-Everything else that subsequently appears there was created by the target
+The content file is extracted into a directory of its own, holding that one
+file. Everything else that subsequently appears there was created by the target
 application, by construction. A lock file, an autosave, a backup, a save-in-
 progress temporary: the tool does not need to know which, or what any of them
 are called.
@@ -231,7 +234,7 @@ are called.
 Siblings present means the application is working in there, which process exit
 does not tell you. Siblings gone means it has cleaned up and has probably
 finished. That is worth more than a table of `~$name.docx` and `.~lock.name#`
-conventions, it generalises to applications nobody thought to enumerate, and it
+conventions, it generalizes to applications nobody thought to enumerate, and it
 keeps this tool free of the shipped table `slipcase-desktop` DESIGN §3 refuses
 on the same grounds.
 
@@ -254,26 +257,26 @@ Because detection is unreliable, the tool should not pretend to be invisible.
 - A session surviving a crash is recoverable on next launch, because the
   content file and the session record are still on disk (§6.3).
 
-This is more honest than a silent watcher, gives a place to surface "the content file
-changed — write it back?" if confirmation is wanted, and gives the user
-somewhere to look when they expect an edit to have landed.
+This is truer to what the tool knows than a silent watcher, gives a place to
+surface "the content file changed — write it back?" if confirmation is wanted,
+and gives the user somewhere to look when they expect an edit to have landed.
 
 **Closing a session that saw no modification event offers a write-back rather
 than skipping one.** This is the only available answer to Save As. It costs one
 dialog on a path the user is already interacting with, and the alternative is a
 container that silently keeps the old content file after the user believes they
 edited it. Asking is not detection and should not be described as though it
-were: the prompt says the content file was not seen to change, and lets the user say
-otherwise.
+were: the prompt says the content file was not seen to change, and lets the user
+say otherwise.
 
-**Closing a session while the application still has the content file open does not
-delete the directory.** The close is honoured: the final repack runs as it
+**Closing a session while the application still has the content file open does
+not delete the directory.** The close is honored: the final repack runs as it
 would otherwise. But where siblings say the application is still working in
 there (§6.1), the directory is handed to the recovery mechanism rather than
-removed, and the next launch picks it up through §6.3 — which, as amended,
-writes it back where the container has not moved and asks where it has. The
-editor's next save then lands somewhere the tool will still look, at the cost of
-a session directory living until the next launch instead of until the close.
+removed, and the next launch picks it up through §6.3, which writes it back
+where the container has not moved and asks where it has. The editor's next save
+then lands somewhere the tool will still look, at the cost of a session
+directory living until the next launch instead of until the close.
 
 Warn at close and offer to proceed anyway, but do not make the warning the only
 protection. A user who chooses to go ahead should still not lose the save.
@@ -288,39 +291,37 @@ audience, off by default.
 A session that survives a crash is recoverable because the content file and the
 session record are still on disk. The ZIP central directory already stores a
 CRC-32 for the content member, so recovery computes the CRC of the extracted
-content file and compares. Equal means nothing was lost: clean up and say nothing.
+content file and compares. Equal means nothing was lost: clean up and say
+nothing.
 
 Different means an edit never landed, and what to do about it depends on
 something the comparison cannot see: which side moved. If the container is still
 holding what this session last agreed with it about, the difference is the
 person's own edit and nobody else's, and it is written back. If the container
 has changed too, both sides hold work the other does not and only the person can
-choose; that is the recovery item, naming the container, the content file and the
-content file's modification time, offering write-back, discard and
+choose; that is the recovery item, naming the container, the content file and
+the content file's modification time, offering write-back, discard and
 reveal-the-folder. Nothing happens until they choose, and the session directory
 survives until they do.
 
-**Amended while building it, 2026-09-03.** This section said recovery must never
-write back on its own: the tool was not watching when the process died, so it
-cannot tell a complete save from a half-written one, and putting a truncated
-save over the container is the worst outcome this tool can produce.
-
-That risk is real and is not gone. What was wrong was the comparison it was
-being weighed against. The alternative is not safety, it is a question — and a
-question that goes unanswered loses the same edit more quietly, which is what
-made §9's five-minute withdrawal a dead end. The person pressed Save. Being
+**Writing back unasked carries a real risk.** The tool was not watching when
+the process died, so it cannot tell a complete save from a half-written one, and
+putting a truncated save over the container is the worst outcome this tool can
+produce. The alternative is not safety, though, it is a question — and a
+question that goes unanswered loses the same edit more quietly, which is why
+§9's five-minute withdrawal cannot be the answer. The person pressed Save. Being
 asked afterwards to choose between *write back*, *discard* and *reveal the
 folder* is this tool's own failure handed back to them in vocabulary they never
-asked to learn, and it is the single most common way anyone meets this design.
+asked to learn, and it is the most common way anyone meets this design.
 
 Two things keep the risk small, and they are why the trade is worth making
 rather than merely convenient. Most applications save by writing a sibling and
-renaming over the content file — the behaviour §6.1 already relies on to know the
+renaming over the content file — the behavior §6.1 already relies on to know the
 application is working — so the file is the old bytes or the complete new ones
 and not a prefix of either. And what is written back is *reported*, not done
 silently: the report is not droppable by the notification setting, because
 somebody seeing an outcome that looks wrong while the container is still in
-front of them is the only defence left against the case this accepts.
+front of them is the only defense left against the case this accepts.
 
 The three outcomes — sweep it, write it back, ask — are decided by one
 exhaustive function over the recovery states rather than by two predicates. What
@@ -328,28 +329,27 @@ they choose between is deleting somebody's directory, writing into somebody's
 container and interrupting them, and a state added later must not fall into one
 of those by whichever way a negation happened to go.
 
-**Comparing against the container beats recording a digest of the content file.** A
-recorded value is a second copy of a fact and can drift from it, and the moment
-it gets consulted is after a crash, which is when a session record is least
-trustworthy. The container's own stored CRC needs nothing maintaining it:
+**Comparing against the container beats recording a digest of the content
+file.** A recorded value is a second copy of a fact and can drift from it, and
+the moment it gets consulted is after a crash, which is when a session record is
+least trustworthy. The container's own stored CRC needs nothing maintaining it:
 repacking recomputes it, so the comparison stays correct across every write-back
 in a session as a side effect of the write-backs themselves.
 
 **The one value the session does record is not that, and the difference
-matters.** *Has the content file changed* is answerable from the container, and is
-answered there. *Which side changed* is not answerable from either side, because
-both are only observable now and the question is about then; it needs a note of
-a past moment. So the session records what the container held at the two moments
-the two were made to agree — the extraction, and each write-back — and nothing
-else. There is nothing for it to drift from: if it is stale, the answer it gives,
-that the container is not where we left it, is the true one. A session that never
-recorded it, which is one written by an earlier build, is read as *not known to
-agree* and asks.
+matters.** *Has the content file changed* is answerable from the container, and
+is answered there. *Which side changed* is not answerable from either side,
+because both are only observable now and the question is about then; it needs a
+note of a past moment. So the session records what the container held at the two
+moments the two were made to agree — the extraction, and each write-back — and
+nothing else. There is nothing for it to drift from: if it is stale, the answer
+it gives, that the container is not where we left it, is the true one. A session
+that never recorded it, which is one written by an earlier build, is read as
+*not known to agree* and asks.
 
-`slpc` does not expose it today — `content_size()` and `content_mode()` are
-there and the CRC is not — and adding the accessor reads a field the container
-already carries, which is the format library's job and costs no dependency
-(§14). Computing the extracted content file's value needs `crc32fast`, already compiled
+`slpc` exposes it as `content_crc()`, which reads a field the container already
+carries; that is the format library's job and costs no dependency (§14).
+Computing the extracted content file's value needs `crc32fast`, already compiled
 as a transitive dependency of `zip`.
 
 **It is change detection and never fixity.** The question is whether the file
@@ -373,42 +373,45 @@ not yet written back, silently, in the window §6.3 exists to survive.
 
 A session lives under the application's own per-user state directory, at 0700:
 `%LOCALAPPDATA%` on Windows and deliberately not the roaming profile, since an
-extracted content file cannot follow a user between machines; `~/Library/Application
-Support` on macOS rather than `Caches`, which the system may purge at will;
-`$XDG_STATE_HOME` on Linux, which is defined for state that must survive a
-restart without being configuration or data, and not `XDG_RUNTIME_DIR`, which is
-cleared at logout.
+extracted content file cannot follow a user between machines, and the package's
+`LocalCacheFolder` when the process is packaged, because MSIX redirects
+`%LOCALAPPDATA%` without telling the process and a redirection layer cannot
+remove a directory beneath it; `~/Library/Application Support` on macOS rather
+than `Caches`, which the system may purge at will; `$XDG_STATE_HOME` on Linux,
+which is defined for state that must survive a restart without being
+configuration or data, and not `XDG_RUNTIME_DIR`, which is cleared at logout.
 
 One directory per session, holding a small TOML record naming the container's
-absolute path, the content file's name, the session start, and the write-back count.
-TOML because `toml_edit` is already in the tree under `slpc`, so the record costs
-no dependency. Recovery is then a scan of one tree rather than a record pointing
-at a directory that may not be there.
+absolute path, the content file's name, the session start, and the write-back
+count. TOML because `toml_edit` is already in the tree under `slpc`, so the
+record costs no dependency. Recovery is then a scan of one tree rather than a
+record pointing at a directory that may not be there.
 
-**The content file sits one level below the record, in a `content/` directory of its
-own, and it took writing this to see why.** SPEC §2.3 permits any plain
-filename, `session.toml` among them, so a content file beside the record could
-overwrite it — a container can be built to do that deliberately. And §6.1 reads
-anything else appearing in the content directory as the target application's
-work, which is a sound inference only where this tool put exactly one file
-there. The record sitting alongside would make the tool its own first false
-positive. One subdirectory answers both.
+**The content file sits one level below the record, in a `content/` directory of
+its own.** SPEC §2.3 permits any plain filename, `session.toml` among them, so a
+content file beside the record could overwrite it — a container can be built to
+do that deliberately. And §6.1 reads anything else appearing in the content
+directory as the target application's work, which is a sound inference only
+where this tool put exactly one file there. The record sitting alongside would
+make the tool its own first false positive. One subdirectory answers both.
 
 The record cannot settle one case and the code has to: the container moved or
 was deleted while the session ran. Recovery says so and offers to save the
 content file elsewhere rather than failing at the rename.
 
-**The cost of moving out of the temporary directory is that the content file is now
-somewhere backup and sync software looks.** A content file from a confidential
-container sits in the user's state directory for the life of the session, where
-`%LOCALAPPDATA%` and `~/Library/Application Support` are both routinely captured.
-That is the right trade against losing edits, and it is a trade rather than a
-free fix, so it belongs in the administrator documentation beside §11.
+**The cost of moving out of the temporary directory is that the content file is
+now somewhere backup and sync software looks.** A content file from a
+confidential container sits in the user's state directory for the life of the
+session, where `%LOCALAPPDATA%` and `~/Library/Application Support` are both
+routinely captured. That is the right trade against losing edits, and it is a
+trade rather than a free fix, so it belongs in the administrator documentation
+beside §11. A packaged Windows install is the exception: its `LocalCacheFolder`
+is the store Windows neither roams nor puts in a device backup.
 
 ## 7. Write-back mechanics
 
 Repack to a temporary container and swap it over the original. Never modify in
-place: an interruption mid-write corrupts the container. Preserve unrecognised
+place: an interruption mid-write corrupts the container. Preserve unrecognized
 members, as `repack` already does, per SPEC §3.
 
 **`slpc` already implements the swap, and reimplementing it would be a
@@ -445,15 +448,16 @@ rename, which is the difference between replacing the only copy of a container
 on faith and doing it on evidence. Write-back has more reason to do this than
 `repack` does, because it runs unattended and repeatedly.
 
-**Write-back does not touch the flyleaf member.** SPEC §5 defines no checksum
-or fixity key, and §2.2 assigns no meaning to any key beyond `slipcase_version`
-and `content.file`, so there is nothing in a conformant container that a changed
-content file can falsify. A producer may have recorded its own size or digest under a
-private key permitted by §2.5, but since the specification gives those keys no
-meaning, this tool cannot know which key, what it covers, or how it is encoded.
-Guessing is worse than leaving it: a wrong digest is a false claim, where a stale
-one is at least a claim whose provenance is the producer's. The flyleaf member
-is preserved byte for byte, and the administrator documentation says so.
+**Write-back does not touch the flyleaf member.** SPEC §5 defines no checksum or
+fixity key, and §2.2 assigns no meaning to any key beyond `slipcase_version` and
+`content.file`, so there is nothing in a conformant container that a changed
+content file can falsify. A producer may have recorded its own size or digest
+under a private key permitted by §2.5, but since the specification gives those
+keys no meaning, this tool cannot know which key, what it covers, or how it is
+encoded. Guessing is worse than leaving it: a wrong digest is a false claim,
+where a stale one is at least a claim whose provenance is the producer's. The
+flyleaf member is preserved byte for byte, and the administrator documentation
+says so.
 
 ## 8. Process model
 
@@ -474,35 +478,35 @@ it hands over and exits.
 sessions on one container would both repack it, the second write-back would
 overwrite the first, and one person's edit would be gone with nothing said. The
 resident instance keeps a table of live sessions, and an invocation naming a
-container already in it starts nothing: it re-launches that session's content file
-and brings the application forward, which is what a second double-click on an
-open document does everywhere else. No refusal, no second session directory, no
-divergent copies.
+container already in it starts nothing: it re-launches that session's content
+file and brings the application forward, which is what a second double-click on
+an open document does everywhere else. No refusal, no second session directory,
+no divergent copies.
 
 **The table is keyed on file identity and on the path, because neither holds
 alone.** Device and inode on Unix, volume serial and file index on Windows.
-Canonicalising a path resolves symbolic links and does nothing about the
+Canonicalizing a path resolves symbolic links and does nothing about the
 container reachable under two hard links that §7 already warns about, and two
 names for one inode are two paths and one file.
 
-**Amended, found while building it: the identity does not survive a
-write-back.** §7 replaces the container by renaming a new file over it, so a
-container acquires a new inode every time a session saves. An identity recorded
-when the session opened stops matching the file at that path after the first
-save, and the next invocation of the same container finds no entry and opens the
-second session all of this exists to prevent. The path is stable across
-replacement and blind to hard links; the identity is the opposite. So a lookup
-matches on either, and the identity is re-read after each write-back so that the
-hard-link half does not quietly lapse for the rest of a session.
+**The identity does not survive a write-back.** §7 replaces the container by
+renaming a new file over it, so a container acquires a new inode every time a
+session saves. An identity recorded when the session opened stops matching the
+file at that path after the first save, and the next invocation of the same
+container finds no entry and opens the second session all of this exists to
+prevent. The path is stable across replacement and blind to hard links; the
+identity is the opposite. So a lookup matches on either, and the identity is
+re-read after each write-back so that the hard-link half does not quietly lapse
+for the rest of a session.
 
 The case where the two keys disagree comes out right rather than by accident.
 After a write-back through one of two hard links, §7 says the other name still
 points at the original holding the old contents — so by then they really are
-different files, neither key matches, and opening the other one is a new session,
-which is correct.
+different files, neither key matches, and opening the other one is a new
+session, which is correct.
 
 Where a filesystem returns no stable identity, which some network mounts do not,
-fall back to the canonicalised path and accept the narrower guarantee. A zero
+fall back to the canonicalized path and accept the narrower guarantee. A zero
 inode is that case rather than an answer: some mounts report one for every file,
 and a key that collapsed every container on such a mount into one entry would
 refuse to open the second container somebody asked for, believing it already had
@@ -511,9 +515,9 @@ it.
 **A pending recovery item is resolved before a new session opens on the same
 container.** A session left behind by a crash is not in the live table, so
 nothing refuses it, but opening a fresh session first would extract the
-container's current content file and leave the recovered edit with nowhere to go. So
-the recovery question comes first — write it back, discard it, or open fresh and
-discard it — and the new session follows the answer.
+container's current content file and leave the recovered edit with nowhere to
+go. So the recovery question comes first — write it back, discard it, or open
+fresh and discard it — and the new session follows the answer.
 
 **The front door is a control surface and has to be treated as one.** §10 says
 any value supplied over IPC is a policy bypass, and the requests themselves are
@@ -528,25 +532,30 @@ hardening measure.
 process lives while an open session or a directory handed to recovery under §6.2
 exists, and stops when neither does. Staying resident does nothing for the crash
 case, where the process is dead by definition and recovery-on-next-launch is
-already the answer. What it helps is the other path into recovery, where the user
-closed a session while the editor still had the document open: a live process
-keeps watching that directory and notices the save when it happens, rather than
-leaving the question until somebody next opens a container. Bound it — once the
-siblings are gone and the content file has settled, prompt once, act on the answer,
-and exit; if nobody answers, the record on disk carries the question to the next
-launch.
+already the answer. What it helps is the other path into recovery, where the
+user closed a session while the editor still had the document open: a live
+process keeps watching that directory and notices the save when it happens,
+rather than leaving the question until somebody next opens a container. Bound it
+— once the siblings are gone and the content file has settled, prompt once, act
+on the answer, and exit; if nobody answers, the record on disk carries the
+question to the next launch.
 
-**Amended, measured on GNOME Shell 48.7: the notification does not carry it.**
-This sentence used to say that §9's persistent notification held the question
-alongside the record. It does not, on this platform: a notification is removed
-when the process that sent it goes, so the buttons stop working at the moment
-the instance exits. Nothing here breaks, because the record on disk was always
-the durable half and `sessions` reads it — but two things follow. The bound on
-the linger is the whole window in which a question can be answered rather than a
-courtesy on top of a durable one, so it is a real interface decision and not a
-housekeeping constant. And the message this leaves in place of a withdrawn
+**On GNOME the notification does not carry the question past the process.**
+Through `org.freedesktop.Notifications` a notification is removed when the
+process that sent it goes, so the buttons stop working at the moment the
+instance exits. Nothing breaks, because the record on disk is the durable half
+and `sessions` reads it — but two things follow. The bound on the linger is the
+only window in which a question can be answered rather than a courtesy on top of
+a durable one, so it is a real interface decision and not a housekeeping
+constant. And the message this leaves in place of a withdrawn
 question is itself sent from the dying process, so on Linux it goes too; what
 somebody actually comes back to is `slipcase-open sessions`.
+
+**Where there is a standing surface, the instance stays until it is asked to
+leave.** The exit rule above is written for a process with no face. The Windows
+tray is a face, and a warning raised by a process on its way out has nowhere to
+go, so an instance with an icon stands until it is dismissed. Where a terminal
+started it there is no icon, and the rule holds as written.
 
 Autostart on login is not worth three conventions and three sets of expectations
 about what may run unbidden, for a tool invoked occasionally whose fallback
@@ -559,12 +568,11 @@ it is drivable headlessly, which is how it is tested.
 
 ## 9. Presentation
 
-This was written imagining a tray icon, which is a Windows habit. It translates
-to a menu bar item on macOS and to nothing dependable on Linux: GNOME has not
-had a system tray since 3.26, and GNOME Shell does not implement
-StatusNotifierItem without an extension. Designing around one would make the
-platform with the weakest security parity also the platform that loses the
-session model.
+A tray icon is a Windows habit. It translates to a menu bar item on macOS and to
+nothing dependable on Linux: GNOME has not had a system tray since 3.26, and
+GNOME Shell does not implement StatusNotifierItem without an extension.
+Designing around one would make the platform with the weakest security parity
+also the platform that loses the session model.
 
 **Notifications carrying actions are the portable primitive, and they are what
 the design needs.** Buttons in the notification, and a notification that
@@ -587,37 +595,29 @@ which a notification is poor at. **The command line is the floor**, always
 available, and it is how the session list stays reachable on a desktop that
 offers neither.
 
-**Amended 2026-09-07: macOS shipped the floor and neither layer above it.**
-The baseline this section names for macOS needs a bundle, which it now has,
-and a process that receives the notification's action, which the resident
-instance is not — `packaging/macos/README.md` says why the bundle's process is
-a moment rather than the instance. So macOS is, for now, the platform this
-section imagined Linux would be: the command line is the standing list and the
-questions wait there. `PLAN.md` Phase 5 names the first increment above it.
+**macOS has the floor and neither layer above it.** The baseline this section
+names for macOS needs a bundle, which it has, and a process that receives the
+notification's action, which the resident instance is not —
+`packaging/macos/README.md` says why the bundle's process is a moment rather
+than the instance. So on macOS the command line is the standing list and the
+questions wait there.
 
 The cost is packaging work on two platforms rather than one. A Windows toast
-with actions from an unpackaged binary needs an AppUserModelID and a Start Menu
-shortcut, and macOS needs a real bundle for `UNUserNotificationCenter`. Both are
-already required by the association work in §4, so neither is new.
+with actions needs an AppUserModelID, and macOS needs a real bundle for
+`UNUserNotificationCenter`. Both are already required by the association work in
+§4, so neither is new.
 
-**Windows creates its own user-scope shortcut on first run, and falls back to
-the tray when that fails.** This applies to an unpackaged install only: an MSIX
-carries an AppUserModelID as part of its identity, so the Store channel in §15
-removes the problem rather than solving it. An archive that was unpacked rather than installed
-has no shortcut and an AppUserModelID nothing registered, and the toast is what
-degrades. The fallback costs nothing there, because Windows is the platform that
-reliably has both a tray and a message box: such an install loses toast fidelity
-and keeps the whole interaction. On Windows the toast is the nicety and the tray
-is the mechanism, which is the inverse of Linux, and that asymmetry is the
-better argument for this section's layering than the symmetry it opens with.
-
-Creating the shortcut needs no elevation and also makes an unpacked binary
-findable in Start, which that user probably wants. It does sit close to a rule
-§4 sets, and the distinction is worth stating rather than glossing: an
-association changes how the user's files behave across the system, where a
-shortcut changes only whether this application is findable and whether its own
-notifications work. Different weight, different rule. Make it visible and
-removable rather than silent.
+**On Windows the package supplies the identity, and the tray is the fallback.**
+An MSIX carries an AppUserModelID as part of its identity, so the Store channel
+in §15 removes the problem rather than solving it. A binary run from outside
+its package has none, and the toast is what degrades. The tool does not create
+a Start Menu shortcut to stand in for the identity: a shortcut and a process
+declaring different identities is worse than neither declaring one. The
+fallback costs nothing, because Windows is the platform that reliably has both a
+tray and a message box, so such a run loses toast fidelity and keeps the
+interaction. On Windows the toast is the nicety and the tray is the mechanism,
+which is the inverse of Linux, and that asymmetry is the better argument for
+this section's layering than the symmetry it opens with.
 
 Native dialogs stay available where they exist and nothing depends on them.
 Windows and macOS each offer a message box without a toolkit; Linux guarantees
@@ -626,9 +626,9 @@ A step that needs a modal on Linux is a step that has a hole on Linux.
 
 ## 10. Policy and administration
 
-The set of content file extensions the tool will open must be configurable by the
-user and lockable by an administrator. Extensions rather than media types, for
-the reasons in §5.1.
+The set of content file extensions the tool will open must be configurable by
+the user and lockable by an administrator. Extensions rather than media types,
+for the reasons in §5.1.
 
 **Precedence:** machine policy → user policy → user configuration → built-in
 default.
@@ -649,31 +649,30 @@ precedence over `~/.config`.
 | Setting | Notes |
 |---|---|
 | Allowed extensions | The permitted set, compared per §5.2 |
-| User may extend | Whether the user's own additions are honoured at all |
+| User may extend | Whether the user's own additions are honored at all |
 | Replace vs. append | Must be explicit. An administrator who sets a list expecting it to be exhaustive, and instead gets it unioned with the defaults, has a silent hole |
 | Deny list | Always wins, regardless of every other setting |
 | Confirm each write-back | Off by default; on for archival use (§6.2) |
-| How much is said | A threshold on §9's weights, not a list of switches. Added while building Phase 3; see below |
+| How much is said | A threshold on §9's weights, not a list of switches; see below |
 
-There is no setting for the extensionless case. A content file the platform has no
-registration for is refused whatever the lists say (§5.1), because the dialog it
-would otherwise raise offers the user every executable on the machine.
+There is no setting for the extensionless case. A content file the platform has
+no registration for is refused whatever the lists say (§5.1), because the dialog
+it would otherwise raise offers the user every executable on the machine.
 
-**Added while building it: how much the tool says belongs here too, and it is a
-threshold rather than a list of switches.** Most people will want fewer
-notifications than the design produces, and the honest axis is not how loud a
-message is but whether anybody asked for it. A write-back happens on its own; a
-confirmation of a button somebody just pressed does not, however routine it
-looks, and a setting that silenced the second would mean pressing a button and
-getting nothing back. So §9's weights carry that distinction and the setting is
-one word over them.
+**How much the tool says belongs here too, and it is a threshold rather than a
+list of switches.** Most people will want fewer notifications than the design
+produces, and the axis that matters is not how loud a message is but whether
+anybody asked for it. A write-back happens on its own; a confirmation of a
+button somebody just pressed does not, however routine it looks, and a setting
+that silenced the second would mean pressing a button and getting nothing back.
+So §9's weights carry that distinction and the setting is one word over them.
 
 Two things follow. **A question cannot be quietened**, because it goes through
 the channel's *ask* rather than its *report* and the threshold cannot reach it —
 structural rather than a rule to remember, since silencing one would strand a
-content file with nothing to say so until the next launch. And **this key needs none
-of the launch-path discipline below**: it gates no decision, so it is resolved
-once when the instance starts and held.
+content file with nothing to say so until the next launch. And **this key needs
+none of the launch-path discipline below**: it gates no decision, so it is
+resolved once when the instance starts and held.
 
 Putting it in this chain rather than in a settings file of its own is what makes
 it work on three platforms without designing anything: it inherits the registry,
@@ -685,20 +684,19 @@ key is for is the middle ground none of them can express.
 
 **Enforcement happens in the launch path**, immediately before execution and
 after the extension has been taken from the decoded `content.file` and folded
-(§5.2).
-Disabling a control in a settings dialog is cosmetic. Any value cached at
-startup, read from a user-writable config file, or supplied over IPC is a
+(§5.2). Disabling a control in a settings dialog is cosmetic. Any value cached
+at startup, read from a user-writable config file, or supplied over IPC is a
 bypass.
 
 **`slpc` is not in the default allowed set, and nesting needs no special case
-beyond a depth limit.** SPEC §2.3 permits a container whose content file is itself a
-container and gives it no meaning. Opening one composes correctly without
-anything coordinating it: the inner session repacks the inner container, that
-container is the outer session's content file, the outer watcher sees it change and
-repacks the outer, and each session knows only about its own container. So there
-is no correctness reason to intervene.
+beyond a depth limit.** SPEC §2.3 permits a container whose content file is
+itself a container and gives it no meaning. Opening one composes correctly
+without anything coordinating it: the inner session repacks the inner container,
+that container is the outer session's content file, the outer watcher sees it
+change and repacks the outer, and each session knows only about its own
+container. So there is no correctness reason to intervene.
 
-The reason to keep it off by default is judgement rather than correctness. A
+The reason to keep it off by default is judgment rather than correctness. A
 nested container is usually somebody having packed one by mistake, or an
 archival wrapper, and neither wants an automatic recursive open; the viewer is
 the better answer for looking at one. It stays allowlistable for the archival
@@ -721,25 +719,25 @@ package that its settings were administered when nothing had been, which is this
 paragraph's own support load arriving by the front door. An empty allow list is
 not the same thing: a layer permitting nothing says a great deal.
 
-## 11. Honest limits
+## 11. Limits
 
 **The allowlist is not a security boundary.** The `slipcase` CLI is publicly
-distributed and the container is a plain zip; any user can extract the content file
-with standard tools and run it. What this control provides is a guardrail
+distributed and the container is a plain zip; any user can extract the content
+file with standard tools and run it. What this control provides is a guardrail
 against user error and social engineering in the *convenient* path — which is
 where the realistic risk sits — not a barrier against a determined user. The
 actual boundary is application control (AppLocker/WDAC and equivalents).
 
-This must be stated plainly in administrator documentation. An organisation that
-believes the allowlist is load-bearing may skip the controls that actually are,
-which would leave them worse off than before the tool existed.
+This must be stated plainly in administrator documentation. An organization that
+believes the allowlist is a boundary may skip the controls that actually are
+one, which would leave them worse off than before the tool existed.
 
 §5.1's content check is not a second control and must not be described as one,
 and the fact that it now refuses does not make it one. It is a veto: it admits
-nothing, so nothing is permitted *by* it, and a content file that is what it claims
-to be and still hostile passes it without comment. An organisation that read the
-refusal as a malware check would be making exactly the mistake this section
-exists to prevent.
+nothing, so nothing is permitted *by* it, and a content file that is what it
+claims to be and still hostile passes it without comment. An organization that
+read the refusal as a malware check would be making the mistake this
+section exists to prevent.
 
 ## 12. Platform coverage
 
@@ -750,46 +748,51 @@ platforms, and the container swap is portable too, because
 
 | | Windows | macOS | Linux |
 |---|---|---|---|
-| Trust-zone propagation | Mark of the Web via `IAttachmentExecute` | `com.apple.quarantine` xattr | **Not available** |
+| Trust-zone propagation | Mark of the Web | `com.apple.quarantine` xattr | **Not available** |
 | Zone carried on write-back | `slpc::provenance` (ADS) | `slpc::provenance` (xattr) | Noted, not enforced |
-| Launch | `ShellExecuteEx` / `IAttachmentExecute` | `open` | `xdg-open` |
-| Notifications with actions | Toast; needs an AppUserModelID | `UNUserNotificationCenter`; needs a bundle | `org.freedesktop.Notifications` |
-| Standing session list | Tray icon | Menu bar item | Command line |
+| Launch | `ShellExecuteEx`, zone check left on | `open` | `xdg-open` |
+| Notifications with actions | Toast; needs an AppUserModelID | `UNUserNotificationCenter`; not built (§9) | `org.freedesktop.Notifications` |
+| Standing session list | Tray icon | Command line; a menu bar item is not built | Command line |
 | Native dialog | Message box | `NSAlert` | **Nothing guaranteed** |
 | IPC front door | Named pipe, ACL by SID | Unix socket, plus `openFile` | Unix socket |
 | Association | ProgID | Exported UTI | shared-mime-info + desktop entry |
-| Secondary verb | `shell\open-content` under the ProgID | Services entry | Additional desktop entry, `NoDisplay` |
-| Managed policy | Registry `Policies` + ADMX | Configuration profiles | Root-owned `/etc` |
+| Secondary verb | `shell\open-content` under the ProgID | Services entry | The one desktop entry (§4) |
+| Managed policy | Registry `Policies` + ADMX | Root-owned `/etc`; configuration profiles are not built | Root-owned `/etc` |
 
 Structure the differences as a small trait — `launch()`, `propagate_zone()`,
 `effective_policy()`, `present()` — with three implementations, rather than
 treating cross-platform as a yes/no decision.
 
-**Windows first means Windows is the reference, not that it is built first.**
-The trait is defined against what Windows requires — an attachment-aware launch,
-a zone to propagate, a policy subtree with an ACL — because a trait shaped
-around the platform with the weakest security story would have to be widened
-later, and widening a security interface after three implementations exist is
-how the arms drift. Which platform is implemented first is a separate question
-and belongs in `PLAN.md`, where the answer is whichever machine the work is
-happening on.
+**Windows is the reference, which is not a build order.** The trait is defined
+against what Windows requires — an attachment-aware launch, a zone to propagate,
+a policy subtree with an ACL — because a trait shaped around the platform with
+the weakest security story would have to be widened later, and widening a
+security interface after three implementations exist is how the arms drift.
+Which platform is implemented first is a separate question, answered by
+whichever machine the work is happening on.
 
-macOS is roughly a day's work once Windows is done, beyond the bundle. Linux
-ships with the allowlist and a documented statement that zone propagation does
-not exist there.
+**`IAttachmentExecute` is not what reads the mark.** It is for a client that
+has *received* an attachment and is deciding whether to save and run it, so it
+takes the zone from the source it is told about rather than from the file. This
+tool arrives after that point, with the content file already on disk and already
+marked. What consults the mark is `ShellExecuteEx` itself, so the launcher is
+that call with `SEE_MASK_NOZONECHECKS` and `SEE_MASK_FLAG_NO_UI` deliberately
+absent.
+
+Linux ships with the allowlist and a documented statement that zone propagation
+does not exist there.
 
 **These are three risk shapes rather than a ranking, and calling Linux the
-degraded one flattens the picture.** Windows has the strongest zone story and the
-weakest notification story, needing an AppUserModelID and a Start Menu shortcut
-before a toast will carry a button. macOS is close to Windows on zones and needs
-a bundle for anything at all. Linux has no zone propagation, which is a real
-loss and the one worth stating plainly to administrators, and in exchange it has
-the least fussy notification story of the three and the only sandbox story: a
-Flatpak's target applications are already confined, and the document portal
-exists to hand one file to one application with controlled access and take
-changes back, which is this tool's job description. If `slipcase-open` ever
-ships as a Flatpak, that is a better mechanism than a session directory rather
-than a worse one.
+degraded one flattens the picture.** Windows has the strongest zone story and
+the weakest notification story, needing an AppUserModelID before a toast will
+carry a button. macOS is close to Windows on zones and needs a bundle for
+anything at all. Linux has no zone propagation, which is a real loss and the one
+worth stating plainly to administrators, and in exchange it has the least fussy
+notification story of the three and the only sandbox story: a Flatpak's target
+applications are already confined, and the document portal exists to hand one
+file to one application with controlled access and take changes back, which is
+this tool's job description. If `slipcase-open` ever ships as a Flatpak, that is
+a better mechanism than a session directory rather than a worse one.
 
 Where Linux is genuinely thinner is the standing session list, and §9 answers
 that with the command line rather than by pretending a tray is there.
@@ -832,9 +835,9 @@ effect of the first.
 **The engine does not belong inside `slpc`, and the format is the reason before
 the dependencies are.** `slpc` is the reference implementation of SPEC.md, so
 anything in it reads as part of what a conformant implementation does. SPEC §5
-is careful about what the format takes no position on, and how a content file reaches
-an application sits so far outside that it never needed excluding. Put launch
-policy, session state and a file watcher in there and the format acquires
+is careful about what the format takes no position on, and how a content file
+reaches an application sits so far outside that it never needed excluding. Put
+launch policy, session state and a file watcher in there and the format acquires
 opinions about opening content files, which misleads the outside implementer the
 crate exists to serve.
 
@@ -847,18 +850,17 @@ engine would add `notify`, `crc32fast`, a registry reader, `objc2` for
 it is about the container, and the line between the two is already drawn where
 those two features sit.
 
-**One addition to `slpc` is needed**: an accessor for the content member's
-CRC-32, which the ZIP central directory already stores and the `zip` crate
-already surfaces on read. It is a field of the container, so reading it out is
-the format library's job, it costs no dependency, and it is what recovery
+**`slpc` carries one accessor for this tool**: `content_crc()`, the content
+member's CRC-32, which the ZIP central directory already stores and the `zip`
+crate already surfaces on read. It is a field of the container, so reading it
+out is the format library's job, it costs no dependency, and it is what recovery
 compares against rather than keeping a content file digest of its own (§6.3).
 
-The alternative was the engine reading the central directory itself, and it is
-worse than a version bump on any reading. It duplicates the parsing `slpc`
-exists to keep in one place, and it does that parsing in the crate with no
-fuzzing harness behind it, which is the drift this project is organised against.
-The cost is a minor bump and a public accessor supported from then on, over a
-field `zip` hands back for free.
+The alternative is the engine reading the central directory itself, and it is
+worse on any reading. It duplicates the parsing `slpc` exists to keep in one
+place, and it does that parsing in the crate with no fuzzing harness behind it,
+which is the drift this project is organized against. The cost is a public
+accessor to support, over a field `zip` hands back for free.
 
 Document it as the ZIP field it is rather than a Slipcase one, and disclaim
 fixity in the doc comment. A format library exposing a checksum invites the
@@ -873,87 +875,62 @@ separation §2 exists to make. Promote the engine to a crate when something else
 needs it and not before.
 
 The `slpc-rust` workspace publishes a library and a CLI, and its shape reflects
-that: an MSRV floor inherited from `zip` rather than chosen, a `cargo-dist`
-release configuration covering two artifacts, and a lockfile that a fourth
-member would populate with `windows-rs`, `notify` and a COM dependency tree
-irrelevant to everyone consuming `slpc`. `slipcase-desktop` is already a
-separate repository, which settles the precedent for anything with a UI surface.
+that: an MSRV floor inherited from `zip` rather than chosen, a release covering
+a library and a CLI, and a lockfile that another member would populate with
+`windows-rs`, `notify` and a COM dependency tree irrelevant to everyone
+consuming `slpc`. `slipcase-desktop` is already a separate repository, which
+settles the precedent for anything with a UI surface.
 
-The argument that runs the other way is worth keeping in view. Nothing currently
-exercises `slpc` as a published crate — the in-workspace CLI reaches it by path,
-so the crates.io package could be broken in ways the workspace cannot see. A
-second consumer that acquires it the way an outside implementer would is a check
-the project does not otherwise have.
+Being outside the workspace is also a check the project has nowhere else. The
+in-workspace CLI reaches `slpc` by path, so the crates.io package could be
+broken in ways the workspace cannot see; this tool acquires it the way an
+outside implementer would.
 
 ## 15. Distribution
 
-Both channels, and they are not in tension. The stores serve the person who was
-sent a container and has nothing that opens it; winget, Homebrew and apt serve
-the person who already knows what this is. That is the audience split §2 is
-built on, which is a fair sign the answer is the right shape.
+A store and a package manager serve different people. A store listing is how
+somebody staring at an unopenable `.slpc` finds the thing that opens it; winget,
+Homebrew and apt serve the person who already knows what this is. That is the
+audience split §2 is built on.
 
-`slipcase-desktop` already took the Microsoft Store and the Mac App Store, and
-its packaging notes give the reason: Finder offers *Search App Store* by document
-type, so a store listing is how somebody staring at an unopenable `.slpc` finds
-the thing that opens it. That argument is stronger here than it is for the
-viewer, because §2's audience is that person.
-
-**Windows works either way, and the Store is the better fit.** The viewer's
-handoff records that an MSIX process reads an alternate data stream, so Mark of
-the Web survives packaging, and MSIX file type registration is proven in that
-repository. Packaged identity also supplies an AppUserModelID, which removes the
-first-run shortcut §9 otherwise needs. winget is not excluded: its `msstore`
-source serves the Store package, and it will serve a plain installer instead.
+**Windows: the Microsoft Store.** An MSIX process reads an alternate data
+stream, so Mark of the Web survives packaging, and MSIX file type registration
+is proven in `slipcase-desktop`. Packaged identity also supplies an
+AppUserModelID, which is what a toast is addressed by (§9). winget
+reaches the same package through its `msstore` source.
 
 One consequence for §10: an MSIX runs no code at install, so the package cannot
 place ADMX/ADML files into `PolicyDefinitions`. Ship those as a separate
 administrator download, which is how Microsoft ships its own.
 
-**macOS needs one thing checked before the channel is chosen.** Under the App
-Sandbox the content file sits in the application's own container, and a sandboxed
-target editor — which is every Mac App Store editor — may not be able to open a
-path inside another application's container. That failure mode is bad because it
-is invisible: the content file opens in Word and fails in something from the Store,
-with nothing to tell the user why.
+**macOS: Developer ID with notarization, through a Homebrew cask, and not the
+Mac App Store.** A sandboxed handover reaches the editor — `slipcase-desktop`'s
+Open button extracts a content file and launches it from inside the sandbox —
+but the in-place swap §7 relies on is refused there, because the grant covers
+the file and not its directory. For a resident tool that is the first of four
+costs. The grant dies with the process, so §6.3's recovery after a restart
+needs a bookmark per session; a path in `argv` carries no grant, so §9's
+command-line floor cannot open a container; and `UNUserNotificationCenter`
+delivers an action to a relaunched bundle rather than to the instance holding
+the session. Every one of those lands in the engine, which §12 keeps to one
+implementation, so the cask leaves the engine untouched, and Finder's *Search
+App Store* for a `.slpc` is the viewer's to answer. `packaging/macos/README.md`
+carries the rest.
 
-The subject to check is already to hand. `slipcase-desktop` DESIGN §3 has an
-Open button that extracts a content file and launches whatever the platform
-registered, and that application ships to the Mac App Store. If Open works from
-the sandboxed build against a sandboxed editor, the objection dissolves and the
-Store is right for both products. If it does not, that is worth knowing for the
-viewer as well, and this tool takes Developer ID with notarization through a
-Homebrew cask.
-
-**Amended 2026-09-07: the check was made, Open works, and this tool takes
-Developer ID anyway.** The paragraph above framed one question, and the viewer
-answered it on 2026-08-25: a sandboxed handover reaches the editor. The same
-measurement answered a question this paragraph did not ask — the in-place swap
-§7 relies on is refused under the sandbox, because the grant covers the file
-and not its directory — and for a resident tool that is the first of four
-costs rather than the only one. The grant dies with the process, so §6.3's
-recovery after a restart needs a bookmark per session; a path in `argv`
-carries no grant, so §9's command-line floor cannot open a container; and
-`UNUserNotificationCenter` delivers an action to a relaunched bundle rather
-than to the instance holding the session. Every one of those lands in the
-engine, which §12 keeps to one implementation. So the cask it is, with the
-engine untouched, and the Finder search the Store would have bought is one the
-viewer's listing already answers. `PLAN.md` Phase 5 and
-`packaging/macos/README.md` carry the rest.
-
-**Linux is settled.** `cargo-deb` and the Excelano apt repository are the
-established path in `slpc-rust`, and a `.deb` carries the binary, the desktop
+**Linux: `cargo-deb` and the Excelano apt repository**, the
+path `slpc-rust` uses, and a `.deb` carries the binary, the desktop
 entry, the shared-mime-info XML, and the root-owned `/etc/slipcase` §10 wants.
 Flatpak stays an option worth taking for §12's document portal rather than a
 distribution requirement.
 
-## 16. Relationship to the parked Explorer work
+## 16. Relationship to the Explorer property handler
 
 The Explorer property handler — surfacing the container's flyleaf as Windows
 properties so that Explorer's built-in faceted search works over `.slpc` files —
-is a separate parked item. It shares nothing with this tool but the `slpc`
+is a separate piece of work. It shares nothing with this tool but the `slpc`
 dependency.
 
-If both are eventually built, the property handler is clearly an excelano
+If both exist, the property handler is clearly an excelano
 product rather than part of the reference implementation: it has no portable
 analogue and would be the largest block of platform-specific code in the
 project. `slipcase-open`, by contrast, degrades gracefully and can reasonably
@@ -970,14 +947,11 @@ is settled by writing the code rather than by more of this document.
 - What a policy change mid-session does. §10 puts enforcement in the launch path
   deliberately, so a session on a newly denied extension continues; terminating
   it would discard work in progress.
-- Removing the first-run shortcut on Windows where §15 has not made it moot —
-  an archive install has no uninstaller, and a shortcut pointing at a deleted
-  binary is the stale-ProgID defect `slipcase-desktop` documents, by another
-  route.
 - Whether the state directory's backup and sync exposure (§6.4) is said to the
-  user at open time or only in the administrator documentation.
+  user at open time or only in the administrator documentation, on the
+  platforms where it applies.
 - Whether Linux moves to `org.gtk.Notifications` with `DBusActivatable=true`.
-  §8's amendment records that a notification through
+  §8 records that a notification through
   `org.freedesktop.Notifications` dies with the process that sent it, which
   leaves Linux the odd platform out: a Windows toast reactivates its application
   through the COM activator, and `UNUserNotificationCenter` relaunches a bundle
@@ -987,5 +961,4 @@ is settled by writing the code rather than by more of this document.
   parity §9 assumes. What it costs is a second way into the process, which §8
   calls a control surface and which would have to be treated as one; and it is
   GNOME's rather than the freedesktop specification's, so the other desktops
-  would keep the current path and the current limit. Worth deciding before
-  Phase 4 builds on the assumption, and not before this one ships.
+  would keep the current path and the current limit.

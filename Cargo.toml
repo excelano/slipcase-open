@@ -13,10 +13,10 @@ categories = ["gui", "filesystem"]
 # 2026-09-01 and worth keeping the shape of. What this tool is for is the
 # double-click: the desktop entry, the media type `slipcase-common` declares,
 # and the policy file under `/etc`. A crate carries none of those, so
-# `cargo install slipcase-open` hands somebody concept 9's command-line floor
+# `cargo install slipcase-open` hands somebody DESIGN §9's command-line floor
 # with no association above it, and the symptom of the missing media type is
 # the one `packaging/linux/install.sh` warns about: a double-clicked container
-# opens the archive tool. The channels in PLAN.md 15 carry the rest of it and
+# opens the archive tool. The channels in DESIGN §15 carry the rest of it and
 # remain the way a person should install this. crates.io is the from-source
 # route for somebody who already has a toolchain, and README.md says what it
 # leaves out.
@@ -41,11 +41,11 @@ rust-version = "1.88"
 #
 # It is a dependency of the engine rather than of `main`, because the engine is
 # what narrates: `resident` composes every notification and every question, and
-# `present` only carries them. Concept 9's boundary, holding for language.
+# `present` only carries them. DESIGN §9's boundary, holding for language.
 potext = "0.1"
 # From crates.io as of 0.4.0, which is the release carrying `content_crc` and
 # the SPEC 1.1 rename (flyleaf/content.file, `slipcase.flyleaf.toml`). It was a
-# path dependency until 0.3.11 (PLAN.md Phase 0), and switching off it is what
+# path dependency until 0.3.11, and switching off it is what
 # finally exercises `slpc` as a published crate — an argument nothing in that
 # workspace can make on its own, because its own CLI reaches the library by
 # path. `fs` is the atomic file placement write-back needs and `provenance` is
@@ -57,7 +57,7 @@ slpc = { version = "0.7", features = ["fs", "provenance"] }
 # a content file's name may carry a quote or a backslash, which is where
 # hand-rolling the writing side goes wrong.
 toml_edit = "0.25"
-# Watching the content directory. Concept 6 needs the watch on the directory
+# Watching the content directory. DESIGN §6 needs the watch on the directory
 # rather than the file, because a serious editor saves by writing a temporary
 # sibling and renaming over the target, and a watcher holding the file loses its
 # handle on the first save. `notify` does that on all three platforms —
@@ -65,17 +65,17 @@ toml_edit = "0.25"
 # deliberately.
 notify = { version = "8", default-features = false, features = ["macos_fsevent"] }
 # Recovery compares the extracted content file against the CRC-32 the container
-# already records for it (concept 6.3). Already compiled in the tree under
+# already records for it (DESIGN §6.3). Already compiled in the tree under
 # `zip`, so this is a manifest line rather than a dependency. It answers whether
 # a file changed and never whether it can be proved untampered — SPEC 5 defines
 # no fixity key and this is not one.
 crc32fast = "1.5"
-# The verbs. Concept 9 keeps the command line as the floor beneath the
+# The verbs. DESIGN §9 keeps the command line as the floor beneath the
 # notifications and the tray, so this is a shipped interface and not only the
 # harness the engine is driven by.
 clap = { version = "4.6", features = ["derive"] }
 
-# Linux's half of concept 9. `org.freedesktop.Notifications` has carried an
+# Linux's half of DESIGN §9. `org.freedesktop.Notifications` has carried an
 # actions parameter for as long as it has existed, and a notification with
 # buttons is the portable primitive the design needs — so this is a D-Bus client
 # and not a notification library. Pure Rust, which keeps `forbid(unsafe_code)`
@@ -90,7 +90,7 @@ clap = { version = "4.6", features = ["derive"] }
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { version = "5", default-features = false, features = ["blocking-api", "async-io"] }
 
-# Windows' half of concept 8's file identity: one function,
+# Windows' half of DESIGN §8's file identity: one function,
 # `GetFileInformationByHandle`, for the volume serial number and file index that
 # keep two hard links to one container from opening two sessions on it.
 #
@@ -99,7 +99,7 @@ zbus = { version = "5", default-features = false, features = ["blocking-api", "a
 # windows-sys@0.61.2` names all three, and `Cargo.lock` gained one edge and no
 # package.
 #
-# `same-file` was the other route PLAN.md named, and it does not fit. It keys on
+# `same-file` is the other route, and it does not fit. It keys on
 # exactly this pair and compares on it, but `key` and its `Key` type are both
 # private with no accessor, and a `Handle` holds the file open for as long as it
 # lives — where `Identity` is owned data held across a whole session and
@@ -117,7 +117,7 @@ zbus = { version = "5", default-features = false, features = ["blocking-api", "a
 # COM is what `windows-sys` does not do: it binds functions and structures and
 # leaves interfaces alone, so reaching one means writing its vtable by hand. The
 # measurement in `platform::shell` ended with `IAttachmentExecute` not being
-# used, which weakens that reason without retiring it, because concept 9's toast
+# used, which weakens that reason without retiring it, because DESIGN §9's toast
 # is WinRT and lands here too. So the split is COM and WinRT through `windows`,
 # plain Win32 through `windows-sys`, and neither is the other's fallback.
 [target.'cfg(windows)'.dependencies]
@@ -146,7 +146,7 @@ windows = { version = "0.62", features = [
     "Win32_UI_Shell",
     "Win32_UI_WindowsAndMessaging",
 ] }
-# Concept 10's Windows layers, which are registry keys. Reading them by hand
+# DESIGN §10's Windows layers, which are registry keys. Reading them by hand
 # means `RegOpenKeyEx` and `RegQueryValueEx` with their two-call buffer sizing
 # and a `REG_MULTI_SZ` to walk, which is perhaps a hundred lines this crate
 # would have to hold `unsafe` for — to read six values. This is the same
@@ -183,7 +183,7 @@ tempfile = "3.27"
 # `slpc-rust` rather than written again: that crate exists because two copies of
 # this helper disagreed about the Windows arm within an hour of being written,
 # and a third here would undo that on purpose. `publish = false` and no version,
-# so a git dependency is the route from outside that workspace. PLAN.md.
+# so a git dependency is the route from outside that workspace.
 testsupport = { git = "https://github.com/excelano/slpc-rust" }
 # One test builds a container the writer will not produce: a content file with
 # general purpose bit 0 set, which is what `check_content_readable` refuses.
@@ -212,10 +212,10 @@ unsafe_code = "deny"
 [lints.clippy]
 pedantic = { level = "warn", priority = -1 }
 
-# The package the Excelano apt repository ships. Concept 15: `cargo-deb` and
+# The package the Excelano apt repository ships. DESIGN §15: `cargo-deb` and
 # that repository are the established path in `slpc-rust`, and a `.deb` is what
 # carries the desktop entry, the media type, and the root-owned policy file
-# concept 10 wants.
+# DESIGN §10 wants.
 [package.metadata.deb]
 maintainer = "David M. Anderson <david.anderson@excelano.com>"
 # One line per sentence: cargo-deb re-wraps this, and a source line broken
@@ -253,7 +253,7 @@ changelog = "debian/changelog"
 #
 # `/etc/slipcase/open.toml` becomes a conffile by virtue of its path, so dpkg
 # keeps an administrator's edits across an upgrade and asks before replacing
-# them. That is the behaviour concept 10 needs and the reason the file is under
+# them. That is the behaviour DESIGN §10 needs and the reason the file is under
 # `/etc` rather than somewhere this package would overwrite.
 assets = [
     ["target/release/slipcase-open", "usr/bin/", "755"],
@@ -262,7 +262,7 @@ assets = [
     # cargo-deb compresses anything under `man` on its way in, so this is
     # listed uncompressed and arrives as `.1.gz`. lintian makes its absence a
     # warning and CI fails on warnings, which is the right weight for it:
-    # concept 9 keeps the command line a shipped interface rather than a test
+    # DESIGN §9 keeps the command line a shipped interface rather than a test
     # harness, and a shipped interface with no manual page is half a promise.
     ["packaging/man/slipcase-open.1", "usr/share/man/man1/", "644"],
     ["README.md", "usr/share/doc/slipcase-open/README.md", "644"],

@@ -1,6 +1,6 @@
 #!/bin/sh
 # Undo install.sh. The machine policy file is left alone unless --policy names
-# where it went, and even then only if it has not been edited: concept 10 makes
+# where it went, and even then only if it has not been edited: DESIGN §10 makes
 # it an administrator's, and removing somebody's policy on an uninstall is the
 # one deletion this script must not make by accident.
 #

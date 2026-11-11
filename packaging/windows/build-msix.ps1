@@ -4,8 +4,8 @@
     it so it can be installed here.
 
 .DESCRIPTION
-    Concept 15 takes the Microsoft Store for this product, and more strongly
-    than it does for the viewer: the audience in concept 2 is the person who was
+    DESIGN §15 takes the Microsoft Store for this product, and more strongly
+    than it does for the viewer: the audience in DESIGN §2 is the person who was
     sent a container and has nothing that opens it, and a Store listing is how
     that person finds the thing that opens it when Windows offers to search by
     file type.
@@ -110,30 +110,23 @@ function Step([string] $what) { Write-Host "build-msix: $what" -ForegroundColor 
 #
 # **This is a record of what is known, not a claim that it is acceptable.**
 # Recording a finding here does not take the decision to ship with it. That is
-# David's.
-#
-# It started empty on purpose -- a baseline written before the first run is a
-# list of things somebody assumed -- and the first run, 2026-09-06, refused with
-# two findings. One is below. The other was fixed instead, and the re-run came
-# back PASS with only the entry below reported.
+# the maintainer's. A finding enters this list only after somebody traces it;
+# a baseline written before a run is a list of things somebody assumed.
 #
 # Shrink this list when a finding goes away; the run says so when one does.
 #
-#   Blocked executables   `ShellExecuteExW`, which is concept 5 step 7 and the
+#   Blocked executables   `ShellExecuteExW`, which is DESIGN §5 step 7 and the
 #                         thing this product is for: hand the content file to the
 #                         desktop, deliberately without the two flags that would
 #                         switch off the Mark-of-the-Web check. Removing the
-#                         reference would remove the application. Read out of
-#                         our own report on 2026-09-06 rather than borrowed:
-#                         `APP_TYPE="Centennial"`, and the kit marks this task
-#                         optional for Centennial packages -- which is why
+#                         reference would remove the application. The report
+#                         says `APP_TYPE="Centennial"`, and the kit marks this
+#                         task optional for Centennial packages -- which is why
 #                         `OVERALL_RESULT` reads WARNING over a test reading
-#                         FAIL. Submitted with it outstanding, deliberately.
+#                         FAIL.
 #
-# `DPIAwarenessValidation` was the second finding on that run. It never entered
-# this list: it was fixed instead -- there was no PE application manifest for the
-# kit to read, and `build.rs` embeds one now. The re-run on the same day reported
-# it not at all and took the overall verdict from WARNING to PASS.
+# `DPIAwarenessValidation` is answered rather than listed: `build.rs` embeds the
+# PE application manifest the kit reads.
 $KNOWN_FINDINGS = @{
     'Blocked executables' = 'FAIL'
 }
@@ -220,9 +213,8 @@ if ($ReadReport) {
 # publisher display name, and the calculated forms. `Publisher` is the X.500
 # string Partner Center assigns per account, the same for every Excelano
 # product, and it comes from the environment so that a public repository does
-# not carry an account identifier: `windows.yml` passes the organisation
-# secret STORE_PUBLISHER, and a Windows machine sets STORE_PUBLISHER in its
-# own environment before running this.
+# not carry an account identifier: a Windows machine sets STORE_PUBLISHER in
+# its own environment before running this.
 $identityFile = Join-Path $here 'identity.psd1'
 if (-not (Test-Path -LiteralPath $identityFile)) {
     Refuse "no identity at $identityFile - it is committed beside this script and should not be missing"

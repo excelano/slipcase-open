@@ -3,7 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 8: a container that already has a live session is not opened twice,
+//! DESIGN §8: a container that already has a live session is not opened twice,
 //! because two sessions on one container would both repack it and the second
 //! write-back would overwrite the first with nothing said.
 //!
@@ -68,7 +68,7 @@ impl<T> Table<T> {
         self.entries.len()
     }
 
-    /// Whether this instance is holding nothing, which is half of concept 8's
+    /// Whether this instance is holding nothing, which is half of DESIGN §8's
     /// exit rule.
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -186,7 +186,7 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_second_hard_link_finds_the_same_session() {
-        // Concept 8's stated reason for keying on identity: two names, one
+        // DESIGN §8's stated reason for keying on identity: two names, one
         // file, and a canonical path cannot tell.
         let tmp = tempfile::tempdir().unwrap();
         let a = a_file(tmp.path(), "a.slpc");
@@ -217,7 +217,7 @@ mod tests {
         // file over the container, so the inode changes on every save; an entry
         // keyed only on the identity recorded at open would stop matching after
         // the first write-back, and the next invocation would start the second
-        // session concept 8 exists to prevent.
+        // session DESIGN §8 exists to prevent.
         let tmp = tempfile::tempdir().unwrap();
         let c = a_file(tmp.path(), "report.slpc");
         let mut table = Table::new();

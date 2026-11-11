@@ -168,7 +168,7 @@ if ($Refusal) {
     # **Through `wscript` and not from here, and that is not fussiness.**
     # `attach_console` joins the console of whatever started this product, and
     # a process started from a console is a command line -- which is the floor
-    # concept 9 puts beneath the tray, where there is no icon and no dialog to
+    # DESIGN §9 puts beneath the tray, where there is no icon and no dialog to
     # wait for. So calling the verb straight out of this script photographs an
     # invocation nobody makes: measured 2026-09-06, the box did not appear at
     # all, and the same container opened through the launcher below showed the

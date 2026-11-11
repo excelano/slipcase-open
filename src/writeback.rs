@@ -3,7 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 7. Repack to a temporary container beside the original and swap it
+//! DESIGN §7. Repack to a temporary container beside the original and swap it
 //! over: never modify in place, because an interruption mid-write corrupts the
 //! only copy.
 //!
@@ -49,13 +49,13 @@ pub enum Error {
     /// The content file could not be read out of the session directory.
     Content(std::io::Error),
     /// The container could not be read, or is no longer where the session
-    /// recorded it. Concept 6.4: a container may move or go while a session
+    /// recorded it. DESIGN §6.4: a container may move or go while a session
     /// runs, and this is not a failure of the edit.
     Container(std::io::Error),
     /// The file at the recorded path is not the container this session was
     /// opened against — its content file goes by another name. Writing back
     /// would rename the content file of a container somebody else may be
-    /// holding, so it refuses. Concept 6.3 asks the same question on the
+    /// holding, so it refuses. DESIGN §6.3 asks the same question on the
     /// recovery side; this is the guard on the acting side, and it belongs
     /// here because it is a safety property of the write-back rather than an
     /// optimisation in whatever called it.
@@ -70,7 +70,7 @@ pub enum Error {
     /// What the repack produced was not a conformant container, so it was not
     /// allowed to replace one. Nothing was changed.
     WouldNotBeConformant(String),
-    /// The replacement could not be put in place. Includes the case concept 7
+    /// The replacement could not be put in place. Includes the case DESIGN §7
     /// cares most about: the container carries a mark that could not be carried
     /// onto its replacement, which stops the commit rather than silently
     /// laundering it.
@@ -223,7 +223,7 @@ mod tests {
 
     #[test]
     fn the_flyleaf_member_is_returned_byte_for_byte() {
-        // Concept 7. SPEC 5 defines no fixity key and 2.2 gives no meaning to
+        // DESIGN §7. SPEC 5 defines no fixity key and 2.2 gives no meaning to
         // any other, so a changed content file falsifies nothing — and a
         // private key a producer used under 2.5 is one this cannot interpret,
         // so leaving it is the only honest option.
@@ -297,7 +297,7 @@ mod tests {
 
     #[test]
     fn a_container_that_went_away_is_reported_rather_than_recreated() {
-        // Concept 6.4: a container may move or be deleted while a session runs.
+        // DESIGN §6.4: a container may move or be deleted while a session runs.
         // Writing a fresh one where it used to be would be inventing a file the
         // user deleted.
         let tmp = tempfile::tempdir().unwrap();
@@ -347,7 +347,7 @@ mod tests {
 
     #[test]
     fn a_marked_container_is_still_marked_after_a_write_back() {
-        // The defect concept 7 exists to name: a plain rename is `MoveFileEx`,
+        // The defect DESIGN §7 exists to name: a plain rename is `MoveFileEx`,
         // which carries neither ACLs nor alternate data streams, and Mark of
         // the Web is an alternate data stream. `Destination::in_place` carries
         // it before the rename, so this survives — and fails the commit rather

@@ -3,7 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 6.3, amended 2026-09-03. **Recovery writes back an edit whose
+//! DESIGN §6.3. **Recovery writes back an edit whose
 //! container has not moved, and asks about everything else.**
 //!
 //! The rule it replaces was that recovery never writes back on its own, because
@@ -17,7 +17,7 @@
 //! learn.
 //!
 //! Two things keep the risk small. Most applications save by writing a sibling
-//! and renaming over the content file — the behaviour concept 6.1 already
+//! and renaming over the content file — the behaviour DESIGN §6.1 already
 //! relies on to know the application is working — so the file is the old bytes
 //! or the complete new ones and not a prefix of either. And what is written
 //! back is reported rather than done silently, so an outcome that looks wrong
@@ -86,7 +86,7 @@ pub enum State {
     /// also rare: it needs a second writer to the same container while this
     /// session was not running.
     Diverged,
-    /// The container is no longer where the session recorded it. Concept 6.4
+    /// The container is no longer where the session recorded it. DESIGN §6.4
     /// requires surviving this rather than failing at the rename: the content
     /// file is still here, and the person can be offered somewhere else to put
     /// it.
@@ -155,7 +155,7 @@ impl fmt::Display for State {
 /// them* — three things that must never be picked by accident.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Course {
-    /// Nothing was lost. Remove it and say nothing (concept 6.3).
+    /// Nothing was lost. Remove it and say nothing (DESIGN §6.3).
     Sweep,
     /// An edit that never reached a container that is still where it was. Put
     /// it back, and say so.

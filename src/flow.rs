@@ -1,14 +1,14 @@
-//! Concept 5's steps, joined into a session.
+//! DESIGN §5's steps, joined into a session.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
 //! Open and validate, decide, extract, mark, launch, watch, write back, close.
 //! Everything security-relevant that this tool does happens on the path through
-//! [`open`], which is what concept 8 means by the engine being one body of code
+//! [`open`], which is what DESIGN §8 means by the engine being one body of code
 //! on three platforms.
 //!
-//! **The policy check is here and immediately before the launch.** Concept 10
+//! **The policy check is here and immediately before the launch.** DESIGN §10
 //! says enforcement lives in the launch path: a value read at startup, held
 //! across a policy push, or handed in over IPC is a bypass. So [`open`] resolves
 //! policy itself, from sources it is given rather than from an answer somebody
@@ -31,7 +31,7 @@ pub enum Error {
     /// It is not a container, or not one this build can read.
     Container(slpc::Error),
     /// The content file is a program wearing a document's name, so it was not
-    /// opened. Concept 5.1: the one content check there is, and the only thing
+    /// opened. DESIGN §5.1: the one content check there is, and the only thing
     /// it can do is refuse something policy had already allowed.
     Misrepresented(content::Executable),
     /// Policy will not have it opened. Carries the decision, so the refusal can
@@ -48,7 +48,7 @@ pub enum Error {
     /// The desktop would not open it.
     Launch(std::io::Error),
     /// The content directory could not be watched. Fatal rather than
-    /// degraded: concept 6 already concedes that detection is unreliable, and a
+    /// degraded: DESIGN §6 already concedes that detection is unreliable, and a
     /// session with no watch at all would write back only at close while
     /// looking like one that writes back on every save.
     Watch(notify::Error),
@@ -101,11 +101,11 @@ pub enum Closed {
     Cleared,
     /// The target application still has things of its own in the content
     /// directory, so the session was handed to recovery instead of being
-    /// removed. Concept 6.2: the close is honoured, but deleting the directory
+    /// removed. DESIGN §6.2: the close is honoured, but deleting the directory
     /// underneath a running editor sends its next save nowhere this tool will
     /// ever look.
     ///
-    /// The watch comes with it. Concept 8: what a resident process is good for
+    /// The watch comes with it. DESIGN §8: what a resident process is good for
     /// on this path is noticing the application's last save when it happens,
     /// rather than leaving the question until somebody next opens a container.
     ///
@@ -121,7 +121,7 @@ pub enum Closed {
 /// A closed session the target application has not finished with, still
 /// watched.
 ///
-/// **Nothing here writes back, and that is concept 6.3 rather than an
+/// **Nothing here writes back, and that is DESIGN §6.3 rather than an
 /// omission.** The session is closed; a save arriving now is one this tool was
 /// not watching for when the user said they were done, and it cannot tell a
 /// complete save from a half-written one. So the watch is used to know when the
@@ -141,11 +141,11 @@ impl Lingering {
     }
 
     /// Whether the application appears to have finished: nothing of its own
-    /// left in the content directory (concept 6.1), and nothing written there
+    /// left in the content directory (DESIGN §6.1), and nothing written there
     /// for `quiet`.
     ///
     /// **Both halves, because either alone is wrong.** Siblings gone is the
-    /// signal concept 6.1 settles on, and it says the application cleaned up;
+    /// signal DESIGN §6.1 settles on, and it says the application cleaned up;
     /// it says nothing about a save still being flushed. A quiet period alone
     /// would fire in the middle of somebody's afternoon, between two edits.
     ///
@@ -178,7 +178,7 @@ impl Lingering {
     }
 }
 
-/// Open a container: concept 5, steps 1 through 7.
+/// Open a container: DESIGN §5, steps 1 through 7.
 ///
 /// # Errors
 ///
@@ -197,7 +197,7 @@ pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result
         return Err(Error::Refused(decision));
     }
 
-    // Concept 5.1's content check, and it refuses.
+    // DESIGN §5.1's content check, and it refuses.
     //
     // **A veto, not a control, and the distinction is what keeps 5.1's argument
     // standing.** The extension still decides what may be opened — the
@@ -269,7 +269,7 @@ pub fn open(root: &Path, container_path: &Path, outside: &Outside<'_>) -> Result
     })
 }
 
-/// What concept 5.1's check makes of the content file, read out of the
+/// What DESIGN §5.1's check makes of the content file, read out of the
 /// container rather than off disk so the answer is available before anything
 /// is written.
 fn misrepresentation<R: std::io::Read + std::io::Seek>(
@@ -313,7 +313,7 @@ impl Opened {
     }
 
     /// Whether the target application has anything of its own in the content
-    /// directory (concept 6.1).
+    /// directory (DESIGN §6.1).
     ///
     /// # Errors
     ///
@@ -334,7 +334,7 @@ impl Opened {
     ///
     /// # Errors
     ///
-    /// Where the write-back failed. The session stays open: concept 6.2 puts
+    /// Where the write-back failed. The session stays open: DESIGN §6.2 puts
     /// the close at the user's hand, and a failed save is a reason to tell them
     /// rather than to give up on the container.
     pub fn pump(&mut self) -> Result<bool, writeback::Error> {
@@ -373,8 +373,8 @@ impl Opened {
     /// number of repacks a function of how busy the machine is. A quiet period
     /// before repacking would trade that for latency on every save and still
     /// only make the guess better. `recover` answers the real question by
-    /// comparing against the CRC-32 the container already records (concept
-    /// 6.3), so a redundant event costs one comparison instead of one rebuild.
+    /// comparing against the CRC-32 the container already records (DESIGN
+    /// §6.3), so a redundant event costs one comparison instead of one rebuild.
     ///
     /// **Only the two quiet states are silent.** An earlier version returned
     /// *nothing to do* for every state that was not `Edited`, which meant a
@@ -412,7 +412,7 @@ impl Opened {
 
     /// Close the session: catch up on the watch, then clean up.
     ///
-    /// Concept 6.2's question — *write it back anyway?* — is the caller's, and
+    /// DESIGN §6.2's question — *write it back anyway?* — is the caller's, and
     /// so is the answer: it asks, and calls
     /// [`save_if_changed`](Self::save_if_changed) if the answer is yes. This
     /// used to take a `bool` and repack unconditionally on it, which rebuilt
@@ -428,7 +428,7 @@ impl Opened {
         // between the last pump and the close is a save.
         self.pump()?;
 
-        // Concept 6.2. The close is honoured either way; what changes is
+        // DESIGN §6.2. The close is honoured either way; what changes is
         // whether the directory goes now or is handed to recovery, so that an
         // editor still holding the content file has somewhere for its next
         // save to land and the next launch asks about it.
@@ -442,9 +442,8 @@ impl Opened {
         // **The watch goes before the directory does, and the order is load
         // bearing.** `Watch::drop` waits for the platform to finish stopping
         // it, so by the line below there is no watcher left to collide with the
-        // removal. Removing first, which is what this used to do, is what a
-        // 300-second hang was caught doing; `docs/windows-save-test-hang.md`
-        // has the stack.
+        // removal. Removing first is what a 300-second hang was caught doing:
+        // `remove_dir_all` parked against a watcher re-arming its read.
         drop(self.watch);
 
         // A failure to remove leaves a session recovery will pick up, which is
@@ -537,7 +536,7 @@ mod tests {
 
     #[test]
     fn a_save_that_emits_one_event_still_reaches_the_container() {
-        // Concept 6 is written about editors that save atomically, and the
+        // DESIGN §6 is written about editors that save atomically, and the
         // tests followed it there. This is the other shape: a plain write in
         // place, which emits fewer events. It passes either side of the
         // `pump_including` change rather than pinning it — what it pins is that
@@ -606,7 +605,7 @@ mod tests {
 
     #[test]
     fn policy_refuses_before_a_session_directory_exists() {
-        // Concept 10 puts enforcement in the launch path, and a refusal that
+        // DESIGN §10 puts enforcement in the launch path, and a refusal that
         // had already written the content file somewhere would be a refusal in
         // name.
         let tmp = tempfile::tempdir().unwrap();
@@ -638,7 +637,7 @@ mod tests {
 
     #[test]
     fn an_executable_wearing_a_documents_name_is_refused() {
-        // Concept 5.1's check, as a veto. It admits nothing — policy had
+        // DESIGN §5.1's check, as a veto. It admits nothing — policy had
         // already allowed `.pdf` — and all it does here is say no to something
         // policy allowed.
         let tmp = tempfile::tempdir().unwrap();
@@ -726,7 +725,7 @@ mod tests {
 
     #[test]
     fn closing_while_the_application_is_working_hands_over_to_recovery() {
-        // Concept 6.2: the close is honoured, but removing the directory under
+        // DESIGN §6.2: the close is honoured, but removing the directory under
         // a running editor sends its next save nowhere this tool will look.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
@@ -887,9 +886,9 @@ mod tests {
 
     /// **A diagnostic, not part of the gate**, which is why it is `ignore`d.
     ///
-    /// `docs/windows-save-test-hang.md` caught a wedge in `TempDir::drop`:
-    /// `remove_dir_all` on a watched directory against the watcher re-arming
-    /// `ReadDirectoryChangesW` on it. `close` does that collision by
+    /// A wedge was caught in `TempDir::drop`: `remove_dir_all` on a watched
+    /// directory against the watcher re-arming `ReadDirectoryChangesW` on it.
+    /// `close` does that collision by
     /// construction rather than by luck — `session.remove()` removes the
     /// watched directory while `self.watch` is still alive, and the watch is
     /// dropped only afterwards. This loops the shipping close path so the
@@ -944,9 +943,8 @@ mod tests {
     /// **The positive control for [`close_alone_under_repetition`].** Same
     /// loop, minus the close: `o` and `tmp` both go at the end of the scope,
     /// so the watch is stopped while `remove_dir_all` walks the directory it
-    /// was watching. That is the shape of the stack in
-    /// `docs/windows-save-test-hang.md`, and this is the run that says whether
-    /// the harness can catch it at all.
+    /// was watching. That is the shape of the wedged stack, and this is the run
+    /// that says whether the harness can catch it at all.
     ///
     /// Without this, "no wedge in N closes" is not evidence about `close`; it
     /// is only evidence that the loop is too gentle to wedge anything — which

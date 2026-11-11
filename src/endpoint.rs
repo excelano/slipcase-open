@@ -3,7 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 8: where no instance is running, the invocation starts one and hands
+//! DESIGN §8: where no instance is running, the invocation starts one and hands
 //! over; where one is, it hands over and exits.
 //!
 //! **The endpoint is restricted to its owner by the directory it sits in**,
@@ -195,7 +195,7 @@ mod unix {
     }
 }
 
-/// Concept 8's named pipe, and the ACL that makes it this user's front door
+/// DESIGN §8's named pipe, and the ACL that makes it this user's front door
 /// rather than the machine's.
 #[cfg(windows)]
 pub use pipe::{bind, connect, Incoming, Listener, Stream};
@@ -222,7 +222,7 @@ mod pipe {
     //! **The name carries the SID and the descriptor enforces it.** The pipe
     //! prefix is one namespace for the whole machine, so a fixed name would be
     //! the machine's door and two accounts would collide on it. The SID in the
-    //! name keeps them apart; the ACL is what keeps them out, and concept 8 puts
+    //! name keeps them apart; the ACL is what keeps them out, and DESIGN §8 puts
     //! that among the requirements rather than the hardening.
     //!
     //! **Only the server half reaches past `std`.** A pipe opens as a file, so
@@ -681,7 +681,7 @@ mod tests {
     }
 }
 
-// The named pipe's own. Concept 8's front door on Windows, tested against the
+// The named pipe's own. DESIGN §8's front door on Windows, tested against the
 // same questions the Unix module asks, with one asked in reverse: there is no
 // debris to clear here, and that is a property worth a test rather than a
 // paragraph.

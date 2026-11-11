@@ -3,20 +3,20 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 8. One process holds every open session; every other invocation
+//! DESIGN §8. One process holds every open session; every other invocation
 //! reaches it through the front door and exits.
 //!
 //! **Requests are served on the loop's own thread and the accepting is not.** A
 //! blocking `accept` would starve the watchers, and the watchers are the whole
 //! reason this process exists. So a thread does nothing but accept and hand
 //! connections over, and the loop alternates between answering one, pumping the
-//! sessions, and collecting whatever concept 9's channel has been told.
+//! sessions, and collecting whatever DESIGN §9's channel has been told.
 //!
 //! ## Three lists rather than one
 //!
 //! A session is open, or it is closed and the application has not finished with
-//! it (concept 6.2), or a question has been asked about it and nothing may
-//! happen until somebody answers (concept 6.3). Concept 8 says the process
+//! it (DESIGN §6.2), or a question has been asked about it and nothing may
+//! happen until somebody answers (DESIGN §6.3). DESIGN §8 says the process
 //! lives while any of the three exists and stops when none does, so they are
 //! three lists and `is_idle` is all of them being empty.
 
@@ -37,7 +37,7 @@ use crate::table::Table;
 const TICK: Duration = Duration::from_millis(250);
 
 /// How long a closed session's content directory must go untouched before the
-/// application is taken to have finished with it (concept 8).
+/// application is taken to have finished with it (DESIGN §8).
 ///
 /// Short, because it is the second of two conditions rather than the whole
 /// test: the siblings have to be gone as well, and an application that has
@@ -48,7 +48,7 @@ const SETTLED: Duration = Duration::from_secs(2);
 /// How long the instance stays alive holding a question nobody has answered,
 /// where there is nothing standing to keep showing it.
 ///
-/// **A judgement, and worth naming as one.** Concept 8 says to bound the linger
+/// **A judgement, and worth naming as one.** DESIGN §8 says to bound the linger
 /// and does not say where, because there is no measurement that settles it:
 /// what it trades is a resident process against a question that can still be
 /// acted on. Five minutes is long enough that somebody who saw the notification
@@ -81,7 +81,7 @@ struct Pending {
     /// What the answer acts on.
     session: Session,
     /// A container to open once this is settled, where the question was raised
-    /// by an `open` that could not proceed until it was (concept 8).
+    /// by an `open` that could not proceed until it was (DESIGN §8).
     then_open: Option<PathBuf>,
     /// When it was last put in front of somebody. Reset by a `Reveal`, which is
     /// somebody saying *not yet* rather than declining to answer.
@@ -96,7 +96,7 @@ pub struct Resident {
     pending: Vec<Pending>,
     /// [`SETTLED`] and [`HELD`], held rather than read, so that the rules they
     /// express can be tested instead of waited out. Nothing outside the tests
-    /// changes them: a five-minute hold is not a setting concept 10 asks for,
+    /// changes them: a five-minute hold is not a setting DESIGN §10 asks for,
     /// and making it one would put a second answer to *how long* in a file.
     settles_after: Duration,
     /// How long an unanswered question is held before being taken back, or
@@ -141,7 +141,7 @@ impl Resident {
         self
     }
 
-    /// Whether there is anything left to hold, which is concept 8's exit rule.
+    /// Whether there is anything left to hold, which is DESIGN §8's exit rule.
     #[must_use]
     pub fn is_idle(&self) -> bool {
         self.sessions.is_empty() && self.lingering.is_empty() && self.pending.is_empty()
@@ -166,7 +166,7 @@ impl Resident {
 
     /// Put back an edit that never reached its container.
     ///
-    /// **Concept 6.3 as amended: this one is not a question.** `recover` only
+    /// **DESIGN §6.3: this one is not a question.** `recover` only
     /// answers [`recover::Course::WriteBack`] where it knows the difference is
     /// this session's own edit and the container is still holding what the two
     /// last agreed on, so there is nothing for a person to decide and nobody
@@ -283,7 +283,7 @@ impl Resident {
 
     /// Open a container, or bring forward the session that already has it.
     fn open(&mut self, container: &Path, voice: Voice, outside: &Outside<'_>) -> Response {
-        // Concept 8: a container that already has a live session is not opened
+        // DESIGN §8: a container that already has a live session is not opened
         // twice. Two sessions would both repack it and the second write-back
         // would overwrite the first with nothing said. Re-launching is what a
         // second double-click on an open document does everywhere else.
@@ -311,7 +311,7 @@ impl Resident {
             };
         }
 
-        // Concept 8: a pending recovery item is resolved first. A session left
+        // DESIGN §8: a pending recovery item is resolved first. A session left
         // by a crash is not in the live table, so nothing refuses it — but
         // opening a fresh one would extract the container's current content
         // leave the recovered edit with nowhere to go.
@@ -335,7 +335,7 @@ impl Resident {
                     || container.display().to_string(),
                     |n| n.to_string_lossy().into_owned(),
                 );
-                // **The one refusal that is spoken twice.** Concept 5.1's check
+                // **The one refusal that is spoken twice.** DESIGN §5.1's check
                 // fires close to never and means one thing when it does, and
                 // the person is holding a file somebody sent them believing it
                 // is a document. A notification they may not look at is not
@@ -395,10 +395,10 @@ impl Resident {
         }
     }
 
-    /// Put concept 6.3's question about a session left behind on this
+    /// Put DESIGN §6.3's question about a session left behind on this
     /// container, where there is one worth asking about, and hold it.
     ///
-    /// Answers `true` where the open must wait for it. Concept 8: *the recovery
+    /// Answers `true` where the open must wait for it. DESIGN §8: *the recovery
     /// question comes first, and the new session follows the answer* — so the
     /// container is remembered against the question and opened once it is
     /// settled, rather than the person having to double-click a second time.
@@ -470,7 +470,7 @@ impl Resident {
     /// Every session, with the id apart from the words.
     ///
     /// One source for both surfaces: `list` puts the id back in front and hands
-    /// the lines to the command line, and concept 12's standing list takes the
+    /// the lines to the command line, and DESIGN §12's standing list takes the
     /// pieces, because a menu needs the id to act on and no room to show it.
     pub(crate) fn listed(&self) -> Vec<crate::present::Listed> {
         let mut out: Vec<crate::present::Listed> = self
@@ -530,7 +530,7 @@ impl Resident {
                         recover::state(s)
                     ),
                     live: false,
-                    // Concept 6.3: what needs nobody is swept and never spoken
+                    // DESIGN §6.3: what needs nobody is swept and never spoken
                     // of. Listing it in a standing surface is furniture.
                     needs_a_person: recover::state(s).needs_a_person(),
                     write_backs: None,
@@ -581,7 +581,7 @@ impl Resident {
         };
         match opened.close() {
             Ok(flow::Closed::Cleared) => Response::Ok(vec!["Session closed.".into()]),
-            // Concept 6.2 and 8. The close is honoured; the directory is not
+            // DESIGN §6.2 and 8. The close is honoured; the directory is not
             // removed, and the watch stays on it so that the application's last
             // save is noticed when it happens rather than at the next launch.
             Ok(flow::Closed::LeftForRecovery(lingering)) => {
@@ -618,7 +618,7 @@ impl Resident {
                     // notifications for the same fact. The first is worth
                     // saying, because it is how somebody learns the loop works
                     // at all; the rest are the tool congratulating itself.
-                    // Concept 6.2 wants a session visible and wants somewhere
+                    // DESIGN §6.2 wants a session visible and wants somewhere
                     // to look when an edit is expected to have landed, and
                     // `sessions` answers that better than a stream of banners.
                     if s.record().write_backs <= 1 {
@@ -635,7 +635,7 @@ impl Resident {
                 }
                 Ok(false) => {}
                 // One failing container is not a reason to stop watching the
-                // rest, and it is a reason to say so: concept 6.2 puts the
+                // rest, and it is a reason to say so: DESIGN §6.2 puts the
                 // close at the user's hand, and a save that did not land is the
                 // thing they most need to know did not.
                 Err(e) => {
@@ -694,10 +694,10 @@ impl Resident {
             let session = lingering.into_session();
             let state = recover::state(&session);
             let name = slpc::display_name(&session.record().content_name).into_owned();
-            // Concept 6.3: equal to what the container holds means nothing was
+            // DESIGN §6.3: equal to what the container holds means nothing was
             // lost, so clean up and say nothing. This is that case arriving
-            // while the process is still alive to see it, which is what concept
-            // 8 keeps it alive for.
+            // while the process is still alive to see it, which is what DESIGN
+            // §8 keeps it alive for.
             //
             // And the amended case beside it: a save that landed after the
             // close is the most ordinary reason to be here at all — somebody
@@ -844,7 +844,7 @@ impl Resident {
             Choice::Reveal => unreachable!("answered above"),
         }
 
-        // Concept 8: the new session follows the answer.
+        // DESIGN §8: the new session follows the answer.
         if let Some(container) = pending.then_open {
             if let Response::Err(why) = self.open(&container, Voice::Instance, outside) {
                 outside.report(&Report::interrupt(fill(
@@ -893,7 +893,7 @@ impl Resident {
     ///
     /// A question left standing when this process goes is a button with nobody
     /// behind it, so each is withdrawn and replaced by the two commands that
-    /// reach the same decision. The session directories stay: concept 6.3
+    /// reach the same decision. The session directories stay: DESIGN §6.3
     /// carries them to the next launch, which is where they were always going
     /// to be answered if nobody answered here.
     pub fn stand_down(&mut self, outside: &Outside<'_>) {
@@ -952,7 +952,7 @@ fn say(voice: Voice, outside: &Outside<'_>, report: Report) -> Response {
 /// A refusal said once, on the same rule.
 ///
 /// Weighted as an interrupt through the channel. A refusal answers something
-/// somebody just double-clicked, and concept 5.1's extensionless case is one of
+/// somebody just double-clicked, and DESIGN §5.1's extensionless case is one of
 /// the things it can be: a quiet refusal there reads as the document simply not
 /// opening.
 fn refuse(voice: Voice, outside: &Outside<'_>, why: String) -> Response {
@@ -964,14 +964,14 @@ fn refuse(voice: Voice, outside: &Outside<'_>, why: String) -> Response {
 
 /// Remove the sessions left behind that have nothing to say.
 ///
-/// Concept 6.3: a recovered content file matching its container means nothing was
+/// DESIGN §6.3: a recovered content file matching its container means nothing was
 /// lost, so clean up and say nothing.
 ///
-/// **This could not be done before Phase 2 and that is why it was not.** A
-/// session that is open and not yet edited reads as unchanged, and no process
-/// could tell a live session from a dead one — a sweep run from a second
-/// terminal would have deleted a directory out from under a running editor.
-/// `live` is what the resident instance knows and nothing else did.
+/// **It needs the resident instance.** A session that is open and not yet
+/// edited reads as unchanged, and only the instance can tell a live session
+/// from a dead one — a sweep run without it would delete a directory out from
+/// under a running editor. `live` is what the resident instance knows and
+/// nothing else does.
 ///
 /// # Errors
 ///
@@ -1046,7 +1046,7 @@ pub fn run(
 
         resident.turn(outside);
 
-        // Concept 12's standing list, told what to say and asked what was
+        // DESIGN §12's standing list, told what to say and asked what was
         // said back. Only when it changed: this is every 250 milliseconds, and
         // all three are the same on almost all of them.
         //
@@ -1080,7 +1080,7 @@ pub fn run(
             break;
         }
 
-        // Concept 8's exit rule: nothing open, nothing lingering, nothing
+        // DESIGN §8's exit rule: nothing open, nothing lingering, nothing
         // waiting on somebody. Staying resident does nothing for the crash
         // case, where this process is dead by definition.
         //
@@ -1197,7 +1197,7 @@ mod tests {
 
     /// A session left behind by a process that died with an edit in it.
     ///
-    /// Its container has not moved, so concept 6.3 as amended puts the edit
+    /// Its container has not moved, so DESIGN §6.3 puts the edit
     /// back without asking. Use [`a_diverged_session`] for the tests that are
     /// about the question.
     fn a_crashed_session(root: &Path, c: &Path, name: &str, edit: &[u8]) -> session::Session {
@@ -1214,7 +1214,7 @@ mod tests {
     /// The same, and then somebody else repacks the container while the session
     /// is not running.
     ///
-    /// **The only shape that still raises concept 6.3's question**, because it
+    /// **The only shape that still raises DESIGN §6.3's question**, because it
     /// is the only one where both sides hold work the other does not and no
     /// answer is obviously right.
     fn a_diverged_session(root: &Path, c: &Path, name: &str, edit: &[u8]) -> session::Session {
@@ -1225,7 +1225,7 @@ mod tests {
 
     #[test]
     fn opening_a_container_twice_brings_the_session_forward() {
-        // Concept 8. Two sessions would both repack it and the second
+        // DESIGN §8. Two sessions would both repack it and the second
         // write-back would overwrite the first with nothing said.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
@@ -1312,7 +1312,7 @@ mod tests {
 
     #[test]
     fn a_recovery_item_on_the_same_container_is_asked_about_first() {
-        // Concept 8. Opening a fresh session would extract the container's
+        // DESIGN §8. Opening a fresh session would extract the container's
         // current content file and leave the recovered edit with nowhere to go.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
@@ -1330,8 +1330,8 @@ mod tests {
         );
         assert_eq!(session::scan(&root).unwrap().len(), 1);
 
-        // Concept 9 turns the Phase 2 refusal into a question, and it has to
-        // carry all three of concept 6.3's answers.
+        // DESIGN §9 makes this a question rather than a refusal, and it has to
+        // carry all three of DESIGN §6.3's answers.
         let asked = w.channel.questions();
         assert_eq!(asked.len(), 1);
         assert!(asked[0]
@@ -1362,7 +1362,7 @@ mod tests {
 
     #[test]
     fn writing_back_a_recovered_session_opens_the_one_that_was_waiting() {
-        // Concept 8: the new session follows the answer, so nobody has to
+        // DESIGN §8: the new session follows the answer, so nobody has to
         // double-click the container a second time.
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
@@ -1458,7 +1458,7 @@ mod tests {
 
     #[test]
     fn a_question_nobody_answers_is_taken_back_and_replaced_by_the_commands() {
-        // Concept 8 says to bound the linger. What it costs is that the buttons
+        // DESIGN §8 says to bound the linger. What it costs is that the buttons
         // stop working, so they are removed rather than left to do nothing, and
         // what replaces them reaches the same decision.
         let tmp = tempfile::tempdir().unwrap();
@@ -1482,7 +1482,7 @@ mod tests {
             .channel
             .said()
             .contains(&format!("recover {about} --discard")));
-        // The session itself stays. Concept 6.3 carries it to the next launch.
+        // The session itself stays. DESIGN §6.3 carries it to the next launch.
         assert!(left.dir().exists());
         assert!(r.is_idle());
     }
@@ -1665,7 +1665,7 @@ mod tests {
 
     #[test]
     fn closing_while_the_application_is_working_keeps_the_watch_on_it() {
-        // Concept 6.2 and 8. The close is honoured, the directory stays, and
+        // DESIGN §6.2 and 8. The close is honoured, the directory stays, and
         // the process keeps watching so the application's last save is noticed
         // when it happens rather than at the next launch.
         let tmp = tempfile::tempdir().unwrap();
@@ -1695,7 +1695,7 @@ mod tests {
     #[test]
     fn a_lingering_session_saved_after_the_close_is_written_back_not_asked_about() {
         // The most ordinary reason to be here at all: somebody pressed Save on
-        // the way out. Concept 6.3 as amended — the container has not moved, so
+        // the way out. DESIGN §6.3 — the container has not moved, so
         // the save is theirs and it goes home. Putting it to them as *write
         // back, discard, or reveal the folder* would be this tool's own timing
         // handed back to them as a decision.
@@ -1740,7 +1740,7 @@ mod tests {
 
     #[test]
     fn a_lingering_session_that_matches_its_container_goes_quietly() {
-        // Concept 6.3: equal means nothing was lost, so clean up and say
+        // DESIGN §6.3: equal means nothing was lost, so clean up and say
         // nothing. This is that case arriving while the process is still alive
         // to see it, rather than at the next launch.
         let tmp = tempfile::tempdir().unwrap();
@@ -1778,7 +1778,7 @@ mod tests {
 
     #[test]
     fn a_double_click_is_spoken_for_and_a_terminal_is_not() {
-        // Concept 9. An invocation with nowhere to print is why the instance
+        // DESIGN §9. An invocation with nowhere to print is why the instance
         // has a channel at all, and one with a terminal of its own would
         // otherwise hear everything twice.
         let tmp = tempfile::tempdir().unwrap();
@@ -1845,7 +1845,7 @@ mod tests {
 
     #[test]
     fn the_sweep_will_not_touch_a_live_session() {
-        // The reason this could not be written before Phase 2. A session that
+        // Why the sweep needs the session table. A session that
         // is open and not yet edited reads as unchanged, and deleting it would
         // take the directory out from under a running editor.
         let tmp = tempfile::tempdir().unwrap();
@@ -1988,7 +1988,7 @@ mod tests {
 
     #[test]
     fn a_content_file_that_is_a_program_is_the_one_thing_red_is_for() {
-        // Concept 5.1's check, which fires close to never and means one thing
+        // DESIGN §5.1's check, which fires close to never and means one thing
         // when it does. Nothing else in this file may reach `Danger`.
         let tmp = tempfile::tempdir().unwrap();
         let w = World::new();
@@ -2059,7 +2059,7 @@ mod tests {
 
         let mut r = Resident::new(&root);
         assert_eq!(r.mood(), crate::present::Mood::Settled);
-        // Opening the same container is what raises concept 6.3's question.
+        // Opening the same container is what raises DESIGN §6.3's question.
         let _ = r.handle(announcing(c), &w.loud());
         assert_eq!(
             r.mood(),

@@ -1,4 +1,4 @@
-//! Concept 12's standing session list on Windows: an icon by the clock.
+//! DESIGN §12's standing session list on Windows: an icon by the clock.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
@@ -6,7 +6,7 @@
 //! **A thread of its own, because a tray icon is a window and a window needs a
 //! pump.** `Shell_NotifyIcon` reports what the person did by posting a message
 //! to a window, so something has to call `GetMessage` in a loop forever.
-//! `resident::run` cannot: it is pumping the watchers, which concept 8 makes
+//! `resident::run` cannot: it is pumping the watchers, which DESIGN §8 makes
 //! the reason the process exists, and a blocking message loop there would stop
 //! them. So the window, the icon and the pump live on one thread and talk to
 //! the loop through two mutexes — the lines to show, and what was chosen.
@@ -15,7 +15,7 @@
 //! here can change that. `Shell_NotifyIcon` has no way to say *this window is
 //! gone*; the shell finds out when somebody's pointer passes over the icon and
 //! the message bounces. So a crash, or a kill, leaves a ghost until then —
-//! which is the same shape as concept 8's crash story for sessions, where what
+//! which is the same shape as DESIGN §8's crash story for sessions, where what
 //! is left behind is recoverable rather than tidy. [`Tray::drop`] covers every
 //! ending this process is present for, and is the whole of what it can cover.
 //!
@@ -182,7 +182,7 @@ impl Standing for Tray {
 
     fn holding(&self) -> bool {
         // Always, and see `Standing::holding` for why this is a change to
-        // concept 8 rather than an exception to it. An icon that vanished when
+        // DESIGN §8 rather than an exception to it. An icon that vanished when
         // the last document was closed would take every warning with it, and a
         // warning is exactly the thing that arrives after the work is done.
         //
@@ -204,7 +204,7 @@ fn redress(hwnd: HWND, shown: &Shown) {
     let mut data = icon_data(hwnd, Some(icon(shown.mood)));
     // What the trouble is, if there is one, because that is what somebody
     // hovering over a coloured icon is asking. Otherwise what the tool is
-    // quietly doing, which concept 6.2 has no other place to say: the report
+    // quietly doing, which DESIGN §6.2 has no other place to say: the report
     // that would have said it is `Weight::Routine`, and the default volume
     // drops those for good reason — it is one per save.
     let text = match (shown.troubles.first(), shown.lines.len()) {
@@ -511,7 +511,7 @@ unsafe fn offer(hwnd: HWND) {
             let _ = AppendMenuW(menu, MF_SEPARATOR, 0, PCWSTR::null());
         }
 
-        // Concept 6.3 sweeps what needs nobody and says nothing about it.
+        // DESIGN §6.3 sweeps what needs nobody and says nothing about it.
         // Putting it in a standing surface is furniture with a name on it.
         let lines: Vec<&Listed> = shown
             .lines

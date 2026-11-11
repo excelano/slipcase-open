@@ -3,7 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 10. Four layers — machine policy, user policy, user configuration,
+//! DESIGN §10. Four layers — machine policy, user policy, user configuration,
 //! built-in default — resolved into one answer, and one function that answers
 //! it for a content file.
 //!
@@ -12,7 +12,7 @@
 //! business and lives behind [`Source`]. What is here is pure, which is what
 //! makes the precedence testable without three operating systems.
 //!
-//! **Nothing here is cached, and that is the security property.** Concept 10
+//! **Nothing here is cached, and that is the security property.** DESIGN §10
 //! puts enforcement in the launch path, immediately before execution: a value
 //! read at startup, or held across a policy push, or handed in over IPC, is a
 //! bypass. [`decide`] resolves from the sources on every call for that reason,
@@ -52,7 +52,7 @@ impl Settings {
     /// whatever words a person would use to go and look.
     ///
     /// A path on one platform and a key on another, so the answer is a string
-    /// rather than a `Path`: concept 10's point is that only the running
+    /// rather than a `Path`: DESIGN §10's point is that only the running
     /// program can say where its settings are, and a type that can only hold
     /// filenames cannot say it on Windows.
     #[must_use]
@@ -94,7 +94,7 @@ pub fn for_this_platform() -> Settings {
 /// Why a layer could not be read.
 ///
 /// **A policy source that fails is not a policy source that says nothing.** An
-/// administrator's deny list that cannot be read is the case concept 10 cares
+/// administrator's deny list that cannot be read is the case DESIGN §10 cares
 /// about most, and answering `None` for it would permit whatever it was written
 /// to refuse — quietly, and for as long as the typo survives. So reading a
 /// layer can fail, and the failure travels to whoever is deciding.
@@ -158,7 +158,7 @@ impl Origin {
     }
 }
 
-/// The name a person knows a layer by, which is the vocabulary concept 10 uses
+/// The name a person knows a layer by, which is the vocabulary DESIGN §10 uses
 /// and the vocabulary the shipped policy file and the manual page use with it.
 impl fmt::Display for Origin {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -184,7 +184,7 @@ impl fmt::Display for Origin {
 /// [`crate::present::Channel::ask`] rather than `report`, so nothing here
 /// reaches them. That is structural rather than a rule somebody has to
 /// remember: a session waiting on a decision would otherwise be silenced into
-/// stranding its content file, and concept 6.3 has nothing else to offer that
+/// stranding its content file, and DESIGN §6.3 has nothing else to offer that
 /// person until the next launch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Notify {
@@ -193,7 +193,7 @@ pub enum Notify {
     /// Everything except [`crate::present::Weight::Routine`] — so warnings,
     /// failures, questions, and the answer to anything the person did. **The
     /// default**, because the routine half is a notification per save and
-    /// somebody editing a document for an hour gets dozens of them. Concept 6.2
+    /// somebody editing a document for an hour gets dozens of them. DESIGN §6.2
     /// wants a session visible and wants somewhere to look when an edit is
     /// expected to have landed, and `sessions` answers that better than a
     /// stream of banners.
@@ -218,7 +218,7 @@ pub struct Layer {
     /// Extensions this layer permits.
     pub allowed: Option<Vec<String>>,
     /// Whether `allowed` stands alone or adds. **Defaults to [`Mode::Replace`]
-    /// deliberately.** Concept 10 names the silent hole: an administrator who
+    /// deliberately.** DESIGN §10 names the silent hole: an administrator who
     /// writes a list expecting it to be exhaustive and gets it unioned with the
     /// defaults has permitted things they never listed, and never finds out.
     /// Appending is the surprising reading, so it is the one that has to be
@@ -232,7 +232,7 @@ pub struct Layer {
     /// administered too.
     pub user_may_extend: Option<bool>,
     /// Whether every write-back is confirmed, rather than only the session
-    /// close. Concept 6.2 keeps this off by default: a repack is atomic and
+    /// close. DESIGN §6.2 keeps this off by default: a repack is atomic and
     /// unremarkable, and a prompt on every save is friction for everyone who is
     /// not archiving.
     pub confirm_each_write_back: Option<bool>,
@@ -269,7 +269,7 @@ impl Layer {
 /// source is empty. It is not an error and is not a refusal.
 pub trait Source {
     /// This layer, read now rather than remembered. An implementation that
-    /// caches is the bypass concept 10 warns about.
+    /// caches is the bypass DESIGN §10 warns about.
     ///
     /// `Ok(None)` means this platform has no such source, or it is not there.
     /// That is not an error and not a refusal. An `Err` means the source exists
@@ -289,7 +289,7 @@ pub trait Source {
 /// away and everything wrongly on it is a guardrail this tool claimed and did
 /// not provide.
 ///
-/// **`slpc` is not here**, and concept 10 explains why. A container whose
+/// **`slpc` is not here**, and DESIGN §10 explains why. A container whose
 /// content file is a container is usually somebody having packed one by mistake, or
 /// an archival wrapper, and neither wants an automatic recursive open. It stays
 /// allowlistable for the archival user who nests deliberately.
@@ -322,8 +322,8 @@ pub struct Effective {
     /// `/etc/slipcase/open.toml` documenting every key and setting none of
     /// them, so a rule that counted the file's presence would have every
     /// machine that installed the package told its settings were administered
-    /// when nothing had been administered — which is the support load concept
-    /// 10 wants this to reduce, arriving by the front door.
+    /// when nothing had been administered — which is the support load DESIGN
+    /// §10 wants this to reduce, arriving by the front door.
     pub managed: bool,
     /// Whether the user's own configuration was suppressed by policy.
     pub configuration_suppressed: bool,
@@ -337,7 +337,7 @@ pub struct Effective {
     /// decision, so nothing is lost by resolving it when the instance starts.
     pub notify: Notify,
     /// List entries that can never match anything, because they are not
-    /// comparable under concept 5.2. Surfaced rather than dropped: an entry an
+    /// comparable under DESIGN §5.2. Surfaced rather than dropped: an entry an
     /// administrator wrote and this will never honour is worth a word, and
     /// silently ignoring one on a deny list is the worse half.
     pub uncomparable_entries: Vec<String>,
@@ -354,7 +354,7 @@ pub enum Decision {
     /// Not on any allow list. A different answer from `Denied`, because the
     /// remedy differs and so does the sentence a person should be shown.
     NotPermitted { key: String },
-    /// No extension, or one nothing can compare. Concept 5.1 refuses this
+    /// No extension, or one nothing can compare. DESIGN §5.1 refuses this
     /// whatever the lists say, because `ShellExecuteEx` answers it with the
     /// Open With dialog, which offers every executable on the machine inside a
     /// flow the person reads as *open the document*.
@@ -363,7 +363,7 @@ pub enum Decision {
 
 /// Resolve the layers and answer for this content file, in one call.
 ///
-/// **Takes the content file's name and not an extension.** Concept 10 requires
+/// **Takes the content file's name and not an extension.** DESIGN §10 requires
 /// the decision to be made after the extension is taken and folded, and a
 /// signature accepting a key would let a caller hand in one it computed some
 /// other way. The folding is [`extension::policy_key`]'s, once, here.
@@ -429,7 +429,7 @@ pub fn resolve(source: &dyn Source) -> std::result::Result<Effective, Error> {
 
     // Every layer's refusals, unioned. A deny is never overridden, including by
     // a layer with more authority: a user refusing something for themselves is
-    // a preference an administrator has no reason to overrule, and concept 10
+    // a preference an administrator has no reason to overrule, and DESIGN §10
     // says the deny list wins regardless of every other setting.
     let mut denied = BTreeSet::new();
     for layer in stack.iter().filter_map(|(_, l)| l.as_ref()) {
@@ -557,7 +557,7 @@ mod tests {
 
     #[test]
     fn a_nested_container_is_not_permitted_by_default() {
-        // Concept 10. Allowlistable, and not shipped allowed.
+        // DESIGN §10. Allowlistable, and not shipped allowed.
         assert!(!BUILT_IN_ALLOWED.contains(&"slpc"));
         assert_eq!(
             decide(&Stack::default(), "inner.slpc").unwrap(),
@@ -569,7 +569,7 @@ mod tests {
 
     #[test]
     fn a_policy_list_replaces_rather_than_appends_when_it_does_not_say() {
-        // The silent hole concept 10 names: an administrator writing an
+        // The silent hole DESIGN §10 names: an administrator writing an
         // exhaustive list and getting it unioned with the defaults has
         // permitted things they never listed and will not find out.
         let s = Stack {
@@ -633,7 +633,7 @@ mod tests {
 
     #[test]
     fn a_deny_beneath_wins_over_an_allow_above_it() {
-        // Concept 10 says the deny list wins regardless of every other
+        // DESIGN §10 says the deny list wins regardless of every other
         // setting, and that includes authority. A user refusing something for
         // themselves is a preference an administrator has no reason to
         // overrule, and nothing is made less safe by honouring it.
@@ -722,7 +722,7 @@ mod tests {
 
     #[test]
     fn a_content_file_with_no_usable_extension_is_refused_whatever_the_lists_say() {
-        // Concept 5.1: there is no setting for this, because the dialog it
+        // DESIGN §5.1: there is no setting for this, because the dialog it
         // would otherwise raise offers every executable on the machine.
         let s = Stack {
             machine: Some(Layer {

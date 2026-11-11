@@ -1,4 +1,4 @@
-//! Windows' half of concept 9: a toast, with the buttons a question needs.
+//! Windows' half of DESIGN §9: a toast, with the buttons a question needs.
 //
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
@@ -9,17 +9,17 @@
 //! identity and `SetCurrentProcessExplicitAppUserModelID` agreeing with it —
 //! which `slipcase-desktop` looked at and declined, because a shortcut and a
 //! process declaring different identities is worse than neither declaring one.
-//! Concept 15 saw this coming and took the Store partly for it.
+//! DESIGN §15 saw this coming and took the Store partly for it.
 //!
 //! So [`Toast::connect`] failing is ordinary rather than exceptional: it is
 //! what happens when the binary is run from a checkout instead of from its
-//! package, and the answer is concept 9's floor. That is the same shape as the
+//! package, and the answer is DESIGN §9's floor. That is the same shape as the
 //! Linux arm, where no session bus means the terminal takes over.
 //!
 //! **Multi-threaded apartment, and the reason is the resident loop.** A `WinRT`
 //! event handler on a single-threaded apartment is delivered through the
 //! thread's message queue, and `resident::run` has no message pump — it is
-//! pumping watchers, which concept 8 makes the reason the process exists. In an
+//! pumping watchers, which DESIGN §8 makes the reason the process exists. In an
 //! MTA the callback arrives on a pool thread instead, which is what lets an
 //! answer be pushed into a queue the loop drains on its own turn. It is the
 //! same arrangement the Linux arm reaches by putting the bus signals on a
@@ -55,7 +55,7 @@ impl Toast {
     /// # Errors
     ///
     /// Where the process has no package identity, which is every run that is
-    /// not from the installed package. Concept 9's floor is the answer.
+    /// not from the installed package. DESIGN §9's floor is the answer.
     pub fn connect() -> windows::core::Result<Self> {
         apartment();
         // The call that needs the identity. Unpackaged it refuses, and that
@@ -218,7 +218,7 @@ impl Dialogs {
     }
 }
 
-/// Concept 12's native dialog, which this is the first thing to need.
+/// DESIGN §12's native dialog, which this is the first thing to need.
 ///
 /// **Returns the showing rather than doing it**, because where it runs is
 /// [`Dialogs`]'s decision and not this function's. The two callers want
@@ -287,7 +287,7 @@ fn apartment() {
 fn body(summary: &str, detail: &[String], choices: &[Choice], weight: Weight) -> String {
     let mut xml = String::from("<toast");
     // A question stays on screen until it is answered or taken back; a report
-    // goes when the person stops looking at it. Concept 9's weights are about
+    // goes when the person stops looking at it. DESIGN §9's weights are about
     // whether somebody asked for it, and this is the nearest thing the platform
     // offers to that distinction.
     if weight == Weight::Interrupt {
@@ -319,7 +319,7 @@ fn body(summary: &str, detail: &[String], choices: &[Choice], weight: Weight) ->
 
 /// The five characters XML will not take raw.
 ///
-/// A content file's name reaches here, and concept 9 already learned this on
+/// A content file's name reaches here, and DESIGN §9 already learned this on
 /// the other platform: a name carrying an ampersand or a quote would otherwise be
 /// markup, and the toast would either render wrongly or not parse at all.
 fn escape(text: &str) -> String {

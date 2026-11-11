@@ -6,8 +6,8 @@
 //! Where policy is read from, what opens a content file, and how the person is
 //! spoken to. They travel together because they are chosen together — once, by
 //! `main`, from what the machine turns out to be — and because the engine
-//! passes all three down the same path: concept 10 puts the policy decision
-//! immediately before the launch, and concept 5.1's warning is said about the
+//! passes all three down the same path: DESIGN §10 puts the policy decision
+//! immediately before the launch, and DESIGN §5.1's warning is said about the
 //! same content file in the same breath.
 //!
 //! Held as trait objects rather than as type parameters. The alternative
@@ -22,11 +22,11 @@ use crate::present::{Channel, Report, Weight};
 /// What the engine has been given to work with.
 #[derive(Clone, Copy)]
 pub struct Outside<'a> {
-    /// Concept 10's layers, in whatever form this platform keeps them.
+    /// DESIGN §10's layers, in whatever form this platform keeps them.
     pub policy: &'a dyn policy::Source,
-    /// Concept 5 step 7, which hands the content file to the desktop.
+    /// DESIGN §5 step 7, which hands the content file to the desktop.
     pub launcher: &'a dyn Launcher,
-    /// Concept 9, which narrates and asks.
+    /// DESIGN §9, which narrates and asks.
     pub channel: &'a dyn Channel,
     /// How much to say without being asked, resolved once when the instance
     /// started. See [`Notify`].

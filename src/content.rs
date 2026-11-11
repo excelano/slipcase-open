@@ -3,7 +3,7 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 5.1 settles that policy keys on the extension, because that is what
+//! DESIGN §5.1 settles that policy keys on the extension, because that is what
 //! `ShellExecuteEx`, `open` and `xdg-open` resolve a handler from and none of
 //! them reads the bytes. Sniffing a content type and checking policy against it
 //! would be checking a value with no bearing on what executes.

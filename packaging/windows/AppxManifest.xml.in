@@ -19,15 +19,15 @@
 
   WHAT IS DECIDED HERE
 
-  **The association is the whole product.** Concept 4 opens with the
+  **The association is the whole product.** DESIGN §4 opens with the
   double-click, and this file is where that becomes true on Windows: there is no
   freedesktop database to put a media type in, so the extension, the content
   type and the friendly name are declared here. The type and the extension come
   from SPEC 4 and are not this file's to choose; `Excelano.SlipcaseOpen` is the
   identity Partner Center assigned.
 
-  **The secondary verb, because the viewer claims the same extension.** Concept
-  4 says the two products contend for it, that last installed wins, and that the
+  **The secondary verb, because the viewer claims the same extension.** DESIGN
+  §4 says the two products contend for it, that last installed wins, and that the
   answer is not to engineer around it — so each registers a verb to stay one
   click away when it is not the default. "Open content file" is this product's,
   and without it a machine where the viewer won would have no route to this one
@@ -114,7 +114,7 @@
             </uap:SupportedFileTypes>
             <uap:DisplayName>Slipcase Container</uap:DisplayName>
             <uap:Logo>Assets\slipcase.png</uap:Logo>
-            <!-- Concept 4's secondary verb. The parameters are the path alone,
+            <!-- DESIGN §4's secondary verb. The parameters are the path alone,
                  which is what the default activation passes too, so the verb
                  and the double-click reach the same command. `main` reads a
                  lone path as `open` for exactly this reason. -->
@@ -123,7 +123,7 @@
             </uap2:SupportedVerbs>
           </uap3:FileTypeAssociation>
         </uap:Extension>
-        <!-- Concept 9 keeps the command line a shipped interface rather than
+        <!-- DESIGN §9 keeps the command line a shipped interface rather than
              a test harness, and a package without this has none: the binary
              under WindowsApps is ACL'd against being run directly, so every
              verb the command line offers would be unreachable from the

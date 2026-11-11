@@ -3,18 +3,18 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 9 makes this the floor: always present, the way the session list
+//! DESIGN §9 makes this the floor: always present, the way the session list
 //! stays reachable on a desktop that has no tray, and the harness the engine is
 //! driven by before the notifications and the tray exist.
 //!
-//! **Every verb is a client of the front door first.** Concept 8: where an
+//! **Every verb is a client of the front door first.** DESIGN §8: where an
 //! instance is running the invocation hands over and exits; where none is, an
 //! `open` becomes the instance and the rest do their work against the state
 //! directory, which is where the answer lives when nobody is holding anything.
 //!
 //! **The instance runs in the foreground and holds the terminal.** Detaching
-//! means `fork`, and this crate forbids `unsafe`; nothing in concept 8 asks for
-//! a background process, and from Phase 3 the tool is started from a desktop
+//! means `fork`, and this crate forbids `unsafe`; nothing in DESIGN §8 asks for
+//! a background process, and a double-click starts the tool from a desktop
 //! entry rather than a shell, where there is no terminal to hold. Interrupting
 //! it rather than closing its sessions leaves them recoverable, which is the
 //! crash path working as designed.
@@ -25,7 +25,7 @@
 //
 // A console subsystem binary always has a terminal, so `is_terminal` below was
 // answering yes to a double-click and the voice was the client's — which is the
-// branch where the instance says nothing through concept 9's channel, because a
+// branch where the instance says nothing through DESIGN §9's channel, because a
 // person is taken to be reading the lines it hands back. Measured on 2026-09-01
 // against the packaged build: the narration appeared in a console window that
 // stayed open for the life of the session, and no toast was ever raised.
@@ -55,7 +55,7 @@ use slipcase_open::{recover, session};
 /// write edits back into the container.
 ///
 /// Two lines rather than the table, and under `--help` rather than `-h`.
-/// Concept 9 keeps the command line the floor beneath everything else, and the
+/// DESIGN §9 keeps the command line the floor beneath everything else, and the
 /// thing read most often is the list of verbs: every line spent on paths here
 /// is a line between somebody and the verb they came for. `policy` is where the
 /// paths belong, because it prints the ones this machine resolves rather than
@@ -82,7 +82,7 @@ struct Cli {
     verb: Option<Verb>,
     /// A container to open, for an invocation that names no verb.
     ///
-    /// **The association is why this exists.** Concept 4 wants a double-click,
+    /// **The association is why this exists.** DESIGN §4 wants a double-click,
     /// and on Windows a packaged handler is launched with the file path and
     /// nothing else — there is no place in a manifest to put a verb in front of
     /// it, the way `Exec=slipcase-open open %f` does in the desktop entry. So a
@@ -133,7 +133,7 @@ type Fallible = Result<(), Box<dyn std::error::Error>>;
 
 /// A failure whoever needed to see it has already seen.
 ///
-/// Concept 9 puts the instance's narration on its channel, and on a machine
+/// DESIGN §9 puts the instance's narration on its channel, and on a machine
 /// with no notification service that channel is this program's own error
 /// stream. A refusal reported there and then returned to the top would appear
 /// in it twice. This carries the exit code and no second sentence.
@@ -157,7 +157,7 @@ fn main() -> ExitCode {
     //
     // **What is translated is what the tool says about your files** — a
     // notification, a question, a button on one, a line of `sessions`. There is
-    // no machine-readable output mode to protect: concept 9 makes the command
+    // no machine-readable output mode to protect: DESIGN §9 makes the command
     // line the floor beneath the notifications, which is a person reading
     // prose, not a script parsing columns.
     //
@@ -180,7 +180,7 @@ fn main() -> ExitCode {
         (Some(verb), _) => Some(verb),
         (None, Some(container)) => Some(Verb::Open(Open { container })),
         // Neither a verb nor a container. On Windows that is the Start tile
-        // being clicked, which concept 12 answers with the standing list; a
+        // being clicked, which DESIGN §12 answers with the standing list; a
         // packaged application whose tile does nothing is the first thing a
         // person sees of it. Everywhere else it is a command missing its verb.
         (None, None) => {
@@ -249,7 +249,7 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
     // matches against its table are the same file rather than two spellings.
     let container = std::fs::canonicalize(&a.container)
         .map_err(|e| format!("{}: {e}", a.container.display()))?;
-    // Concept 9. A double-click has no terminal, so the lines handed back here
+    // DESIGN §9. A double-click has no terminal, so the lines handed back here
     // go nowhere and the instance has to speak for this invocation. Asked of
     // the error stream because that is where this program's own messages go; a
     // run whose output is piped into something still has somewhere to show a
@@ -288,7 +288,7 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
 
     let channel = channel();
     let source = policy::for_this_platform();
-    // Resolved once and held for the life of the instance. Concept 10's warning
+    // Resolved once and held for the life of the instance. DESIGN §10's warning
     // about caching is about what may be opened, where a value held across a
     // policy push is a bypass; `flow::open` still resolves the lists itself on
     // every launch. How loud to be gates no decision.
@@ -298,8 +298,8 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
     let outside = Outside::new(&source, &Host, channel.as_ref()).saying(volume);
     report_policy(&outside);
 
-    // Before the first session, and with nothing live yet to protect. Concept
-    // 6.3: an unchanged leftover means nothing was lost, so it goes quietly.
+    // Before the first session, and with nothing live yet to protect. DESIGN
+    // §6.3: an unchanged leftover means nothing was lost, so it goes quietly.
     let _ = resident::sweep(root, &[]);
 
     let mut instance = Resident::new(root);
@@ -308,9 +308,9 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
     // **Raised before the exit decision rather than after it**, because whether
     // there is anywhere for a trouble to live is part of that decision.
     //
-    // Concept 5.1 says a refused container is told about in a way that cannot
+    // DESIGN §5.1 says a refused container is told about in a way that cannot
     // be missed "and the standing list carries it afterwards in the one colour
-    // reserved for it". A refusal holds no session, so concept 8's exit rule
+    // reserved for it". A refusal holds no session, so DESIGN §8's exit rule
     // was ending this process before the icon existed. Measured on 2026-09-06
     // against the installed package: on a cold double-click of a container that
     // must be refused, `standing` was never reached at all, while the same
@@ -332,7 +332,7 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
         // fail to reach an instance that is not there.
         drop(listener);
         // **But a refusal this invocation raised may still be on the screen.**
-        // Concept 12's box belongs to this process, and returning here is what
+        // DESIGN §12's box belongs to this process, and returning here is what
         // took it down before it had drawn — the whole of the defect measured
         // on 2026-09-06, where the first container refused after a restart said
         // nothing at all and the second, with an instance by then running, said
@@ -346,7 +346,7 @@ fn open(root: &Path, door: &Path, a: &Open) -> Fallible {
     }
 
     // Something is being held, and a refusal can be what is holding it.
-    // Concept 8 has an open on a container with a session left behind refuse
+    // DESIGN §8 has an open on a container with a session left behind refuse
     // *and* raise the recovery question, so returning on the refusal would end
     // the process that the question's buttons have to reach — and end it
     // without withdrawing them, which is the one thing `stand_down` exists to
@@ -398,11 +398,11 @@ fn see_out(outside: &Outside<'_>) {
     }
 }
 
-/// Concept 8's exit rule, as concept 5.1 and [`present::Standing::holding`]
+/// DESIGN §8's exit rule, as DESIGN §5.1 and [`present::Standing::holding`]
 /// amend it.
 ///
 /// Three facts and no state, so that the rule can be read and tested rather
-/// than traced through `open`. *Idle* is concept 8's own: no open session, none
+/// than traced through `open`. *Idle* is DESIGN §8's own: no open session, none
 /// lingering, no question outstanding. *Carrying* is something the icon has
 /// gone a colour for. *Showing* is whether this invocation has a surface that
 /// colour can appear on — which at a prompt it has not, and there the command
@@ -412,7 +412,7 @@ const fn has_a_reason_to_stay(idle: bool, carrying: bool, showing: bool) -> bool
     !idle || (carrying && showing)
 }
 
-/// Concept 9's channel, or the floor beneath it.
+/// DESIGN §9's channel, or the floor beneath it.
 ///
 /// The fallback is silent on purpose. A machine with no session bus is one
 /// where the command line is the interface, and announcing that the
@@ -457,8 +457,8 @@ fn sessions(root: &Path, door: &Path) -> Fallible {
             )
         );
         // Anything that is not quiet, which is a wider set than the ones
-        // needing a decision. Concept 6.3 as amended writes an edit back when
-        // its container is next opened, and this is concept 9's floor: what it
+        // needing a decision. DESIGN §6.3 writes an edit back when
+        // its container is next opened, and this is DESIGN §9's floor: what it
         // owes somebody reading it is the verb that does the same thing now,
         // whether or not the tool would eventually get there by itself.
         match state.course() {
@@ -510,7 +510,7 @@ fn recover_one(root: &Path, door: &Path, a: &Recover) -> Fallible {
         return Ok(());
     }
     if !a.write_back {
-        // Concept 6.3: recovery reports and never acts. Naming a session
+        // DESIGN §6.3: recovery reports and never acts. Naming a session
         // without saying what to do with it is a question, so this answers it
         // rather than choosing.
         println!("{}: {}", a.id, recover::state(&s));
@@ -529,7 +529,7 @@ fn recover_one(root: &Path, door: &Path, a: &Recover) -> Fallible {
     Ok(())
 }
 
-/// Concept 10 asks the interface to say when settings are administered, both to
+/// DESIGN §10 asks the interface to say when settings are administered, both to
 /// set expectations and to keep somebody from reporting that the application
 /// randomly refuses to open files.
 ///
@@ -555,7 +555,7 @@ fn report_policy(outside: &Outside<'_>) {
     }
 }
 
-/// Concept 10's layers, named rather than described.
+/// DESIGN §10's layers, named rather than described.
 ///
 /// **The paths are resolved and not documented.** Every one of them comes out
 /// of the environment — `XDG_CONFIG_HOME` and `XDG_STATE_HOME` here,
@@ -565,7 +565,7 @@ fn report_policy(outside: &Outside<'_>) {
 /// --show-origin` and `npm config ls -l` exist for the same reason.
 ///
 /// **Read here rather than asked of the instance.** There is nothing for the
-/// front door to add: concept 10 forbids holding what may be opened, so a
+/// front door to add: DESIGN §10 forbids holding what may be opened, so a
 /// running instance re-reads these files on every launch as well. The one
 /// value it does keep is how loud to be, and that is what it read when it
 /// started rather than what is in the file now — which is a reason to print
@@ -582,8 +582,8 @@ fn settings(root: &Path, door: &Path) -> Fallible {
 
     let layers = source.locations();
     if layers.is_empty() {
-        // macOS, until PLAN.md Phase 5. Said out loud, because a blank heading
-        // reads as a program that could not find its own configuration.
+        // A platform with no layer. Said out loud, because a blank heading reads
+        // as a program that could not find its own configuration.
         println!("No settings on this platform yet. The built-in set is what decides.");
     } else {
         println!("Where settings are read, in order of authority:");
@@ -658,7 +658,7 @@ fn settings(root: &Path, door: &Path) -> Fallible {
     let (speaks, refused) = how_it_speaks();
     println!("  {:<14}  {speaks}", "notifications");
     if let Some(why) = refused {
-        // Named here and nowhere else. Concept 9's fallback is silent on
+        // Named here and nowhere else. DESIGN §9's fallback is silent on
         // purpose — announcing it on every run would be the first thing this
         // tool said in an SSH session — but *where settings are read from* is
         // exactly the verb somebody reaches for when they are asking why
@@ -669,16 +669,16 @@ fn settings(root: &Path, door: &Path) -> Fallible {
     Ok(())
 }
 
-/// Concept 12's standing session list, where the platform has somewhere to put
+/// DESIGN §12's standing session list, where the platform has somewhere to put
 /// one.
 ///
 /// The same shape as [`channel`]: try the platform's, and fall back to the one
 /// that does nothing. A session with no shell has no tray, and that is ordinary.
-/// **Where a terminal started this there is no icon, and that is concept 9's
+/// **Where a terminal started this there is no icon, and that is DESIGN §9's
 /// own rule rather than a special case.** The command line is the floor beneath
 /// the tray: a terminal *is* a standing list, `sessions` answers the same
 /// question, and the person is looking at the output already. It is also what
-/// keeps concept 8's exit rule intact for that invocation — an `open` typed at
+/// keeps DESIGN §8's exit rule intact for that invocation — an `open` typed at
 /// a prompt that never returned would be a worse command than the one it
 /// replaced.
 ///
@@ -724,7 +724,7 @@ fn from_a_command_line() -> bool {
 }
 
 /// Nowhere else has a tray for this to gate, so the narrower question is the
-/// right one: concept 12 makes the command line the standing list on Linux
+/// right one: DESIGN §12 makes the command line the standing list on Linux
 /// whatever this answers.
 #[cfg(not(windows))]
 fn from_a_command_line() -> bool {
@@ -935,7 +935,7 @@ mod tests {
 
     #[test]
     fn an_open_session_stays_whether_or_not_anything_is_wrong() {
-        // Concept 8's rule, untouched: the watcher is the reason, not the icon.
+        // DESIGN §8's rule, untouched: the watcher is the reason, not the icon.
         for carrying in [false, true] {
             for showing in [false, true] {
                 assert!(

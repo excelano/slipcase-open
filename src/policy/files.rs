@@ -3,16 +3,16 @@
 // Author: David M. Anderson
 // Built with AI assistance (Claude, Anthropic)
 //
-//! Concept 10's four layers, as TOML documents. The paths are given rather than
+//! DESIGN §10's four layers, as TOML documents. The paths are given rather than
 //! discovered, so the precedence can be tested without three operating systems
 //! and so a test never reads a real machine's policy.
 //!
-//! **This is the portable shape and not the whole of concept 10.** Windows
+//! **This is the portable shape and not the whole of DESIGN §10.** Windows
 //! reads its two policy layers from the `Policies` registry subtree, which is
 //! access-controlled against standard users and cleaned up by Group Policy on
-//! unapply, and that is not a file and does not belong here. Concept 10 gives
+//! unapply, and that is not a file and does not belong here. DESIGN §10 gives
 //! macOS a configuration profile read through `CFPreferencesAppValueIsForced`,
-//! and that is not built: PLAN.md Phase 5 takes the file shape there instead,
+//! and that is not built: macOS takes the file shape instead,
 //! for as long as the channel is one that runs nothing as root at install.
 //! What is here is the shape Linux and macOS share, and the trait
 //! implementation every test uses.
@@ -77,7 +77,7 @@ impl Files {
         self.paths.iter().rev().map(|(o, p)| (*o, p.as_path()))
     }
 
-    /// The layers this platform keeps in files, at the places concept 10 names.
+    /// The layers this platform keeps in files, at the places DESIGN §10 names.
     ///
     /// Linux and macOS, and the same two places on both: a root-owned
     /// `/etc/slipcase` taking precedence over the user's own configuration
@@ -90,7 +90,7 @@ impl Files {
     ///
     /// There is no per-user *policy* layer on either, because neither has a
     /// mechanism in files that would administer one — `Origin::UserPolicy` is
-    /// Windows vocabulary, and the configuration profile concept 10 names for
+    /// Windows vocabulary, and the configuration profile DESIGN §10 names for
     /// macOS is not built. Inventing a file for it would be offering an
     /// administrator a control that nothing enforces.
     ///
@@ -277,7 +277,7 @@ mod tests {
 
     #[test]
     fn a_policy_file_that_will_not_parse_stops_the_decision() {
-        // The case concept 10 cares about most. Answering "says nothing" here
+        // The case DESIGN §10 cares about most. Answering "says nothing" here
         // would permit whatever the file was written to refuse, quietly, for as
         // long as the typo survives.
         let tmp = tempfile::tempdir().unwrap();
@@ -330,7 +330,7 @@ mod tests {
     fn a_machine_list_discards_what_the_user_added_beneath_it() {
         // The point of `replace` being the default. An administrator writing an
         // exhaustive list gets an exhaustive one, and the user's own additions
-        // sit beneath it and go — which is the whole reason concept 10 calls
+        // sit beneath it and go — which is the whole reason DESIGN §10 calls
         // append-by-default a silent hole.
         let tmp = tempfile::tempdir().unwrap();
         let machine = write(tmp.path(), "machine.toml", "allowed = [\"txt\"]\n");
@@ -426,7 +426,7 @@ mod tests {
 
     #[test]
     fn the_policy_file_the_package_ships_says_nothing() {
-        // Concept 10 makes `/etc/slipcase/open.toml` the highest layer on this
+        // DESIGN §10 makes `/etc/slipcase/open.toml` the highest layer on this
         // platform, so a stray uncommented line in the shipped file is a policy
         // nobody wrote being enforced on every machine that installs the
         // package. The file is documentation until an administrator edits it,
@@ -483,7 +483,7 @@ mod tests {
 
     #[test]
     fn a_machine_can_hold_the_volume_down_over_the_user() {
-        // The whole reason this lives in concept 10's chain rather than in a
+        // The whole reason this lives in DESIGN §10's chain rather than in a
         // settings file of its own: an administrator gets it for free, on every
         // platform, through the mechanism already specified.
         let tmp = tempfile::tempdir().unwrap();

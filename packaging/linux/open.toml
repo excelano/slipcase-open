@@ -1,6 +1,6 @@
 # Machine policy for slipcase-open, installed at /etc/slipcase/open.toml.
 #
-# Concept 10. This is the highest layer on Linux: root-owned, and taking
+# DESIGN §10. This is the highest layer on Linux: root-owned, and taking
 # precedence over the user's own configuration at
 # $XDG_CONFIG_HOME/slipcase-open/policy.toml. There is no per-user *policy*
 # layer here, because Linux has no mechanism that would administer one.

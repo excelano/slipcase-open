@@ -2,7 +2,7 @@
 <!--
   Group Policy definitions for Slipcase Open.
 
-  Concept 10 puts machine and user policy in the `Policies` subtree, which is
+  DESIGN §10 puts machine and user policy in the `Policies` subtree, which is
   access-controlled against standard users and which Group Policy cleans up when
   a policy is unapplied. This file is what puts those keys in front of an
   administrator by name instead of by regedit, and `src/policy/registry.rs` is
@@ -24,7 +24,7 @@
 
   `class="Both"` puts every setting under Computer Configuration and under User
   Configuration, writing HKLM and HKCU respectively. That is not a convenience:
-  concept 10's precedence has machine policy above user policy, and an ADMX
+  DESIGN §10's precedence has machine policy above user policy, and an ADMX
   offering only one of them would leave the other reachable by regedit alone.
 
   Author: David M. Anderson
