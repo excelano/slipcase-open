@@ -1,35 +1,13 @@
 [package]
 name = "slipcase-open"
 description = "Open the content file of a Slipcase container in its own application, and write edits back into the container"
+publish = false
 version = "0.3.0"
 edition = "2021"
 authors = ["David M. Anderson"]
 license = "MIT"
 repository = "https://github.com/excelano/slipcase-open"
 readme = "README.md"
-keywords = ["slipcase", "container", "gui", "egui"]
-categories = ["gui", "filesystem"]
-# Published since 2026-09-07, which reversed a decision recorded here on
-# 2026-09-01 and worth keeping the shape of. What this tool is for is the
-# double-click: the desktop entry, the media type `slipcase-common` declares,
-# and the policy file under `/etc`. A crate carries none of those, so
-# `cargo install slipcase-open` hands somebody DESIGN §9's command-line floor
-# with no association above it, and the symptom of the missing media type is
-# the one `packaging/linux/install.sh` warns about: a double-clicked container
-# opens the archive tool. The channels in DESIGN §15 carry the rest of it and
-# remain the way a person should install this. crates.io is the from-source
-# route for somebody who already has a toolchain, and README.md says what it
-# leaves out.
-#
-# One thing about the published crate is quietly broken, measured 2026-09-01
-# and unchanged: `cargo publish` strips the `testsupport` dev-dependency below,
-# a git dependency carrying no version, while still shipping the two unit tests
-# that call it, in `extract.rs` and `writeback.rs`. The verify step compiles
-# the library and the binary and not the tests, so it reports success, and
-# `cargo test` on the extracted crate then fails with two unresolved-crate
-# errors. `cargo install` never builds tests and a downstream dependency never
-# builds dev-dependencies, so nobody installing meets it; anyone running the
-# suite runs it from this checkout.
 # `slpc`'s floor, which is `zip`'s floor, which is a number nobody here chose.
 # It moves when that one does.
 rust-version = "1.88"

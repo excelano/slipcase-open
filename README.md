@@ -104,11 +104,6 @@ with this tool.
     ./packaging/linux/install.sh                    # into ~/.local
     ./packaging/linux/install.sh --prefix /usr/local --policy /etc
 
-`cargo install slipcase-open` builds the binary from crates.io and nothing
-else: no desktop entry, no media type, no policy file. That is the command
-line with no association above it, and a double-clicked container still opens
-the archive tool until `slipcase-common` and `install.sh` have run.
-
 **Windows**, as an MSIX package. `packaging/windows/README.md` has the build and
 the decisions behind it; the association, the *Open content file* verb on a
 container's context menu, and the command line all come from the package. There
