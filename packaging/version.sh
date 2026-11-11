@@ -3,8 +3,7 @@
 #
 # `Cargo.toml` holds the number and nothing else should. Three
 # artefacts want it in three shapes and two of them cannot be the plain string,
-# so one parser here rather than a `sed` in every build script. The reasoning
-# is slipcase-desktop's and so is the shape.
+# so one parser here rather than a `sed` in every build script.
 #
 #   ./packaging/version.sh              0.1.0     Cargo's own, and Debian's
 #   ./packaging/version.sh --appx       0.1.0.0   four parts, the Store requires

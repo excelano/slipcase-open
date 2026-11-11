@@ -95,8 +95,8 @@ function Save-Bitmap($bmp, [string] $path) {
     if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
     $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png)
     Step "wrote $path ($($bmp.Width) x $($bmp.Height))"
-    # The Store's floor, checked rather than assumed. A screenshot rejected at
-    # upload costs a round trip through a form nobody enjoys.
+    # The Store's floor, checked rather than assumed: the Store refuses a
+    # screenshot under it at upload.
     if ($bmp.Width -lt 1366 -or $bmp.Height -lt 768) {
         Write-Host "screenshot: WARNING $($bmp.Width)x$($bmp.Height) is under the Store's 1366x768 minimum" -ForegroundColor Yellow
     }
@@ -119,12 +119,12 @@ Add-Type -AssemblyName System.Windows.Forms
 
 # --- a window, by the process that owns it ----------------------------------
 #
-# **Matched on the owning process and not on the title**, which is a correction
-# rather than a preference. Matching `*Slipcase*` against every window title
-# found a terminal that happened to have the word in its tab, and it would have
-# photographed that: any window belonging to the person taking the screenshot --
-# an editor with the repository open, a browser on the Store listing -- can
-# carry the product's name. The process is what cannot be coincidence.
+# **Matched on the owning process and not on the title.** Matching
+# `*Slipcase*` against every window title can find a terminal that has the
+# word in its tab, and photograph that: any window belonging to the person
+# taking the screenshot -- an editor with the repository open, a browser on the
+# Store listing -- can carry the product's name. The process is what cannot be
+# coincidence.
 function Shoot-Window([string] $title, [string] $owner) {
     $deadline = (Get-Date).AddSeconds(30)
     $target = $null
@@ -170,9 +170,8 @@ if ($Refusal) {
     # a process started from a console is a command line -- which is the floor
     # DESIGN §9 puts beneath the tray, where there is no icon and no dialog to
     # wait for. So calling the verb straight out of this script photographs an
-    # invocation nobody makes: measured 2026-09-06, the box did not appear at
-    # all, and the same container opened through the launcher below showed the
-    # box and the icon every time.
+    # invocation nobody makes: the box does not appear at all, while the same
+    # container opened through the launcher below shows the box and the icon.
     #
     # `wscript.exe` is a GUI-subsystem host with no console, which is what
     # Explorer looks like to the process it starts.
@@ -203,9 +202,8 @@ Next
     Start-Process wscript.exe -ArgumentList "`"$launcher`"", "`"$Container`""
     # **The window is waited for and the desktop is what gets photographed.**
     # The box is about 370x210, and the Store's floor is 1366x768, so a capture
-    # of its frame alone is rejected at upload -- measured 2026-09-06, when this
-    # wrote an 8KB image the form would not take. Waiting for the window first
-    # is still what proves the refusal happened rather than the desktop being
+    # of its frame alone is refused at upload. Waiting for the window first is
+    # still what proves the refusal happened rather than the desktop being
     # photographed hopefully; `Shoot-Window`'s bitmap is discarded and only its
     # having found something is kept.
     #
