@@ -890,7 +890,7 @@ outside implementer would.
 
 A store and a package manager serve different people. A store listing is how
 somebody staring at an unopenable `.slpc` finds the thing that opens it; winget,
-Homebrew and apt serve the person who already knows what this is. That is the
+apt and a GitHub release serve the person who already knows what this is. That is the
 audience split §2 is built on.
 
 **Windows: the Microsoft Store.** An MSIX process reads an alternate data
@@ -903,8 +903,8 @@ One consequence for §10: an MSIX runs no code at install, so the package cannot
 place ADMX/ADML files into `PolicyDefinitions`. Ship those as a separate
 administrator download, which is how Microsoft ships its own.
 
-**macOS: Developer ID with notarization, through a Homebrew cask, and not the
-Mac App Store.** A sandboxed handover reaches the editor — `slipcase-desktop`'s
+**macOS: Developer ID with notarization, as a zip attached to each GitHub
+release, and not the Mac App Store.** A sandboxed handover reaches the editor — `slipcase-desktop`'s
 Open button extracts a content file and launches it from inside the sandbox —
 but the in-place swap §7 relies on is refused there, because the grant covers
 the file and not its directory. For a resident tool that is the first of four
@@ -913,7 +913,7 @@ needs a bookmark per session; a path in `argv` carries no grant, so §9's
 command-line floor cannot open a container; and `UNUserNotificationCenter`
 delivers an action to a relaunched bundle rather than to the instance holding
 the session. Every one of those lands in the engine, which §12 keeps to one
-implementation, so the cask leaves the engine untouched, and Finder's *Search
+implementation, so shipping outside the store leaves the engine untouched, and Finder's *Search
 App Store* for a `.slpc` is the viewer's to answer. `packaging/macos/README.md`
 carries the rest.
 

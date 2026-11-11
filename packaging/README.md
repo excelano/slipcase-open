@@ -3,7 +3,7 @@
 DESIGN §4 registers the association, DESIGN §10 puts machine policy under
 `/etc`, and DESIGN §15 chooses a channel per platform. This directory is
 those three for each of them: `linux` and `debian` below, `windows` for the
-MSIX and the Store, and `macos` for the bundle and the cask. The two
+MSIX and the Store, and `macos` for the bundle and the release zip. The two
 platform directories carry their own README with the decisions behind them.
 
 ## linux
@@ -96,7 +96,7 @@ file-type icon above, and this product has none of its own.
     ./packaging/macos/build-app.sh --universal --sign ID --notarize KEY ISSUER
 
 The bundle, the launcher that receives the double-click, Developer ID signing,
-notarization, and the cask in `excelano/homebrew-tap`. `macos/README.md` has
+notarization, and the zip attached to each release. `macos/README.md` has
 all of it, including why the channel is not the Mac App Store and what to
 check by hand.
 

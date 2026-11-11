@@ -110,14 +110,12 @@ container's context menu, and the command line all come from the package. There
 is no window: an icon by the clock takes its color from whether your work is
 where it should be, and its menu names the file.
 
-**macOS**, as a notarized application bundle through Homebrew:
-
-    brew install --cask excelano/tap/slipcase-open
-
-That puts `Slipcase Open.app` in `/Applications`, which registers the
-association, and links `slipcase-open` into the Homebrew prefix so the command
-line is on `PATH`. The zip the cask downloads is attached to each GitHub
-release and can be unpacked by hand instead. Not the Mac App Store, and
+**macOS**, as a notarized application bundle in
+`slipcase-open-VERSION-macos.zip`, attached to each
+[GitHub release](https://github.com/excelano/slipcase-open/releases/latest).
+Unzip it and move `Slipcase Open.app` into `/Applications`, which registers the
+association. The command line is `Contents/MacOS/slipcase-open` inside the
+bundle; link it onto `PATH` to use it from a shell. Not the Mac App Store, and
 `packaging/macos/README.md` says why: the sandbox would cost this tool its
 write-back path, its recovery, and its command line. There is no menu bar item
 and no notification on this platform.

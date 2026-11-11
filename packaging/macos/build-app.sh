@@ -1,4 +1,7 @@
 #!/bin/sh
+# Author: David M. Anderson
+# Built with AI assistance (Claude, Anthropic)
+#
 # Assemble `Slipcase Open.app`: the launcher that receives the document Finder
 # sends, the `slipcase-open` binary it hands that document to, the property
 # list that claims the type, and the icon. Signs it for Developer ID when asked,
@@ -51,7 +54,7 @@ usage: build-app.sh [--binary PATH] [--outdir DIR] [--universal] [--sign ID]
                  submit the signed bundle to Apple's notary service with the
                  App Store Connect API key at
                  ~/.appstoreconnect/private_keys/AuthKey_KEY_ID.p8, wait for
-                 the verdict, staple it, and write the zip a cask downloads:
+                 the verdict, staple it, and write the zip attached to the release:
                  slipcase-open-VERSION-macos.zip, holding the bundle and the
                  manual page. ISSUER is the Issuer ID from App Store Connect,
                  Users and Access, Integrations. Implies --universal, and
@@ -302,7 +305,7 @@ if [ -n "$key_id" ]; then
         exit 1
     }
 
-    # What the cask downloads: the bundle and the manual page, side by side.
+    # The release zip: the bundle and the manual page, side by side.
     shipping="${stage}/shipping"
     mkdir -p "$shipping"
     ditto "$app" "${shipping}/Slipcase Open.app"

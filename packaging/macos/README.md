@@ -1,7 +1,7 @@
 # macOS
 
 The application bundle, the launcher inside it, signing, notarization, and
-the Homebrew cask. Three files here and everything else is generated:
+the release zip. Three files here and everything else is generated:
 
     Info.plist.in    the bundle's property list, with @VERSION@ substituted
     launcher.swift   the bundle's executable, which receives the double-click
@@ -48,8 +48,7 @@ rather than measured here:
   relaunching it if it has gone, which is never the process holding the
   session.
 
-So the bundle is signed with Developer ID, notarized, and installed by a cask
-or by hand, and the engine is untouched: `writeback.rs`, `recover.rs`, and the
+So the bundle is signed with Developer ID, notarized, and installed by hand, and the engine is untouched: `writeback.rs`, `recover.rs`, and the
 command line all do on macOS what they do on Linux. What is given up
 is Finder's *Search App Store* for an unopenable `.slpc`, and that search is
 the viewer's to answer (DESIGN §15).
@@ -79,7 +78,7 @@ because there is no standing list on this platform for it to raise.
 
 `slipcase-open` sits in `Contents/MacOS` beside the launcher rather than
 under `Helpers`, so that the path a person symlinks or types is the obvious
-one. The cask's `binary` stanza links it into the Homebrew prefix.
+one.
 
 ## What to check by hand
 
@@ -122,7 +121,7 @@ ID, which is in App Store Connect under Users and Access, Integrations, and is
 deliberately written nowhere in this repository. It submits, waits, staples
 the ticket into the bundle, asks Gatekeeper for its verdict, and writes
 `dist/slipcase-open-VERSION-macos.zip` holding the bundle and the manual page,
-printing the SHA-256 the cask needs.
+and prints its SHA-256.
 
 **Which certificate does what.** A **Developer ID Application** identity signs
 what is distributed outside the Store and is the only path that involves
@@ -130,23 +129,19 @@ notarization; **Apple Development** signs a bundle that runs here and
 nowhere else; **Apple Distribution** is the Store's and is not used by this
 product.
 
-## The cask
+## The release zip
 
-The tap is `excelano/tap` and the cask is `slipcase-open`:
+`slipcase-open-VERSION-macos.zip` is attached to the GitHub release for the
+version, so a release here is: build, notarize, attach the zip. Moving
+`Slipcase Open.app` from it into `/Applications` registers the association
+without `lsregister`. The command line is `Contents/MacOS/slipcase-open`
+inside the bundle, for a person to link onto `PATH`, and the manual page
+`slipcase-open.1` sits beside the bundle in the zip.
 
-    brew install --cask excelano/tap/slipcase-open
-
-It installs `Slipcase Open.app` into `/Applications`, which registers the
-association without `lsregister`, links `slipcase-open` into the Homebrew
-prefix so the command line is on `PATH`, and installs the manual page. The
-cask points at the zip attached to the GitHub release for the version, with
-its SHA-256, so a release here is: build, notarize, attach the zip, then bump
-the cask.
-
-`brew uninstall --cask slipcase-open` removes the application and the links.
-`--zap` also removes `~/Library/Application Support/slipcase-open`, which is
-where sessions live — and a session there may hold an edit that has not been
-written back, so the cask says so rather than removing it quietly.
+Deleting the application removes the tool and leaves
+`~/Library/Application Support/slipcase-open`, which is where sessions live.
+A session there may hold an edit that has not been written back, so that
+directory is for a person to remove once `sessions` shows nothing open.
 
 ## Policy
 
