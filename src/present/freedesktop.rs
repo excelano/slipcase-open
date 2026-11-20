@@ -354,7 +354,11 @@ mod tests {
             "the question was not given an identifier"
         );
         desktop.withdraw("test-0");
-        assert!(desktop.identifiers_for("test-0").is_empty());
+        assert!(
+            desktop.identifiers_for("test-0").is_empty(),
+            "{:?}",
+            desktop.identifiers_for("test-0")
+        );
     }
 
     /// DESIGN §9 rests on a notification that persists somewhere the person can

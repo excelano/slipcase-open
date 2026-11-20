@@ -1437,7 +1437,11 @@ mod tests {
 
         assert_eq!(w.launcher.launched(), vec![left.content_dir()]);
         assert_eq!(w.channel.questions().len(), 2);
-        assert!(w.channel.withdrawn().is_empty());
+        assert!(
+            w.channel.withdrawn().is_empty(),
+            "{:?}",
+            w.channel.withdrawn()
+        );
         assert!(left.dir().exists());
         assert!(!r.is_idle());
     }
@@ -1646,7 +1650,11 @@ mod tests {
         let mut r = Resident::new(&root);
         ok(r.handle(opening(c), &w.outside()));
         assert_eq!(w.launcher.launched().len(), 1);
-        assert!(w.channel.questions().is_empty());
+        assert!(
+            w.channel.questions().is_empty(),
+            "{:?}",
+            w.channel.questions()
+        );
     }
 
     #[test]
@@ -1914,7 +1922,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let r = Resident::new(tmp.path().join("sessions"));
         assert_eq!(r.mood(), crate::present::Mood::Settled);
-        assert!(r.troubles().is_empty());
+        assert!(r.troubles().is_empty(), "{:?}", r.troubles());
     }
 
     #[test]
@@ -2042,7 +2050,7 @@ mod tests {
 
         let id = r.troubles()[0].id.clone();
         r.dismiss(&id);
-        assert!(r.troubles().is_empty());
+        assert!(r.troubles().is_empty(), "{:?}", r.troubles());
         assert_eq!(r.mood(), crate::present::Mood::Settled);
     }
 

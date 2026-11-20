@@ -617,7 +617,7 @@ mod tests {
             open(&root, &c, &Outside::new(&DenyAll, &launcher, &Silent)),
             Err(Error::Refused(_))
         ));
-        assert!(launcher.launched().is_empty());
+        assert!(launcher.launched().is_empty(), "{:?}", launcher.launched());
         assert!(crate::session::scan(&root).unwrap().is_empty());
     }
 

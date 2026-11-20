@@ -69,7 +69,6 @@ impl Files {
     ///
     /// A layer being listed says nothing about the file being there. Ask
     /// [`Source::layer`] for that, which reads it.
-    #[must_use]
     pub fn locations(&self) -> impl DoubleEndedIterator<Item = (Origin, &Path)> {
         // Ascending by authority in the map, because that is `Origin`'s order
         // and the resolution wants it that way; reversed here, because a person
@@ -442,7 +441,11 @@ mod tests {
             "the shipped file must not read as policy"
         );
         assert!(!effective.confirm_each_write_back);
-        assert!(effective.uncomparable_entries.is_empty());
+        assert!(
+            effective.uncomparable_entries.is_empty(),
+            "{:?}",
+            effective.uncomparable_entries
+        );
 
         // And the built-in set is what decides, which is the same statement
         // made from the other end.
