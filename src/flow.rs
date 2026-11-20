@@ -622,6 +622,34 @@ mod tests {
     }
 
     #[test]
+    fn a_version_1_0_container_is_refused_as_a_version_this_does_not_read() {
+        use std::io::Write;
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("sessions");
+        let c = tmp.path().join("old.slpc");
+        let mut w = zip::ZipWriter::new(fs::File::create(&c).unwrap());
+        let opts = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        w.start_file("slipcase.metadata.toml", opts).unwrap();
+        w.write_all(b"slipcase_version = \"1.0\"\n\n[payload]\nfile = \"a.txt\"\n")
+            .unwrap();
+        w.start_file("a.txt", opts).unwrap();
+        w.write_all(b"x").unwrap();
+        w.finish().unwrap();
+        let launcher = Recording::default();
+
+        match open(&root, &c, &Outside::new(&Default_, &launcher, &Silent)) {
+            Err(Error::Container(slpc::Error::Unsupported(slpc::Unsupported::Version(v)))) => {
+                assert_eq!(v, "1.0");
+            }
+            Err(e) => panic!("refused for the wrong reason: {e}"),
+            Ok(_) => panic!("a version 1.0 container was opened"),
+        }
+        assert!(launcher.launched().is_empty(), "{:?}", launcher.launched());
+        assert!(crate::session::scan(&root).unwrap().is_empty());
+    }
+
+    #[test]
     fn a_content_file_with_no_usable_extension_is_refused() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("sessions");
