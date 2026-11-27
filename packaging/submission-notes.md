@@ -20,7 +20,7 @@ answer against the product. 500 characters, newlines counted.
 ## The answers a form asks
 
     Category                  Productivity
-    Copyright and trademark   Excelano LLC
+    Copyright and trademark   David M. Anderson
     Additional license terms  blank; the application is MIT and the
                               repository carries the license
     Privacy policy            https://excelano.com/legal/#slipcase
